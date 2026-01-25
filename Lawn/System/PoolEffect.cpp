@@ -221,9 +221,11 @@ void PoolEffect::PoolEffectDraw(Sexy::Graphics* g, bool theIsNight)
         g->DrawTrianglesTex(IMAGE_POOL_BASE, aVertArray[0], 150);
         g->DrawTrianglesTex(IMAGE_POOL_SHADING, aVertArray[1], 150);
     }
-
     UpdateWaterEffect(g);
+    SDL_SetRenderTextureAddressMode(LawnApp::mSDLRenderer, SDL_TEXTURE_ADDRESS_WRAP, SDL_TEXTURE_ADDRESS_WRAP);
     g->DrawTrianglesTex(mCausticImage, aVertArray[2], 150);
+    SDL_SetRenderTextureAddressMode(LawnApp::mSDLRenderer, SDL_TEXTURE_ADDRESS_CLAMP, SDL_TEXTURE_ADDRESS_CLAMP);
+
 }
 
 void PoolEffect::PoolEffectUpdate()

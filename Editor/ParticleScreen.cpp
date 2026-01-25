@@ -9,6 +9,11 @@
 #include "../Sexy.TodLib/TodParticle.h"
 #include "../Sexy.TodLib/Definition.h"
 #include "../GameConstants.h"
+#include "../Sexy.TodLib/EffectSystem.h"
+
+#include <imgui.h>
+#include <backends/imgui_impl_sdl3.h>
+#include <backends/imgui_impl_sdlrenderer3.h>
 
 extern "C" {
 #include <tinyfiledialogs.h>
@@ -20,41 +25,22 @@ ParticleScreen::ParticleScreen(LawnApp* theApp) {
 	mApp = theApp;
 	mWidth = mApp->mWidth;
 	mHeight = mApp->mHeight;
-	mFont = new SysFont("Arial Unicode MS", 10, false, false, false);
 	mIsImported = false;
-	mParticleEffect = ParticleEffect::PARTICLE_MELONSPLASH;
-	InstantiateParticle(mParticleEffect);
+	mParticleDef = new TodParticleDefinition();
+	memcpy(mParticleDef, &gParticleDefArray[Rand() % ParticleEffect::NUM_PARTICLES], sizeof(TodParticleDefinition));
+	InstantiateParticle();
 	mIsDragging = false;
 	mDownX = 0;
 	mDownY = 0;
-	mViewX = -mWidth / 6;
+	mViewX = 0;
 	mViewY = 0;
 	mStartViewX = 0;
 	mStartViewY = 0;
-
-	mExportButton = MakeNewButton(EXPORT, this, _S("EXPORT"), mFont, Sexy::IMAGE_BLANK, Sexy::IMAGE_BLANK, Sexy::IMAGE_BLANK);
-	mExportButton->mColors[ButtonWidget::COLOR_LABEL] = Color::Black;
-	mExportButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = Color::Black;
-	mExportButton->mDoFinger = true;
-	mExportButton->mButtonImage = Sexy::IMAGE_BLANK;
-	mExportButton->mOverImage = Sexy::IMAGE_BLANK;
-	mExportButton->mDownImage = Sexy::IMAGE_BLANK;
-	mExportButton->Resize(mWidth - 90, 10, 80, 30);
-
-	mImportButton = MakeNewButton(IMPORT, this, _S("IMPORT"), mFont, Sexy::IMAGE_BLANK, Sexy::IMAGE_BLANK, Sexy::IMAGE_BLANK);
-	mImportButton->mColors[ButtonWidget::COLOR_LABEL] = Color::Black;
-	mImportButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = Color::Black;
-	mImportButton->mDoFinger = true;
-	mImportButton->mButtonImage = Sexy::IMAGE_BLANK;
-	mImportButton->mOverImage = Sexy::IMAGE_BLANK;
-	mImportButton->mDownImage = Sexy::IMAGE_BLANK;
-	mImportButton->Resize(mExportButton->mX - 90, 10, 80, 30);
+	mIsPaused = false;
+	mIsSysPaused = false;
 }
 
 ParticleScreen::~ParticleScreen() {
-	if (mFont) delete mFont;
-	delete mImportButton;
-	delete mExportButton;
 	gParticleTests.clear();
 }
 
@@ -64,14 +50,17 @@ void ParticleScreen::ResetParticle()
 		aParticle->ParticleSystemDie();
 	}
 	gParticleTests.clear();
-	InstantiateParticle(mParticleEffect);
+	InstantiateParticle();
 }
 
-void ParticleScreen::InstantiateParticle(ParticleEffect theParticleEffect)
+void ParticleScreen::InstantiateParticle()
 {
 	if (gParticleTests.size() >= 2) return;
 
-	TodParticleSystem* aParticle = mApp->AddTodParticle(mWidth / 2, mHeight / 2, 0, theParticleEffect);
+	TodParticleSystem* aParticle = mApp->mEffectSystem->mParticleHolder->mParticleSystems.DataArrayAlloc();
+	aParticle->mParticleHolder = mApp->mEffectSystem->mParticleHolder;
+	aParticle->TodParticleInitializeFromDef(mWidth / 2, mHeight / 2, 0, mParticleDef, ParticleEffect::PARTICLE_MELONSPLASH);
+
 	for (TodListNode<ParticleEmitterID>* aNode = aParticle->mEmitterList.mHead; aNode != nullptr; aNode = aNode->mNext) {
 		TodParticleEmitter* emitter = aParticle->mParticleHolder->mEmitters.DataArrayGet((unsigned int)aNode->mValue);
 		uint tempFlags = static_cast<uint>(emitter->mEmitterDef->mParticleFlags);
@@ -94,6 +83,7 @@ void ParticleScreen::Update() {
 	int aNewParticles = 0;
 
 	for (TodParticleSystem* aParticle : gParticleTests) {
+		aParticle->mDontUpdate = mIsPaused || mIsSysPaused;
 		aParticle->Update();
 
 		if (aParticle->mDead)
@@ -105,9 +95,12 @@ void ParticleScreen::Update() {
 		}
 	}
 
-	for (int i = 0; i < aNewParticles; i++) InstantiateParticle(mParticleEffect);
+	for (int i = 0; i < aNewParticles; i++) InstantiateParticle();
 
-	if (mIsDown && mWidgetManager->mLastMouseX < mWidth / 2 + mWidth / 4)
+	ImGuiIO& io = ImGui::GetIO();
+	bool imguiWantsMouse = io.WantCaptureMouse;
+
+	if (mIsDown && mWidgetManager->mLastMouseX < mWidth)
 	{
 		int dx = mWidgetManager->mLastMouseX - mStartMouseX;
 		int dy = mWidgetManager->mLastMouseY - mStartMouseY;
@@ -116,7 +109,7 @@ void ParticleScreen::Update() {
 		if (!mIsDragging && dragDistanceSquared > 16) 
 		{
 			mIsDragging = true;
-			mApp->SetCursor(CURSOR_DRAGGING);
+			if (!imguiWantsMouse) mApp->SetCursor(CURSOR_DRAGGING);
 			mDownX = mWidgetManager->mLastMouseX;
 			mDownY = mWidgetManager->mLastMouseY;
 			mStartViewX = mViewX;
@@ -128,14 +121,14 @@ void ParticleScreen::Update() {
 			mViewX = mStartViewX + (mWidgetManager->mLastMouseX - mDownX);
 			mViewY = mStartViewY + (mWidgetManager->mLastMouseY - mDownY);
 
-			mViewX = max(-mWidth / 2, min(mViewX, mWidth / 4));
+			mViewX = max(-mWidth + mWidth / 2, min(mViewX, mWidth / 2));
 			mViewY = max(-mWidth + mHeight, min(mViewY, mWidth - mHeight));
 		}
 	}
 	else if (mIsDragging)
 	{
 		mIsDragging = false;
-		mApp->SetCursor(CURSOR_POINTER);
+		if (!imguiWantsMouse) mApp->SetCursor(CURSOR_POINTER);
 	}
 }
 
@@ -144,7 +137,11 @@ void ParticleScreen::MouseUp(int x, int y, int theClickCount)
 	Widget::MouseUp(x, y, theClickCount);
 	
 	mIsDragging = false;
-	mApp->SetCursor(CURSOR_POINTER);
+
+	ImGuiIO& io = ImGui::GetIO();
+	bool imguiWantsMouse = io.WantCaptureMouse;
+
+	if (!imguiWantsMouse) mApp->SetCursor(CURSOR_POINTER);
 }
 
 void ParticleScreen::MouseDown(int x, int y, int theClickCount)
@@ -167,17 +164,15 @@ void ParticleScreen::Draw(Graphics* g) {
 		int theY = y * 50 + mViewY - aExtraHeight;
 		g->DrawLine(0, theY, mWidth, theY);
 	}
-	for (int x = 0; x < (mWidth / 2 + mWidth) / 50 + 1; x++)
+	for (int x = 0; x < (mWidth * 2) / 50 + 1; x++)
 	{
 		g->SetColor(Color(32, 32, 32));
-		int theX = x * 50 - mWidth / 4 + mViewX ;
+		int theX = x * 50 - mWidth / 2 + mViewX ;
 		g->DrawLine(theX, 0, theX, mHeight);
 	}
 	g->SetColor(Color(255, 0, 0));
-	g->DrawLine(0, screenZeroY-1, mWidth, screenZeroY-1);
 	g->DrawLine(0, screenZeroY, mWidth, screenZeroY);
 	g->SetColor(Color(0, 255, 0));
-	g->DrawLine(screenZeroX-1, 0, screenZeroX-1, mHeight);
 	g->DrawLine(screenZeroX, 0, screenZeroX, mHeight);
 	g->mTransX += mViewX;
 	g->mTransY += mViewY;
@@ -196,7 +191,7 @@ void ParticleScreen::Draw(Graphics* g) {
 			{
 				g->SetColor(Color(255, 255, 255));
 				float aRadius1 = FloatTrackEvaluate(def->mEmitterRadius, emitter->mSystemTimeValue, 1);
-				g->DrawCircle(mWidth / 2, mHeight / 2, aRadius1, (int)(aRadius1));
+				g->DrawCircle(mWidth / 2, mHeight / 2, aRadius1, (int)(aRadius1 / PI) * 180);
 			}
 			else if (def->mEmitterType == EmitterType::EMITTER_BOX || def->mEmitterType == EmitterType::EMITTER_BOX_PATH)
 			{
@@ -212,7 +207,6 @@ void ParticleScreen::Draw(Graphics* g) {
 				if (aParticleField->mFieldType == ParticleFieldType::FIELD_GROUND_CONSTRAINT) {
 					float theY = FloatTrackEvaluate(aParticleField->mY, 0, i) + mHeight / 2;
 					g->SetColor(Color(0, 0, 255));
-					g->DrawLine(-mViewX, theY - 1, -mViewX + mWidth, theY - 1);
 					g->DrawLine(-mViewX, theY, -mViewX + mWidth, theY);
 				}
 			}
@@ -221,64 +215,206 @@ void ParticleScreen::Draw(Graphics* g) {
 	}
 	
 	g->PopState();
-	g->PushState();
-	g->SetColor(Color::White);
-	g->FillRect(mWidth / 2 + mWidth / 4, 0, mWidth / 4, mHeight);
-	g->PopState();
-
-	int particles = 0;
-	for (TodParticleSystem* aParticle : gParticleTests) {
-		for (TodListNode<ParticleEmitterID>* aNode = aParticle->mEmitterList.mHead; aNode != nullptr; aNode = aNode->mNext) {
-			TodParticleEmitter* emitter = aParticle->mParticleHolder->mEmitters.DataArrayGet((unsigned int)aNode->mValue);
-			particles += emitter->mParticleList.mSize;
-		}
-	}
-	TodDrawString(g, StrFormat("Active Particles: %d", particles).c_str(), 10, 20, mFont, Color(200, 200, 200, 32), DrawStringJustification::DS_ALIGN_LEFT);
-	TodDrawString(g, "Particle Editor v1.0", 10, mHeight - 10, mFont, Color(200, 200, 200, 32), DrawStringJustification::DS_ALIGN_LEFT);
 }
 
 void ParticleScreen::AddedToManager(WidgetManager* theWidgetManager)
 {
 	Widget::AddedToManager(theWidgetManager);
-	AddWidget(mImportButton);
-	AddWidget(mExportButton);
 }
 
 //0x42F6B0
 void ParticleScreen::RemovedFromManager(WidgetManager* theWidgetManager)
 {
 	Widget::RemovedFromManager(theWidgetManager);
-	RemoveWidget(mImportButton);
-	RemoveWidget(mExportButton);
 }
 
 void ParticleScreen::ButtonDepress(int theId)
 {
-	if (theId == ParticleScreen::IMPORT)
-	{
-		const char* filterPatterns[] = { "*.xml", "*xml.compiled" };
 
-		const char* xmlPath = tinyfd_openFileDialog(
-			"Open",
-			NULL,
-			1,
-			filterPatterns,
-			"XML File",
-			0
-		);
-	}
 }
 
 void ParticleScreen::KeyDown(KeyCode theKey)
 {
 	Widget::KeyDown(theKey);
 
-	ParticleEffect mPreviousParticleEffect = mParticleEffect;
-	if (theKey == KeyCode::KEYCODE_NEXT)  mParticleEffect = (ParticleEffect)(mParticleEffect + 1);
-	else if (theKey == KeyCode::KEYCODE_PRIOR) mParticleEffect = (ParticleEffect)(mParticleEffect - 1);
-	if (mParticleEffect == ParticleEffect::PARTICLE_NONE) mParticleEffect = ParticleEffect::PARTICLE_KERNEL_SPLAT;
-	if (mParticleEffect == ParticleEffect::NUM_PARTICLES) mParticleEffect = ParticleEffect::PARTICLE_MELONSPLASH;
+	if (theKey == KeyCode::KEYCODE_SPACE) mIsPaused = !mIsPaused;
+}
 
-	if (theKey == KeyCode::KEYCODE_NEXT || theKey == KeyCode::KEYCODE_PRIOR)
-		ResetParticle();
+void ParticleScreen::PresetDown(TodParticleDefinition* theDef) {
+	memcpy(mParticleDef, theDef, sizeof(TodParticleDefinition));
+	ResetParticle();
+}
+
+bool openReloadPopup = false;
+bool showDebugger = false;
+
+void ParticleScreen::MenuBar() {
+	if (ImGui::BeginMainMenuBar())
+	{
+		if (ImGui::BeginMenu("File"))
+		{
+			if (ImGui::MenuItem("New File")) {
+				// func
+			}
+
+			if (ImGui::BeginMenu("Open Existing"))
+			{
+				ImGui::TextDisabled("Presets");
+				ImGui::Separator();
+
+				if (ImGui::BeginChild("PresetScroll", ImVec2(0.0f, ImGui::GetFrameHeight() * min(gParticleParamArraySize, 7)), false, ImGuiWindowFlags_None))
+				{
+					for (int i = 0; i < gParticleParamArraySize; i++) {
+						ParticleParams* aParam = &gParticleParamArray[i];
+						std::string name = aParam->mParticleFileName;
+						const std::string prefix = "particles\\";
+						if (name.rfind(prefix, 0) == 0) {
+							name.erase(0, prefix.length());
+						}
+						const std::string suffix = ".xml";
+						if (name.size() >= suffix.size() &&
+							name.compare(name.size() - suffix.size(), suffix.size(), suffix) == 0) {
+							name.erase(name.size() - suffix.size());
+						}
+
+						if (ImGui::MenuItem(name.c_str())) {
+							PresetDown(&gParticleDefArray[i]);
+						}
+					}
+
+					ImGui::EndChild();
+				}
+
+				ImGui::Separator();
+				ImGui::TextDisabled("From Disk");
+
+				if (ImGui::MenuItem("Open from file...")) {
+					const char* filterPatterns[] = { "*.xml", "*xml.compiled" };
+
+					const char* xmlPath = tinyfd_openFileDialog(
+						"Open",
+						NULL,
+						2,
+						filterPatterns,
+						"XML File / Compiled XML File",
+						0
+					);
+				}
+
+				ImGui::EndMenu();
+			}
+
+			if (ImGui::MenuItem("Reload File"))
+			{
+				openReloadPopup = true;
+			}
+
+			if (ImGui::MenuItem("Save File")) {
+				// func
+			}
+
+			if (ImGui::MenuItem("Export File")) {
+				// func
+			}
+			ImGui::EndMenu();
+		}
+
+		if (ImGui::BeginMenu("Windows"))
+		{
+			ImGui::MenuItem("Show Debugger", nullptr, &showDebugger);
+			ImGui::EndMenu();
+		}
+
+		if (ImGui::BeginMenu("Settings"))
+		{
+			ImGui::MenuItem("Preferences");
+			if (ImGui::BeginMenu("UI Theme")) {
+				if (ImGui::MenuItem("Classic (Default)")) ImGui::StyleColorsClassic();
+				if (ImGui::MenuItem("Light")) ImGui::StyleColorsLight();
+				if (ImGui::MenuItem("Dark")) ImGui::StyleColorsDark();
+				ImGui::EndMenu();
+			}
+			ImGui::EndMenu();
+		}
+
+		if (ImGui::BeginMenu("Help"))
+		{
+			if (ImGui::MenuItem("Documentation")) { /* open URL */ }
+			if (ImGui::MenuItem("About")) { /* show about popup */ }
+			ImGui::EndMenu();
+		}
+
+		ImGui::EndMainMenuBar();
+	}
+
+	if (openReloadPopup) {
+		ImGui::OpenPopup("Reload Warning");
+		openReloadPopup = false;
+		mIsSysPaused = true;
+	}
+
+	ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+	if (ImGui::BeginPopupModal("Reload Warning", nullptr, ImGuiWindowFlags_None | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::Text("WARNING");
+		ImGui::Separator();
+		ImGui::Text(
+			"Reloading will discard any unsaved changes.\n"
+			"This action cannot be undone."
+		);
+
+		ImGui::Spacing();
+		ImGui::Spacing();
+
+		if (ImGui::Button("Reload Anyway", ImVec2(150, 0)))
+		{
+			mIsSysPaused = false;
+			ResetParticle();
+			ImGui::CloseCurrentPopup();
+		}
+
+		ImGui::SameLine();
+
+		if (ImGui::Button("Cancel", ImVec2(150, 0)))
+		{
+			mIsSysPaused = false;
+			ImGui::CloseCurrentPopup();
+		}
+
+		ImGui::EndPopup();
+	}
+}
+
+void ParticleScreen::Debugger()
+{
+	if (!showDebugger) return;
+	ImGui::Begin("Debugger", &showDebugger, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+	const float fps = ImGui::GetIO().Framerate;
+	ImGui::Text("FPS: %.1f\n", fps);
+
+	int particles = 0;
+	int emitters = 0;
+	for (TodParticleSystem* aParticle : gParticleTests) {
+		for (TodListNode<ParticleEmitterID>* aNode = aParticle->mEmitterList.mHead; aNode != nullptr; aNode = aNode->mNext) {
+			TodParticleEmitter* emitter = aParticle->mParticleHolder->mEmitters.DataArrayGet((unsigned int)aNode->mValue);
+			particles += emitter->mParticleList.mSize;
+			emitters++;
+		}
+	}
+	ImGui::Text("Emitters: %d\n", emitters);
+	ImGui::Text("Particles: %d\n", particles);
+	ImGui::End();
+}
+
+void ParticleScreen::ImGuiDraw()
+{
+	ImGui_ImplSDLRenderer3_NewFrame();
+	ImGui_ImplSDL3_NewFrame();
+	ImGui::NewFrame();
+
+	ImGui::ShowDemoWindow();
+	Debugger();
+	MenuBar();
+	
+	ImGui::Render();
 }

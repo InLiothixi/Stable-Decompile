@@ -14,18 +14,11 @@ class NewLawnButton;
 
 class ParticleScreen : public Widget, public ButtonListener, public ScrollListener
 {
-private:
-	enum {
-		IMPORT,
-		EXPORT
-	};
 public:
 	LawnApp* mApp;
-	Font* mFont;
+	bool mIsSysPaused;
+	bool mIsPaused;
 	bool mIsImported;
-	ParticleEffect	mParticleEffect;
-	NewLawnButton* mImportButton;
-	NewLawnButton* mExportButton;
 	bool mIsDragging;
 	int mStartMouseX;
 	int mStartMouseY;
@@ -35,13 +28,14 @@ public:
 	int mStartViewY;
 	int mViewX;
 	int mViewY;
+	TodParticleDefinition* mParticleDef;
 
 public:
 	ParticleScreen(LawnApp* theApp);
 	~ParticleScreen();
 
 	void ResetParticle();
-	void InstantiateParticle(ParticleEffect theParticleEffect);
+	void InstantiateParticle();
 
 	virtual void Update();
 	virtual void Draw(Graphics* g);
@@ -50,9 +44,14 @@ public:
 	virtual void MouseDown(int x, int y, int theClickCount);
 	virtual void KeyDown(KeyCode theKey);
 	virtual void ButtonDepress(int theId);
-
 	void AddedToManager(WidgetManager* theWidgetManager);
 	void RemovedFromManager(WidgetManager* theWidgetManager);
+
+	void ImGuiDraw();
+	void MenuBar();
+	void Debugger();
+
+	void PresetDown(TodParticleDefinition* theDef);
 };
 
 extern std::vector<TodParticleSystem*> gParticleTests;

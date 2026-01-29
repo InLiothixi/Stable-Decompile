@@ -365,11 +365,14 @@ void AlmanacDialog::DrawPlants(Graphics* g)
 		}
 	}
 
+	g->PushState();
 	if (mSelectedSeed == SeedType::SEED_LILYPAD || mSelectedSeed == SeedType::SEED_TANGLEKELP || 
 		mSelectedSeed == SeedType::SEED_CATTAIL || mSelectedSeed == SeedType::SEED_SEASHROOM)
 	{
 		bool aNight = mSelectedSeed == SeedType::SEED_SEASHROOM;
+		g->SetLinearBlend(false);
 		g->DrawImage(aNight ? Sexy::IMAGE_ALMANAC_GROUNDNIGHTPOOL : Sexy::IMAGE_ALMANAC_GROUNDPOOL, 521, 107);
+		g->SetLinearBlend(true);
 
 		if (mApp->Is3DAccelerated())
 		{
@@ -382,12 +385,14 @@ void AlmanacDialog::DrawPlants(Graphics* g)
 	}
 	else
 	{
+		g->SetLinearBlend(false);
 		g->DrawImage(
 			Plant::IsNocturnal(mSelectedSeed) || mSelectedSeed == SeedType::SEED_GRAVEBUSTER || mSelectedSeed == SeedType::SEED_PLANTERN ? Sexy::IMAGE_ALMANAC_GROUNDNIGHT :
 			mSelectedSeed == SeedType::SEED_FLOWERPOT ? Sexy::IMAGE_ALMANAC_GROUNDROOF : Sexy::IMAGE_ALMANAC_GROUNDDAY,
 			521, 107
 		);
 	}
+	g->PopState();
 	
 	if (mPlant)
 	{

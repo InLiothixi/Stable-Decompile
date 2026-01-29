@@ -50,6 +50,7 @@ public:
 	void ImGuiDraw();
 	void MenuBar();
 	void Debugger();
+	void EmitterPannel();
 
 	void PresetDown(TodParticleDefinition* theDef);
 };

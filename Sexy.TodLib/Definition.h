@@ -39,7 +39,7 @@ public:
     const char* mSymbolName;                    //+0x4：标志位或枚举项的名称，为空指针时表示不存在该项，故被作为读取结束的标志
 };
 //extern DefSymbol gParticleFlagSymbols[];  //0x69E290
-//extern DefSymbol gEmitterTypeSymbols[];  //0x69E260
+extern DefSymbol gEmitterTypeSymbols[];  //0x69E260
 //extern DefSymbol gParticleTypeSymbols[];  //0x69E200
 
 // ====================================================================================================

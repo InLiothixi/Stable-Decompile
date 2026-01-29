@@ -10,6 +10,7 @@
 #include "../Sexy.TodLib/Definition.h"
 #include "../GameConstants.h"
 #include "../Sexy.TodLib/EffectSystem.h"
+#include "../SexyAppFramework/XMLParser.h"
 
 #include <imgui.h>
 #include <backends/imgui_impl_sdl3.h>
@@ -20,6 +21,16 @@ extern "C" {
 }
 
 std::vector<TodParticleSystem*> gParticleTests;
+
+bool showDebugger = false;
+bool showEmitterPanel = false;
+bool showGrid = true;
+bool showAxis = true;
+bool showSpawnArea = true;
+bool lockCamera = false;
+bool panInvertX = false;
+bool panInvertY = false;
+float panSens = 1.0f;
 
 ParticleScreen::ParticleScreen(LawnApp* theApp) {
 	mApp = theApp;
@@ -42,6 +53,8 @@ ParticleScreen::ParticleScreen(LawnApp* theApp) {
 
 ParticleScreen::~ParticleScreen() {
 	gParticleTests.clear();
+	delete mParticleDef;
+	mParticleDef = nullptr;
 }
 
 void ParticleScreen::ResetParticle()
@@ -59,7 +72,7 @@ void ParticleScreen::InstantiateParticle()
 
 	TodParticleSystem* aParticle = mApp->mEffectSystem->mParticleHolder->mParticleSystems.DataArrayAlloc();
 	aParticle->mParticleHolder = mApp->mEffectSystem->mParticleHolder;
-	aParticle->TodParticleInitializeFromDef(mWidth / 2, mHeight / 2, 0, mParticleDef, ParticleEffect::PARTICLE_MELONSPLASH);
+	aParticle->TodParticleInitializeFromDef(mWidth / 2, mHeight / 2, 0, mParticleDef, ParticleEffect::PARTICLE_NONE);
 
 	for (TodListNode<ParticleEmitterID>* aNode = aParticle->mEmitterList.mHead; aNode != nullptr; aNode = aNode->mNext) {
 		TodParticleEmitter* emitter = aParticle->mParticleHolder->mEmitters.DataArrayGet((unsigned int)aNode->mValue);
@@ -100,7 +113,7 @@ void ParticleScreen::Update() {
 	ImGuiIO& io = ImGui::GetIO();
 	bool imguiWantsMouse = io.WantCaptureMouse;
 
-	if (mIsDown && mWidgetManager->mLastMouseX < mWidth)
+	if (mIsDown && mWidgetManager->mLastMouseX < mWidth && !lockCamera)
 	{
 		int dx = mWidgetManager->mLastMouseX - mStartMouseX;
 		int dy = mWidgetManager->mLastMouseY - mStartMouseY;
@@ -118,8 +131,8 @@ void ParticleScreen::Update() {
 
 		if (mIsDragging)
 		{
-			mViewX = mStartViewX + (mWidgetManager->mLastMouseX - mDownX);
-			mViewY = mStartViewY + (mWidgetManager->mLastMouseY - mDownY);
+			mViewX = mStartViewX + (mWidgetManager->mLastMouseX - mDownX) * panSens * (panInvertX ? -1 : 1);
+			mViewY = mStartViewY + (mWidgetManager->mLastMouseY - mDownY) * panSens * (panInvertY ? -1 : 1);
 
 			mViewX = max(-mWidth + mWidth / 2, min(mViewX, mWidth / 2));
 			mViewY = max(-mWidth + mHeight, min(mViewY, mWidth - mHeight));
@@ -158,22 +171,28 @@ void ParticleScreen::Draw(Graphics* g) {
 	int screenZeroX = mViewX + mWidth / 2;
 	int screenZeroY = mViewY + mHeight / 2;
 	int aExtraHeight = mWidth - mHeight;
-	for (int y = 0; y < (aExtraHeight * 2 + mHeight) / 50 + 1; y++)
+	if (showGrid)
 	{
-		g->SetColor(Color(32, 32, 32));
-		int theY = y * 50 + mViewY - aExtraHeight;
-		g->DrawLine(0, theY, mWidth, theY);
+		for (int y = 0; y < (aExtraHeight * 2 + mHeight) / 50 + 1; y++)
+		{
+			g->SetColor(Color(32, 32, 32));
+			int theY = y * 50 + mViewY - aExtraHeight;
+			g->DrawLine(0, theY, mWidth, theY);
+		}
+		for (int x = 0; x < (mWidth * 2) / 50 + 1; x++)
+		{
+			g->SetColor(Color(32, 32, 32));
+			int theX = x * 50 - mWidth / 2 + mViewX;
+			g->DrawLine(theX, 0, theX, mHeight);
+		}
 	}
-	for (int x = 0; x < (mWidth * 2) / 50 + 1; x++)
+	if (showAxis)
 	{
-		g->SetColor(Color(32, 32, 32));
-		int theX = x * 50 - mWidth / 2 + mViewX ;
-		g->DrawLine(theX, 0, theX, mHeight);
+		g->SetColor(Color(255, 0, 0));
+		g->DrawLine(0, screenZeroY, mWidth, screenZeroY);
+		g->SetColor(Color(0, 255, 0));
+		g->DrawLine(screenZeroX, 0, screenZeroX, mHeight);
 	}
-	g->SetColor(Color(255, 0, 0));
-	g->DrawLine(0, screenZeroY, mWidth, screenZeroY);
-	g->SetColor(Color(0, 255, 0));
-	g->DrawLine(screenZeroX, 0, screenZeroX, mHeight);
 	g->mTransX += mViewX;
 	g->mTransY += mViewY;
 
@@ -185,26 +204,29 @@ void ParticleScreen::Draw(Graphics* g) {
 			TodParticleEmitter* emitter = aParticle->mParticleHolder->mEmitters.DataArrayGet((unsigned int)aNode->mValue);
 			TodEmitterDefinition* def = emitter->mEmitterDef;
 
-			if (def->mEmitterType == EmitterType::EMITTER_CIRCLE ||
-				def->mEmitterType == EmitterType::EMITTER_CIRCLE_PATH ||
-				def->mEmitterType == EmitterType::EMITTER_CIRCLE_EVEN_SPACING)
+			if (showSpawnArea)
 			{
-				g->SetColor(Color(255, 255, 255));
-				float aRadius1 = FloatTrackEvaluate(def->mEmitterRadius, emitter->mSystemTimeValue, 1);
-				g->DrawCircle(mWidth / 2, mHeight / 2, aRadius1, (int)(aRadius1 / PI) * 180);
-			}
-			else if (def->mEmitterType == EmitterType::EMITTER_BOX || def->mEmitterType == EmitterType::EMITTER_BOX_PATH)
-			{
-				g->SetColor(Color(255, 255, 255));
-				g->DrawRect(FloatTrackEvaluate(def->mEmitterBoxX, emitter->mSystemTimeValue, 0) + mWidth / 2, FloatTrackEvaluate(def->mEmitterBoxY, emitter->mSystemTimeValue, 0) + mHeight / 2,
-					-FloatTrackEvaluate(def->mEmitterBoxX, emitter->mSystemTimeValue, 0) + FloatTrackEvaluate(def->mEmitterBoxX, emitter->mSystemTimeValue, 1),
-					-FloatTrackEvaluate(def->mEmitterBoxY, emitter->mSystemTimeValue, 0) + FloatTrackEvaluate(def->mEmitterBoxY, emitter->mSystemTimeValue, 1));
+				if (def->mEmitterType == EmitterType::EMITTER_CIRCLE ||
+					def->mEmitterType == EmitterType::EMITTER_CIRCLE_PATH ||
+					def->mEmitterType == EmitterType::EMITTER_CIRCLE_EVEN_SPACING)
+				{
+					g->SetColor(Color(255, 255, 255));
+					float aRadius1 = FloatTrackEvaluate(def->mEmitterRadius, emitter->mSystemTimeValue, 1);
+					g->DrawCircle(mWidth / 2, mHeight / 2, aRadius1, (int)(aRadius1 / PI) * 180);
+				}
+				else if (def->mEmitterType == EmitterType::EMITTER_BOX || def->mEmitterType == EmitterType::EMITTER_BOX_PATH)
+				{
+					g->SetColor(Color(255, 255, 255));
+					g->DrawRect(FloatTrackEvaluate(def->mEmitterBoxX, emitter->mSystemTimeValue, 0) + mWidth / 2, FloatTrackEvaluate(def->mEmitterBoxY, emitter->mSystemTimeValue, 0) + mHeight / 2,
+						-FloatTrackEvaluate(def->mEmitterBoxX, emitter->mSystemTimeValue, 0) + FloatTrackEvaluate(def->mEmitterBoxX, emitter->mSystemTimeValue, 1),
+						-FloatTrackEvaluate(def->mEmitterBoxY, emitter->mSystemTimeValue, 0) + FloatTrackEvaluate(def->mEmitterBoxY, emitter->mSystemTimeValue, 1));
+				}
 			}
 
 			for (int i = 0; i < emitter->mEmitterDef->mParticleFieldCount; i++)
 			{
 				ParticleField* aParticleField = &emitter->mEmitterDef->mParticleFields[i];
-				if (aParticleField->mFieldType == ParticleFieldType::FIELD_GROUND_CONSTRAINT) {
+				if (aParticleField->mFieldType == ParticleFieldType::FIELD_GROUND_CONSTRAINT && showAxis) {
 					float theY = FloatTrackEvaluate(aParticleField->mY, 0, i) + mHeight / 2;
 					g->SetColor(Color(0, 0, 255));
 					g->DrawLine(-mViewX, theY, -mViewX + mWidth, theY);
@@ -246,7 +268,7 @@ void ParticleScreen::PresetDown(TodParticleDefinition* theDef) {
 }
 
 bool openReloadPopup = false;
-bool showDebugger = false;
+bool openAboutPopup = false;
 
 void ParticleScreen::MenuBar() {
 	if (ImGui::BeginMainMenuBar())
@@ -299,6 +321,20 @@ void ParticleScreen::MenuBar() {
 						"XML File / Compiled XML File",
 						0
 					);
+
+					TodTrace(xmlPath);
+
+
+					XMLParser aXMLParser = XMLParser();
+					if (!aXMLParser.OpenFile(xmlPath))
+					{
+						TodTrace("File not found!");
+
+					}
+					else
+					{
+						TodTrace("File Found!");
+					}
 				}
 
 				ImGui::EndMenu();
@@ -321,17 +357,39 @@ void ParticleScreen::MenuBar() {
 
 		if (ImGui::BeginMenu("Windows"))
 		{
+			ImGui::TextDisabled("Debug");
+			ImGui::Separator();
 			ImGui::MenuItem("Show Debugger", nullptr, &showDebugger);
+			ImGui::Separator();
+			ImGui::TextDisabled("Tools");
+			ImGui::MenuItem("Show Emitter Panel", nullptr, &showEmitterPanel);
 			ImGui::EndMenu();
 		}
 
 		if (ImGui::BeginMenu("Settings"))
 		{
-			ImGui::MenuItem("Preferences");
-			if (ImGui::BeginMenu("UI Theme")) {
+			ImGui::TextDisabled("Background");
+			ImGui::Separator();
+			ImGui::MenuItem("Show Grid", nullptr, &showGrid);
+			ImGui::MenuItem("Show Axes", nullptr, &showAxis);
+			ImGui::MenuItem("Show Spawn-area", nullptr, &showSpawnArea);
+			ImGui::Separator();
+			ImGui::TextDisabled("UI");
+			if (ImGui::BeginMenu("Theme")) {
 				if (ImGui::MenuItem("Classic (Default)")) ImGui::StyleColorsClassic();
 				if (ImGui::MenuItem("Light")) ImGui::StyleColorsLight();
 				if (ImGui::MenuItem("Dark")) ImGui::StyleColorsDark();
+				ImGui::EndMenu();
+			}
+			ImGui::Separator();
+			ImGui::TextDisabled("Camera");
+			ImGui::MenuItem("Lock Position", nullptr, &lockCamera);
+			if (ImGui::BeginMenu("Panning"))
+			{
+				ImGui::MenuItem("Invert X Direction", nullptr, &panInvertX);
+				ImGui::MenuItem("Invert Y Direction", nullptr, &panInvertY);
+				ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x * 0.5f + 20);
+				ImGui::SliderFloat("Speed", &panSens, 0.1f, 3.0f, "%.2fx");
 				ImGui::EndMenu();
 			}
 			ImGui::EndMenu();
@@ -340,7 +398,9 @@ void ParticleScreen::MenuBar() {
 		if (ImGui::BeginMenu("Help"))
 		{
 			if (ImGui::MenuItem("Documentation")) { /* open URL */ }
-			if (ImGui::MenuItem("About")) { /* show about popup */ }
+			if (ImGui::MenuItem("About")) {
+				openAboutPopup = true;
+			}
 			ImGui::EndMenu();
 		}
 
@@ -351,6 +411,11 @@ void ParticleScreen::MenuBar() {
 		ImGui::OpenPopup("Reload Warning");
 		openReloadPopup = false;
 		mIsSysPaused = true;
+	}
+
+	if (openAboutPopup) {
+		ImGui::OpenPopup("About");
+		openAboutPopup = false;
 	}
 
 	ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
@@ -383,14 +448,48 @@ void ParticleScreen::MenuBar() {
 
 		ImGui::EndPopup();
 	}
+
+	ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetCenter(), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+	if (ImGui::BeginPopupModal("About", nullptr, ImGuiWindowFlags_None | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		ImGui::Text("Particle Editor");
+		ImGui::SameLine();
+		ImGui::TextDisabled(" v0.1");
+		ImGui::Separator();
+		ImGui::Text(
+			"A particle-creator tool for\nthe original game \"Plants Vs Zombies (2009/GOTY)\".\n\n"
+		);
+		ImGui::Text("Made by @inliothixie");
+		ImGui::SameLine();
+		ImGui::TextDisabled(" with imgui");
+
+		ImGui::Spacing();
+		ImGui::Spacing();
+
+		if (ImGui::Button("Join Discord", ImVec2(150, 0)))
+		{
+			ShellExecute(NULL, _S("open"), "http://discord.com/invite/feJPyVt6HH", NULL, NULL, SW_SHOWNORMAL);
+		}
+
+		ImGui::SameLine();
+
+		if (ImGui::Button("Close", ImVec2(150, 0)))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+
+		ImGui::EndPopup();
+	}
 }
 
 void ParticleScreen::Debugger()
 {
 	if (!showDebugger) return;
-	ImGui::Begin("Debugger", &showDebugger, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse);
+	ImGuiViewport* vp = ImGui::GetMainViewport();
+	ImGui::SetNextWindowPos(ImVec2(vp->Pos.x + 10.0f, vp->Pos.y + vp->Size.y - 10.0f),ImGuiCond_Always, ImVec2(0.0f, 1.0f));	
+	ImGui::Begin("Debugger", &showDebugger, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize);
 	const float fps = ImGui::GetIO().Framerate;
-	ImGui::Text("FPS: %.1f\n", fps);
+	ImGui::Text("FPS: %.1f", fps);
 
 	int particles = 0;
 	int emitters = 0;
@@ -401,8 +500,77 @@ void ParticleScreen::Debugger()
 			emitters++;
 		}
 	}
-	ImGui::Text("Emitters: %d\n", emitters);
-	ImGui::Text("Particles: %d\n", particles);
+	ImGui::Text("Emitters: %d", emitters);
+	ImGui::Text("Particles: %d", particles);
+	ImGui::End();
+}
+
+
+void ParticleScreen::EmitterPannel()
+{
+	if (!showEmitterPanel) return;
+	ImGuiViewport* vp = ImGui::GetMainViewport();
+	ImGui::SetNextWindowPos(ImVec2(vp->Pos.x + 10.0f, vp->Pos.y + 30.0f), ImGuiCond_Always, ImVec2(0.0f, 0.0f));
+
+	ImGui::Begin("Emitter Pannel", &showEmitterPanel, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysAutoResize);
+
+	int emitterCount = 0;
+	for (TodParticleSystem* ps : gParticleTests)
+		for (auto* n = ps->mEmitterList.mHead; n; n = n->mNext)
+			emitterCount++;
+
+	ImGui::TextDisabled("Emitters (%d)", emitterCount);
+	ImGui::Separator();
+
+	ImGui::BeginChild("EmitterScroll", ImVec2(200.0f, ImGui::GetFrameHeight() * min(emitterCount, 7)), false, ImGuiWindowFlags_None);
+
+	if (ImGui::BeginTable("EmitterTable", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_SizingStretchSame))
+	{
+		ImGui::TableSetupColumn("Type");
+		ImGui::TableSetupColumn("Modify");
+		ImGui::TableSetupColumn("Delete");
+
+		for (int i = 0; i < mParticleDef->mEmitterDefCount; i++)
+		{
+			TodEmitterDefinition* def = &mParticleDef->mEmitterDefs[i];
+
+			ImGui::TableNextRow();
+
+			ImGui::TableNextColumn();
+			if (ImGui::Selectable(StrFormat("%s##sel%d", gEmitterTypeSymbols[0].mSymbolName, i).c_str(), false))
+			{
+			}
+
+			ImGui::TableNextColumn();
+			if (ImGui::SmallButton(StrFormat("Duplicate##%d", i).c_str()))
+			{
+				memcpy(&mParticleDef->mEmitterDefs[mParticleDef->mEmitterDefCount], def, sizeof(TodEmitterDefinition));
+				mParticleDef->mEmitterDefCount++;
+			}
+
+			ImGui::TableNextColumn();
+			if (ImGui::SmallButton(StrFormat("Delete##%d", i).c_str()))
+			{
+
+			}
+		}
+
+		ImGui::EndTable();
+	}
+
+	ImGui::EndChild();
+
+	ImGui::Spacing();
+	ImGui::Separator();
+	ImGui::Spacing();
+
+	if (ImGui::Button("Add Emitter"))
+	{
+		mParticleDef->mEmitterDefCount++;
+		TodEmitterDefinition emitter = mParticleDef->mEmitterDefs[mParticleDef->mEmitterDefCount] = TodEmitterDefinition();
+		memcpy(&emitter, &mParticleDef->mEmitterDefs[mParticleDef->mEmitterDefCount--], sizeof(TodEmitterDefinition));
+	}
+
 	ImGui::End();
 }
 
@@ -415,6 +583,7 @@ void ParticleScreen::ImGuiDraw()
 	ImGui::ShowDemoWindow();
 	Debugger();
 	MenuBar();
+	EmitterPannel();
 	
 	ImGui::Render();
 }

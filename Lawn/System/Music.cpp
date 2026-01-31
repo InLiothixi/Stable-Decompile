@@ -791,8 +791,9 @@ void Music::StartGameMusic()
 	else if (mApp->IsWallnutBowlingLevel() || mApp->IsWhackAZombieLevel() ||
 		mApp->IsLittleTroubleLevel() || mApp->IsBungeeBlitzLevel() ||
 		mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_SPEED 
-#ifdef _MOBILE_MINIGAMES
+#ifdef _DS_MINIGAMES
 		|| mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_HEAT_WAVE
+		|| mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZOMBIE_TRAP
 #endif
 		)
 	{

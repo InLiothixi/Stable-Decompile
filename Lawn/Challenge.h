@@ -73,6 +73,8 @@ public:
     int                     mTreeOfWisdomTalkIndex;                             //+0xB8
     int					    mShoutingCounter; // For Heatwave tolerance avoid powering by clapping...
     int                     mChallengePoints;
+    bool                    mHadInitBombs;
+    int                     mBombsLeft;
 
 public:
     Challenge();

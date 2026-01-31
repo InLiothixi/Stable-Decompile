@@ -344,6 +344,10 @@ namespace Sexy
         IMAGE_LENSEFLARE5_ID,
         IMAGE_LENSEFLARE6_ID,
         IMAGE_LENSEFLARE7_ID,
+        IMAGE_BOMB_INDICATOR_ID,
+        IMAGE_STRIPECROWS_ID,
+        IMAGE_CAGEICON_ID,
+        IMAGE_ZOMBIEMETALGEAR_ID,
         IMAGE_REANIM_WALLNUT_BODY_ID,
         IMAGE_REANIM_WALLNUT_CRACKED1_ID,
         IMAGE_REANIM_WALLNUT_CRACKED2_ID,
@@ -1656,6 +1660,10 @@ namespace Sexy
     extern Image* IMAGE_LENSEFLARE5;
     extern Image* IMAGE_LENSEFLARE6;
     extern Image* IMAGE_LENSEFLARE7;
+    extern Image* IMAGE_BOMB_INDICATOR;
+    extern Image* IMAGE_STRIPECROWS;
+    extern Image* IMAGE_CAGEICON;
+    extern Image* IMAGE_ZOMBIEMETALGEAR;
     extern int          SOUND_LAWNMOWER;                                        //0x6A79A8
     extern int          SOUND_BOSSBOULDERATTACK;                                //0x6A79AC
     extern Image* IMAGE_ICON_ROOFCLEANER;                                 //0x6A79B0

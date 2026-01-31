@@ -8841,7 +8841,7 @@ void Zombie::DieNoLoot()
     }
 #endif
 
-#ifdef _MOBILE_MINIGAMES
+#ifdef _DS_MINIGAMES
     if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_HEAT_WAVE)
     {
         int shooters = 0;

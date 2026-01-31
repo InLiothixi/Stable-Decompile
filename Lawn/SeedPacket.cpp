@@ -1233,7 +1233,15 @@ void SeedPacket::SetPacketType(SeedType theSeedType, SeedType theImitaterType)
 void SeedBank::UpdateConveyorBelt()
 {
 	mConveyorBeltCounter++;
-	if (mConveyorBeltCounter % CONVEYOR_SPEED == 0)
+
+	int speed = CONVEYOR_SPEED;
+
+#ifdef _DS_MINIGAMES
+	if (mApp->mGameMode == GAMEMODE_CHALLENGE_BOMB_ALL_TOGETHER)
+		speed = 0;
+#endif
+
+	if (speed != 0 && mConveyorBeltCounter % speed == 0)
 	{
 		for (int i = 0; i < mNumPackets; i++)
 		{
@@ -1244,6 +1252,13 @@ void SeedBank::UpdateConveyorBelt()
 			}
 		}
 
+		mBoard->UpdateToolTip();
+	}
+	else if (speed == 0) {
+		for (int i = 0; i < mNumPackets; i++) {
+			SeedPacket* aSeedPacket = &mSeedPackets[i];
+			aSeedPacket->mOffsetX = 0;
+		}
 		mBoard->UpdateToolTip();
 	}
 }

@@ -324,6 +324,8 @@ Challenge::Challenge()
 	mTreeOfWisdomTalkIndex = 0;
 	mShoutingCounter = -1;
 	mChallengePoints = 0;
+	mHadInitBombs = false;
+	mBombsLeft = -1;
 	for (int i = 0; i < 6; i++)
 		mReanimClouds[i] = REANIMATIONID_NULL;
 	memset(mBeghouledEated, 0, sizeof(mBeghouledEated));
@@ -430,7 +432,7 @@ void Challenge::StartLevel()
 		mBoard->mZombieCountDown = 200;
 		mBoard->mZombieCountDownStart = mBoard->mZombieCountDown;
 	}
-#ifdef _MOBILE_MINIGAMES
+#ifdef _DS_MINIGAMES
 	if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_HEAT_WAVE)
 	{
 		mBoard->mCursorObject->mCursorType = CURSOR_TYPE_GLOVE;
@@ -559,15 +561,23 @@ void Challenge::StartLevel()
 	}
 
 #ifdef _MOBILE_MINIGAMES
+	if (aGameMode == GameMode::GAMEMODE_CHALLENGE_BUTTERED_POPCORN)
+	{
+		mBoard->mCursorObject->mCursorType = CURSOR_TYPE_BUTTER;
+	}
+#endif
+
+#ifdef _DS_MINIGAMES
 	if (aGameMode == GameMode::GAMEMODE_CHALLENGE_HEAT_WAVE)
 	{
 		mBoard->DisplayAdvice(_S("[ADVICE_HEAT_WAVE]"), MESSAGE_STYLE_HINT_FAST, ADVICE_NONE);
 		mChallengeStateCounter = 2000;
 	}
-
-	if (aGameMode == GameMode::GAMEMODE_CHALLENGE_BUTTERED_POPCORN)
+	if (aGameMode == GameMode::GAMEMODE_CHALLENGE_BOMB_ALL_TOGETHER)
 	{
-		mBoard->mCursorObject->mCursorType = CURSOR_TYPE_BUTTER;
+		mBombsLeft = 25;
+		mBoard->ClearAdvice(ADVICE_NONE);
+		mBoard->DisplayAdvice("[ADVICE_BOMB_ALL_TOGETHER]", MESSAGE_STYLE_HINT_TALL_UNLOCKMESSAGE, ADVICE_NONE);
 	}
 #endif
 }
@@ -1409,12 +1419,13 @@ void Challenge::ClearCursor()
 		mBoard->mCursorObject->mCursorType = CURSOR_TYPE_HAMMER;
 	}
 
-#ifdef _MOBILE_MINIGAMES
+#ifdef _DS_MINIGAMES
 	if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_HEAT_WAVE)
 	{
 		mBoard->mCursorObject->mCursorType = CURSOR_TYPE_GLOVE;
 	}
-
+#endif
+#ifdef _MOBILE_MINIGAMES
 	if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_BUTTERED_POPCORN)
 	{
 		mBoard->mCursorObject->mCursorType = CURSOR_TYPE_BUTTER;
@@ -1678,6 +1689,10 @@ void Challenge::UpdateConveyorBelt()
 	if (mBoard->HasLevelAwardDropped())
 		return;
 
+	if (!mHadInitBombs && mBoard->mSeedBank->GetNumSeedsOnConveyorBelt() == 10) {
+		mHadInitBombs = true;
+	}
+
 	mBoard->mSeedBank->UpdateConveyorBelt();
 	mConveyorBeltCounter--;
 	if (mConveyorBeltCounter > 0)
@@ -1700,6 +1715,12 @@ void Challenge::UpdateConveyorBelt()
 	{
 		aConveyorSpeedMultiplier = 3.0f;
 	}
+#ifdef _DS_MINIGAMES
+	else if (mApp->mGameMode == GAMEMODE_CHALLENGE_BOMB_ALL_TOGETHER)
+	{
+		aConveyorSpeedMultiplier = 0.0f;
+	}
+#endif
 	int aNumSeedsOnConveyor = mBoard->mSeedBank->GetNumSeedsOnConveyorBelt();
 	mConveyorBeltCounter = aConveyorSpeedMultiplier * (aNumSeedsOnConveyor > 8 ? 1000 : aNumSeedsOnConveyor > 6 ? 500 : aNumSeedsOnConveyor > 4 ? 425 : 400);
 
@@ -1907,6 +1928,27 @@ void Challenge::UpdateConveyorBelt()
 		aSeedPickArray[5].mItem = SEED_ICESHROOM;
 		aSeedPickArray[5].mWeight = 10;
 	}
+#ifdef _DS_MINIGAMES
+	else if (mApp->mGameMode == GAMEMODE_CHALLENGE_BOMB_ALL_TOGETHER)
+	{
+		if (mBombsLeft > 0)
+		{
+			aSeedPickCount = 6;
+			aSeedPickArray[0].mItem = SEED_POTATOMINE;
+			aSeedPickArray[0].mWeight = 340;
+			aSeedPickArray[1].mItem = SEED_WALLNUT;
+			aSeedPickArray[1].mWeight = 340;
+			aSeedPickArray[2].mItem = SEED_CHERRYBOMB;
+			aSeedPickArray[2].mWeight = 25;
+			aSeedPickArray[3].mItem = SEED_JALAPENO;
+			aSeedPickArray[3].mWeight = 25;
+			aSeedPickArray[4].mItem = SEED_DOOMSHROOM;
+			aSeedPickArray[4].mWeight = 15;
+			aSeedPickArray[5].mItem = SEED_INSTANT_COFFEE;
+			aSeedPickArray[5].mWeight = 15;
+		}
+	}
+#endif
 	else TOD_ASSERT();
 
 	for (int i = 0; i < aSeedPickCount; i++)
@@ -1932,6 +1974,21 @@ void Challenge::UpdateConveyorBelt()
 		{
 			aSeedPick.mWeight = TodAnimateCurve(0, mApp->mGameMode == GAMEMODE_CHALLENGE_COLUMN ? 45 : 35, aTotalCount, aSeedPick.mWeight, 1, CURVE_LINEAR);
 		}
+
+#ifdef _DS_MINIGAMES
+		if (mApp->mGameMode == GAMEMODE_CHALLENGE_BOMB_ALL_TOGETHER)
+		{
+			if (aSeedType == SEED_POTATOMINE) {
+				aSeedPick.mWeight = TodAnimateCurve(0, 12, aTotalCount, aSeedPick.mWeight, 0, CURVE_LINEAR);
+			}
+			else if (aSeedType == SEED_WALLNUT) {
+				aSeedPick.mWeight = TodAnimateCurve(0, 12, aTotalCount, aSeedPick.mWeight, 0, CURVE_LINEAR);
+			}
+
+			if (aSeedPick.mWeight == 0)
+				continue;
+		}
+#endif
 
 		if (mApp->IsFinalBossLevel())
 		{
@@ -1980,7 +2037,19 @@ void Challenge::UpdateConveyorBelt()
 		}
 	}
 
+	if (aSeedPickCount == 0)
+		return;
+
 	SeedType aSeedType = (SeedType)TodPickFromWeightedArray(aSeedPickArray, aSeedPickCount);
+
+//#ifdef _DS_MINIGAMES
+//	if (mApp->mGameMode == GAMEMODE_CHALLENGE_BOMB_ALL_TOGETHER && mHadInitBombs && mBoard->mSeedBank->mNumPackets != mBoard->mSeedBank->GetNumSeedsOnConveyorBelt())
+//	{
+//		if (aSeedType == SEED_POTATOMINE || aSeedType == SEED_CHERRYBOMB || aSeedType == SEED_JALAPENO || aSeedType == SEED_DOOMSHROOM)
+//			mBombsLeft = max(0, mBombsLeft - 1);
+//	}
+//#endif
+
 	mBoard->mSeedBank->AddSeed(aSeedType);
 	mLastConveyorSeedType = aSeedType;
 }
@@ -2293,7 +2362,7 @@ void Challenge::Update()
 	{
 		LastStandUpdate();
 	}
-#ifdef _MOBILE_MINIGAMES
+#ifdef _DS_MINIGAMES
 	if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_HEAT_WAVE)
 	{
 		HeatWaveUpdate();
@@ -2514,6 +2583,12 @@ void Challenge::DrawBackdrop(Graphics* g)
 	{
 		g->DrawImageF(Sexy::IMAGE_WALLNUT_BOWLINGSTRIPE, 512, 73);
 	}
+#ifdef _DS_MINIGAMES
+	if (mApp->mGameMode == GAMEMODE_CHALLENGE_ZOMBIE_TRAP)
+	{
+		g->DrawImageF(Sexy::IMAGE_STRIPECROWS, 148, 178);
+	}
+#endif
 	g->PopState();
 
 	if (aGameMode == GAMEMODE_CHALLENGE_SLOT_MACHINE)
@@ -2524,6 +2599,15 @@ void Challenge::DrawBackdrop(Graphics* g)
 	{
 		mApp->mZenGarden->DrawBackdrop(g);
 	}
+
+#ifdef _DS_MINIGAMES
+	if (mApp->mGameMode == GAMEMODE_CHALLENGE_BOMB_ALL_TOGETHER && mApp->mGameScene == SCENE_PLAYING) {
+		g->DrawImage(IMAGE_BOMB_INDICATOR, 0, -9);
+		Rect labelRect = Rect(-12, 61, 96, 200);
+		TodDrawStringWrapped(g, to_string(mBombsLeft), labelRect, FONT_CONTINUUMBOLD14OUTLINE, Color::Black, DS_ALIGN_CENTER);
+		TodDrawStringWrapped(g, to_string(mBombsLeft), labelRect, FONT_CONTINUUMBOLD14, Color::White, DS_ALIGN_CENTER);
+	}
+#endif
 }
 
 //0x425460
@@ -2846,10 +2930,6 @@ void Challenge::InitZombieWaves()
 		//aList[ZOMBIE_DOG_WALKER] = true;
 	}
 #ifdef _MOBILE_MINIGAMES
-	else if (aGameMode == GameMode::GAMEMODE_CHALLENGE_HEAT_WAVE)
-	{
-		//
-	}
 	else if (aGameMode == GameMode::GAMEMODE_CHALLENGE_BUTTERED_POPCORN)
 	{
 		aList[ZOMBIE_NORMAL] = true;
@@ -2863,6 +2943,23 @@ void Challenge::InitZombieWaves()
 		aList[ZOMBIE_DOOR] = true;
 		aList[ZOMBIE_JACK_IN_THE_BOX] = true;
 		aList[ZOMBIE_GARGANTUAR] = true;
+	}
+#endif
+#ifdef _DS_MINIGAMES
+	else if (aGameMode == GameMode::GAMEMODE_CHALLENGE_HEAT_WAVE)
+	{
+		//
+	}
+	else if (aGameMode == GAMEMODE_CHALLENGE_BOMB_ALL_TOGETHER)
+	{
+		aList[ZOMBIE_NORMAL] = true;
+		aList[ZOMBIE_PAIL] = true;
+		aList[ZOMBIE_LADDER] = true;
+		aList[ZOMBIE_NEWSPAPER] = true;
+		aList[ZOMBIE_POGO] = true;
+		aList[ZOMBIE_FOOTBALL] = true;
+		aList[ZOMBIE_GARGANTUAR] = true;
+
 	}
 #endif
 	else if (mApp->mGameMode == GameMode::GAMEMODE_LAST_STAND_STAGE_1)
@@ -2958,7 +3055,7 @@ void Challenge::InitZombieWaves()
 	
 	if (mApp->CanSpawnYetis() && !mApp->IsWhackAZombieLevel() && !mApp->IsLittleTroubleLevel() && 
 		aGameMode != GameMode::GAMEMODE_CHALLENGE_POGO_PARTY
-#ifdef _MOBILE_MINIGAMES
+#ifdef _DS_MINIGAMES
 		&& aGameMode != GameMode::GAMEMODE_CHALLENGE_HEAT_WAVE
 #endif
 		&&

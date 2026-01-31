@@ -622,29 +622,36 @@ bool LawnApp::UpdateAppStep(bool* updated)
 							theChar = -1;
 						}
 
-						switch (event.key.key)
 						{
-						case SDLK_KP_HASH:   theChar = '#'; break;
-						case SDLK_PERCENT:   theChar = '%'; break;
-						case SDLK_DOLLAR:   theChar = '$'; break;
+							bool shift = (event.key.mod & SDL_KMOD_SHIFT) != 0;
+							switch (event.key.key)
+							{
+							case SDLK_EXCLAIM: theChar = '!'; break;
+							case SDLK_AT: theChar = '@'; break;
+							case SDLK_KP_HASH:   theChar = '#'; break;
+							case SDLK_DOLLAR:   theChar = '$'; break;
+							case SDLK_PERCENT:   theChar = '%'; break;
+							case SDLK_AMPERSAND:   theChar = '&'; break;
+							case SDLK_ASTERISK:   theChar = '*'; break;
 
-						case SDLK_KP_PLUS:   theChar = '+'; break;
-						case SDLK_KP_MINUS:  theChar = '-'; break;
-						case SDLK_KP_MULTIPLY: theChar = '*'; break;
-						case SDLK_SLASH:
-						case SDLK_KP_DIVIDE: theChar = '/'; break;
-						case SDLK_KP_PERIOD: theChar = '.'; break;
+							case SDLK_KP_PLUS:   theChar = '+'; break;
+							case SDLK_KP_MINUS:  theChar = '-'; break;
+							case SDLK_KP_MULTIPLY: theChar = '*'; break;
+							case SDLK_SLASH:
+							case SDLK_KP_DIVIDE: theChar = '/'; break;
+							case SDLK_KP_PERIOD: theChar = '.'; break;
 
-						case SDLK_KP_0: theChar = '0'; break;
-						case SDLK_KP_1: theChar = '1'; break;
-						case SDLK_KP_2: theChar = '2'; break;
-						case SDLK_KP_3: theChar = '3'; break;
-						case SDLK_KP_4: theChar = '4'; break;
-						case SDLK_KP_5: theChar = '5'; break;
-						case SDLK_KP_6: theChar = '6'; break;
-						case SDLK_KP_7: theChar = '7'; break;
-						case SDLK_KP_8: theChar = '8'; break;
-						case SDLK_KP_9: theChar = '9'; break;
+							case SDLK_KP_0: theChar = shift ? ')' : '0'; break;
+							case SDLK_KP_1: theChar = shift ? '!' : '1'; break;
+							case SDLK_KP_2: theChar = shift ? '@' : '2'; break;
+							case SDLK_KP_3: theChar = shift ? '#' : '3'; break;
+							case SDLK_KP_4: theChar = shift ? '$' : '4'; break;
+							case SDLK_KP_5: theChar = shift ? '%' : '5'; break;
+							case SDLK_KP_6: theChar = shift ? '^' : '6'; break;
+							case SDLK_KP_7: theChar = shift ? '&' : '7'; break;
+							case SDLK_KP_8: theChar = shift ? '*' : '8'; break;
+							case SDLK_KP_9: theChar = shift ? '(' : '9'; break;
+							}
 						}
 
 						if (theChar != -1 && theChar == 'D' && (mWidgetManager != NULL) && (mWidgetManager->mKeyDown[KEYCODE_CONTROL]) && (mWidgetManager->mKeyDown[KEYCODE_MENU]))
@@ -3293,7 +3300,11 @@ bool LawnApp::IsContinuousChallenge()
 		mGameMode == GameMode::GAMEMODE_CHALLENGE_BEGHOULED || 
 		mGameMode == GameMode::GAMEMODE_UPSELL || 
 		mGameMode == GameMode::GAMEMODE_INTRO || 
-		mGameMode == GameMode::GAMEMODE_CHALLENGE_BEGHOULED_TWIST;
+		mGameMode == GameMode::GAMEMODE_CHALLENGE_BEGHOULED_TWIST
+#ifdef _DS_MINIGAMES
+		|| mGameMode == GameMode::GAMEMODE_CHALLENGE_ZOMBIE_TRAP 
+#endif
+		;
 }
 
 bool LawnApp::IsArtChallenge()
@@ -3456,8 +3467,11 @@ bool LawnApp::IsChallengeWithoutSeedBank()
 		mGameMode == GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN || 
 		mGameMode == GameMode::GAMEMODE_TREE_OF_WISDOM 
 #ifdef _MOBILE_MINIGAMES
-		|| mGameMode == GameMode::GAMEMODE_CHALLENGE_HEAT_WAVE ||
-		mGameMode == GameMode::GAMEMODE_CHALLENGE_BUTTERED_POPCORN
+		|| mGameMode == GameMode::GAMEMODE_CHALLENGE_BUTTERED_POPCORN
+#endif
+#ifdef _DS_MINIGAMES
+		|| mGameMode == GameMode::GAMEMODE_CHALLENGE_HEAT_WAVE
+		|| mGameMode == GameMode::GAMEMODE_CHALLENGE_ZOMBIE_TRAP 
 #endif
 		;
 }
@@ -4777,7 +4791,7 @@ void LawnApp::KillLanguageScreen()
 bool LawnApp::ChallengeUsesMicrophone(GameMode theGameMode)
 {
 	return
-#ifdef _MOBILE_MINIGAMES
+#ifdef _DS_MINIGAMES
 		theGameMode == GameMode::GAMEMODE_CHALLENGE_HEAT_WAVE; // ||
 #endif
 		//theGameMode == GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN && gLawnApp->IsScreenSaver();

@@ -159,7 +159,7 @@ void CursorObject::Draw(Graphics* g)
                 mApp->mZenGarden->DrawPottedPlant(g, -22.0f, -38.0f, aPottedPlant, 1.0f, true);
             }
         }
-#ifdef _MOBILE_MINIGAMES
+#ifdef _DS_MINIGAMES
         else if (mApp->mGameMode == GAMEMODE_CHALLENGE_HEAT_WAVE) {
             if (mGlovePlantID != PLANTID_NULL)
             {

@@ -100,7 +100,7 @@ const int           STORESCREEN_PAGESTRING_Y = 500;
 
 //Ported from other editions
 #define _MOBILE_MINIGAMES
-//#define _DS_MINIGAMES
+#define _DS_MINIGAMES
 //#define _CONSOLE_MINIGAMES
 //#define _REPLANTED_SPEED_CONTROL
 //#define _HAS_NEW_GIGA_ZOMBIES
@@ -110,8 +110,8 @@ const int           STORESCREEN_PAGESTRING_Y = 500;
 //#define _HAS_HEALTHBAR_TOGGLE
 //#define _ALLOW_SWIPE
 //#define _HAS_GAMESELECTOR_SPOTLIGHT
-//#define _HAS_ANIMATED_WOOD_SIGN
-//#define _HAS_KERNELPULT_BUTTER_IDLE
+#define _HAS_ANIMATED_WOOD_SIGN
+#define _HAS_KERNELPULT_BUTTER_IDLE
 
 // Quirky stuff
 //#define _HAS_ROOF_SLOPE_ANGLE

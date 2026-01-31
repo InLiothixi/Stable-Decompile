@@ -105,16 +105,16 @@ ChallengeDefinition gChallengeDefs[NUM_CHALLENGE_MODES] = {
 	{ GameMode::GAMEMODE_LAST_STAND_ENDLESS_STAGE_5,           14,  ChallengePage::CHALLENGE_PAGE_LAST_STAND,   1,  4,  _S("[LAST_STAND_ROOF_ENDLESS]") },
 #ifdef _MOBILE_MINIGAMES
 	{ GameMode::GAMEMODE_CHALLENGE_VASEBREAKER,				   10,  ChallengePage::CHALLENGE_PAGE_LIMBO_CHALLENGE,       3,  2,  _S("[VASE_BREAKER]") },
-	{ GameMode::GAMEMODE_CHALLENGE_HEAT_WAVE,				   10,  ChallengePage::CHALLENGE_PAGE_LIMBO_CHALLENGE,       3,  3,  _S("[HEAT_WAVE]") },
-	{ GameMode::GAMEMODE_CHALLENGE_BUTTERED_POPCORN,		   10,  ChallengePage::CHALLENGE_PAGE_LIMBO_CHALLENGE,       3,  4,  _S("[BUTTERED_POPCORN]") },
+	{ GameMode::GAMEMODE_CHALLENGE_BUTTERED_POPCORN,		   10,  ChallengePage::CHALLENGE_PAGE_LIMBO_CHALLENGE,       3,  3,  _S("[BUTTERED_POPCORN]") },
 #endif
 #ifdef _DS_MINIGAMES
-	{ GameMode::GAMEMODE_CHALLENGE_BOMB_ALL_TOGETHER,		   10,  ChallengePage::CHALLENGE_PAGE_LIMBO_CHALLENGE,       3,  3,  _S("[BOMB_ALL_TOGETHER]") },
-	{ GameMode::GAMEMODE_CHALLENGE_HOMERUN_DERBY,			   10,  ChallengePage::CHALLENGE_PAGE_LIMBO_CHALLENGE,       4,  0,  _S("[HOMERUN_DERBY]") },
+	{ GameMode::GAMEMODE_CHALLENGE_HEAT_WAVE,				   10,  ChallengePage::CHALLENGE_PAGE_LIMBO_CHALLENGE,       3,  4,  _S("[HEAT_WAVE]") },
+	{ GameMode::GAMEMODE_CHALLENGE_BOMB_ALL_TOGETHER,		   10,  ChallengePage::CHALLENGE_PAGE_LIMBO_CHALLENGE,       4,  0,  _S("[BOMB_ALL_TOGETHER]") },
+	{ GameMode::GAMEMODE_CHALLENGE_HOMERUN_DERBY,			   10,  ChallengePage::CHALLENGE_PAGE_LIMBO_CHALLENGE,       4,  1,  _S("[HOMERUN_DERBY]") },
 	{ GameMode::GAMEMODE_CHALLENGE_ZOMBIE_TRAP,				   10,  ChallengePage::CHALLENGE_PAGE_LIMBO_CHALLENGE,       4,  2,  _S("[ZOMBIE_TRAP]") },
 #endif
 #ifdef _CONSOLE_MINIGAMES
-	{ GameMode::GAMEMODE_CHALLENGE_HEAVY_WEAPON,			   10,  ChallengePage::CHALLENGE_PAGE_LIMBO_CHALLENGE,       4,  1,  _S("[HEAVY_WEAPON]") },
+	{ GameMode::GAMEMODE_CHALLENGE_HEAVY_WEAPON,			   10,  ChallengePage::CHALLENGE_PAGE_LIMBO_CHALLENGE,       4,  3,  _S("[HEAVY_WEAPON]") },
 #endif
 };
 
@@ -408,23 +408,6 @@ int ChallengeScreen::MoreTrophiesNeeded(int theChallengeIndex)
 			int aNumTrophies = mApp->GetNumTrophies(aDef.mPage);
 			if (aDef.mPage == CHALLENGE_PAGE_LIMBO_CHALLENGE || aDef.mPage == CHALLENGE_PAGE_LIMBO_SURVIVAL)
 			{
-#ifdef _DS_MINIGAMES
-				if (aDef.mChallengeMode == GameMode::GAMEMODE_CHALLENGE_BOMB_ALL_TOGETHER ||
-					aDef.mChallengeMode == GameMode::GAMEMODE_CHALLENGE_HOMERUN_DERBY ||
-					aDef.mChallengeMode == GameMode::GAMEMODE_CHALLENGE_HEAVY_WEAPON ||
-					aDef.mChallengeMode == GameMode::GAMEMODE_CHALLENGE_ZOMBIE_TRAP)
-				{
-					return 1;
-				}
-#endif
-#ifdef _CONSOLE_MINIGAMES
-
-				if (aDef.mChallengeMode == GameMode::GAMEMODE_CHALLENGE_HEAVY_WEAPON)
-				{
-					return 1;
-				}
-#endif
-
 				return 0;
 			}
 			if (mApp->IsSurvivalEndless(aDef.mChallengeMode))
@@ -491,7 +474,7 @@ void ChallengeScreen::UpdateButtons()
 			else
 				aButton->Resize(38 + aColumn * 155, 125 + aRow * 145 - mScrollbar->mScrollValue, 104, 115);
 
-			aButton->mDisabled = (MoreTrophiesNeeded(aChallengeMode) > 0) || (aButton->mY + aButton->mHeight <= mScrollbar->mY || aButton->mY >= mScrollbar->mY + mScrollbar->mHeight);
+			aButton->mDisabled = (MoreTrophiesNeeded(aChallengeMode) > 0) /*|| (aButton->mY + aButton->mHeight < mScrollbar->mY || aButton->mY > mScrollbar->mY + mScrollbar->mHeight)*/;
 			aButton->mDoFinger = !aButton->mDisabled;
 		}
 	}
@@ -712,11 +695,7 @@ void ChallengeScreen::DrawButton(Graphics* g, int theChallengeIndex)
 			}
 			else if (aRecord > 0)
 			{
-				if (mApp->HasBeatenChallenge(aDef.mChallengeMode) 
-#ifdef _DS_MINIGAMES
-					&& !(aDef.mChallengeMode >= GameMode::GAMEMODE_CHALLENGE_BOMB_ALL_TOGETHER && aDef.mChallengeMode <= GameMode::GAMEMODE_CHALLENGE_ZOMBIE_TRAP)
-#endif
-					)
+				if (mApp->HasBeatenChallenge(aDef.mChallengeMode))
 				{
 					g->DrawImage(Sexy::IMAGE_MINIGAME_TROPHY, aPosX - 6, aPosY - 2);
 				}
@@ -982,12 +961,6 @@ void ChallengeScreen::UpdateToolTip()
 				{
 					aLabel = _S("[ONE_MORE_LAST_STAND_TOOLTIP]");
 				}
-#ifdef _DS_MINIGAMES
-				else if (aDef.mChallengeMode >= GameMode::GAMEMODE_CHALLENGE_BOMB_ALL_TOGETHER && aDef.mChallengeMode <= GameMode::GAMEMODE_CHALLENGE_ZOMBIE_TRAP)
-				{
-					aLabel = _S("[COMING_SOON]");
-				}
-#endif
 				else continue;
 
 				mToolTip->SetLabel(aLabel);

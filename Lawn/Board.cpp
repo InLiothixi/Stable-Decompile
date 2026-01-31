@@ -107,7 +107,6 @@ Board::Board(LawnApp* theApp)
 	mCameraTranform.LoadIdentity();
 	mCameraClipRect = mApp->gBoardBounds;
 	mCameraColor = Color::White;
-	mCameraFilter = FilterEffect::FILTER_EFFECT_NONE;
 	mDrawOnlyCamera = true;
 	mPaused = false;
 	mLevelAwardSpawned = false;
@@ -9427,7 +9426,7 @@ void Board::Draw(Graphics* g)
 {
 	if (mApp->GetDialog(Dialogs::DIALOG_STORE) || mApp->GetDialog(Dialogs::DIALOG_ALMANAC))
 		return;
-
+	g->PushState();
 	g->SetLinearBlend(true);
 
 	if (mDrawCount && mCutScene->mPreloaded)
@@ -9453,14 +9452,7 @@ void Board::Draw(Graphics* g)
 
 	mDrawCount++;
 	DrawGameObjects(g);
-
-	if (mCameraTranform.m01 != 0 || mCameraTranform.m02 != 0 || mCameraTranform.m10 != 0 || mCameraTranform.m12 != 0 || mCameraTranform.m20 != 0 || mCameraTranform.m21 != 0 ||
-		mCameraTranform.m00 != 1 || mCameraTranform.m11 != 1 || mCameraTranform.m22 != 1 || mCameraColor != Color::White || !(mCameraClipRect == mApp->gBoardBounds) || mCameraFilter != FilterEffect::FILTER_EFFECT_NONE) // if no transform then do not render camera
-	{
-		SexyTransform2D aTransform;
-		TodScaleRotateTransformMatrix(aTransform, mCameraTranform.m02 + mApp->gBoardBounds.mWidth / 2, mCameraTranform.m12 + mApp->gBoardBounds.mHeight / 2, 0, mCameraTranform.m00, mCameraTranform.m11);
-		mApp->DrawBoardCamera(g, aTransform, mCameraColor, Graphics::DRAWMODE_NORMAL, mCameraClipRect, mCameraFilter, mDrawOnlyCamera);
-	}
+	g->PopState();
 }
 
 //0x41AE60

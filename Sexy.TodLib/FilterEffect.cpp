@@ -2,6 +2,8 @@
 #include "TodCommon.h"
 #include "FilterEffect.h"
 #include "../SexyAppFramework/MemoryImage.h"
+#include "../LawnApp.h"
+#include "../SexyAppFramework/SDL3Image.h"
 
 //0x446B80
 void RGB_to_HSL(float r, float g, float b, float& h, float& s, float& l)

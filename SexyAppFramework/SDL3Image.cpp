@@ -76,6 +76,10 @@ SDL3Image::SDL3Image(SDL_Renderer* renderer)
 
 SDL3Image::~SDL3Image()
 {
+    if ((SDL_Texture*)mD3DData)
+    {
+        SDL_DestroyTexture((SDL_Texture*)mD3DData);
+    }
 }
 
 bool SDL3Image::PolyFill3D(const Point theVertices[], int theNumVertices, const Rect* theClipRect, const Color& theColor, int theDrawMode, int tx, int ty, bool convex)

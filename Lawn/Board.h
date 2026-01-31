@@ -148,7 +148,6 @@ public:
 	SexyTransform2D					mCameraTranform;
 	Color							mCameraColor;
 	Rect							mCameraClipRect;
-	FilterEffect					mCameraFilter;
 	bool							mDrawOnlyCamera;
 	bool							mPaused;												//+0x164
 	ReanimationID					mBushesID[6];

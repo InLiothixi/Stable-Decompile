@@ -93,6 +93,8 @@ extern "C" {
 
 #include <SDL3_ttf/SDL_ttf.h>
 
+#include <thread>
+
 bool LawnApp::mIsPlayingVideo = false;
 
 // I wouldn't be able to make this without Codotaku. Huge W for them
@@ -144,6 +146,7 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 	bool willShutdown = false;
 
 	Uint64 start_ns = 0;
+	Uint64 curElapsed = 0;
 
 	while (av_read_frame(format_context, packet) >= 0) {
 		mLastUserInputTick = mLastTimerTime;
@@ -263,46 +266,61 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 			break;
 		}
 
-		if (packet->stream_index == video_stream_index) {
-			avcodec_send_packet(video_decoder, packet);
-			while (avcodec_receive_frame(video_decoder, frame) == 0) {
-				const double frame_time_s = (double)frame->pts * av_q2d(video_stream->time_base);
-				if (start_ns == 0) start_ns = SDL_GetTicksNS();
-				const Uint64 elapsed_time_ns = SDL_GetTicksNS() - start_ns;
-				const double elapsed_time_s = (double) elapsed_time_ns / SDL_NS_PER_SECOND;
-				const double delay_s = frame_time_s - elapsed_time_s;
-				if (delay_s > 0) SDL_Delay((Uint32) (delay_s * SDL_MS_PER_SECOND));
-				else if (delay_s < -0.5) continue;
-				
-				SDL_UpdateYUVTexture(texture, NULL,
-					frame->data[0], frame->linesize[0],
-					frame->data[1], frame->linesize[1],
-					frame->data[2], frame->linesize[2]);
+		std::vector<std::thread> _jobs;
 
-				//int w, h;
-				//SDL_GetCurrentRenderOutputSize(mSDLRenderer, &w, &h);
-				const float frame_width = (float)video_decoder->width;
-				const float frame_height = (float)video_decoder->height;
-				const float scale_w = (float)mWidth / frame_width;
-				const float scale_h = (float)mHeight / frame_height;
-				const float scale = SDL_max(scale_w, scale_h);
-				SDL_FRect dstrect;
-				dstrect.w = frame_width * scale;
-				dstrect.h = frame_height * scale;
-				dstrect.x = ((float)mWidth - dstrect.w) / 2;
-				dstrect.y = ((float)mHeight - dstrect.h) / 2;
+		curElapsed = SDL_GetTicksNS();
 
-				SDL_RenderTexture(mSDLRenderer, texture, NULL, &dstrect);
-				SDL_RenderPresent(mSDLRenderer);
-			}
+		if (packet->stream_index == video_stream_index && start_ns != 0) {
+			const int width = mWidth;
+			const int height = mHeight;
+
+			_jobs.emplace_back(std::thread([video_decoder, packet, frame, &start_ns, video_stream, texture, width, height, curElapsed]() {
+				avcodec_send_packet(video_decoder, packet);					
+				while (avcodec_receive_frame(video_decoder, frame) == 0) {
+					const double frame_time_s = (double)frame->pts * av_q2d(video_stream->time_base);
+					const Uint64 elapsed_time_ns = curElapsed - start_ns;
+					const double elapsed_time_s = (double)elapsed_time_ns / SDL_NS_PER_SECOND;
+					const double delay_s = frame_time_s - elapsed_time_s;
+					if (delay_s > 0) SDL_Delay((Uint32)(delay_s * SDL_MS_PER_SECOND));
+					else if (delay_s < -0.5) continue;
+
+					SDL_UpdateYUVTexture(texture, NULL,
+						frame->data[0], frame->linesize[0],
+						frame->data[1], frame->linesize[1],
+						frame->data[2], frame->linesize[2]);
+
+					const float frame_width = (float)video_decoder->width;
+					const float frame_height = (float)video_decoder->height;
+					const float scale_w = (float)width / frame_width;
+					const float scale_h = (float)height / frame_height;
+					const float scale = SDL_max(scale_w, scale_h);
+					SDL_FRect dstrect;
+					dstrect.w = frame_width * scale;
+					dstrect.h = frame_height * scale;
+					dstrect.x = ((float)width - dstrect.w) / 2;
+					dstrect.y = ((float)height - dstrect.h) / 2;
+
+					SDL_RenderTexture(mSDLRenderer, texture, NULL, &dstrect);
+					SDL_RenderPresent(mSDLRenderer);
+				}
+				av_packet_unref(packet);
+			}));
 		}
 		else if (packet->stream_index == audio_stream_index) {
-			avcodec_send_packet(audio_decoder, packet);
-			while (avcodec_receive_frame(audio_decoder, frame) == 0) {
-				SDL_PutAudioStreamPlanarData(audio_playback_stream, (const void* const*)frame->data, audio_decoder->ch_layout.nb_channels, frame->nb_samples);
-			}
+			_jobs.emplace_back(std::thread([audio_decoder, packet, frame, audio_playback_stream, &start_ns, curElapsed]() {
+				avcodec_send_packet(audio_decoder, packet);
+				while (avcodec_receive_frame(audio_decoder, frame) == 0) {
+					if (start_ns == 0) start_ns = curElapsed;
+
+					SDL_PutAudioStreamPlanarData(audio_playback_stream, (const void* const*)frame->data, audio_decoder->ch_layout.nb_channels, frame->nb_samples);
+				}
+				av_packet_unref(packet);
+			}));
 		}
-		av_packet_unref(packet);
+
+		for (auto& job : _jobs) {
+			job.join();
+		}
 	}
 	
 	SDL_DestroyTexture(texture);
@@ -346,6 +364,8 @@ void LawnApp::MakeWindow()
 		mIsWindowed = true;
 		mFullScreenWindow = false;
 	}
+
+	gBoardBounds = Rect{ 0, 0, mWidth, mHeight };
 
 	unsigned long long windowFlags = 0UL;
 	if (!IsParticleEditor()) windowFlags |= SDL_WINDOW_RESIZABLE;
@@ -772,7 +792,6 @@ LawnApp::LawnApp()
 	mSfxVolume = 0.5525;
 	mAutoStartLoadingThread = false;
 	mDebugKeysEnabled = false;
-	mBoardCamera = nullptr;
 	mProdName = "PlantsVsZombies";
 	SexyString aTitleName = _S("Plants vs. Zombies");
 #ifdef _DEBUG
@@ -2783,16 +2802,6 @@ void LawnApp::LoadingThreadProc()
 	{
 		mReanimatorCache = new ReanimatorCache();
 		mReanimatorCache->ReanimatorCacheInitialize();
-
-		mBoardCamera = new MemoryImage();
-		mBoardCamera->mWidth = BOARD_WIDTH;
-		mBoardCamera->mHeight = BOARD_HEIGHT;
-		int aNumBits = mBoardCamera->mWidth * mBoardCamera->mHeight;
-		mBoardCamera->mBits = new unsigned long[aNumBits + 1];
-		mBoardCamera->mHasTrans = true;
-		mBoardCamera->mHasAlpha = true;
-		memset(mBoardCamera->mBits, 0, aNumBits * 4);
-		mBoardCamera->mBits[aNumBits] = Sexy::MEMORYCHECK_ID;
 	}
 
 	TodFoleyInitialize(gLawnFoleyParamArray, LENGTH(gLawnFoleyParamArray));
@@ -4793,42 +4802,6 @@ bool LawnApp::IsLastStandEndless(GameMode theGameMode)
 {
 	int aLevel = theGameMode - GameMode::GAMEMODE_LAST_STAND_ENDLESS_STAGE_1;
 	return aLevel >= 0 && aLevel <= 4;
-}
-
-void LawnApp::DrawBoardCamera(Graphics* g, SexyTransform2D theTransform, Color theColor, int theDrawMode, Rect theClipRect, FilterEffect theFilterEffect, bool drawOnlyCamera)
-{
-	DDImage* screen = mDDInterface->GetScreenImage();
-
-	LPDIRECTDRAWSURFACE oldDrawSurface = mDDInterface->mDrawSurface;
-	mDDInterface->mDrawSurface = NULL;
-	DDImage* anImage = new DDImage(mDDInterface);
-	anImage->SetSurface(oldDrawSurface);
-	anImage->GetBits();
-
-	mBoardCamera->mBits = anImage->mBits;
-	mBoardCamera->mWidth = anImage->mWidth;
-	mBoardCamera->mHeight = anImage->mHeight;
-
-
-	anImage->DeleteDDSurface();
-	mDDInterface->mDrawSurface = oldDrawSurface;
-
-	Image* theImage = mBoardCamera;
-	if (theFilterEffect != FilterEffect::FILTER_EFFECT_NONE) {
-		theImage = FilterEffectGetImage(mBoardCamera, theFilterEffect);
-	}
-
-	if (drawOnlyCamera)
-	{
-		g->PushState();
-		g->mTransX = 0;
-		g->mTransY = 0;
-		g->SetColor(Color::Black);
-		g->FillRect(gBoardBounds);
-		g->PopState();
-	}
-
-	TodBltMatrix(g, mBoardCamera, theTransform, theClipRect, theColor, theDrawMode, gBoardBounds);
 }
 
 void LawnApp::ShowParticleEditor()

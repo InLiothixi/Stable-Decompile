@@ -12,6 +12,7 @@
 #include "SexyAppFramework/Common.h"
 
 #include <SDL3/SDL.h>
+#include "SexyAppFramework/SDL3Image.h"
 
 #define SAMPLE_RATE  44100
 #define FRAMES_PER_BUFFER 256
@@ -155,7 +156,6 @@ public:
 	bool							mFlowersPlucked[3];
 	PaStream*						mPortAudioStream;
 	float							mVoiceVolume;
-	MemoryImage*					mBoardCamera;
 
 	Rect							gBoardBounds;
 
@@ -366,8 +366,6 @@ public:
 
 	static int						AudioCallback(const void* inputBuffer, void* outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo* timeInfo, PaStreamCallbackFlags statusFlags, void* userData);
 	
-	void							DrawBoardCamera(Graphics* g, SexyTransform2D theTransform, Color theColor, int theDrawMode, Rect theClipRect, FilterEffect theFilterEffect, bool drawOnlyCamera);
-
 	void							ShowParticleEditor();
 	bool							TryToInitializePA();
 

@@ -2,6 +2,7 @@
 #define __FILTEREFFECT_H__
 
 #include <map>
+#include "../SexyAppFramework/SDL3Image.h"
 
 namespace Sexy
 {

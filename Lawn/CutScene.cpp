@@ -945,7 +945,7 @@ void CutScene::StartLevelIntro()
 			mBoard->mStoreButton->mBtnNoDraw = true;
 		}
 	}
-#ifdef _CONSOLE_MINIGAMES
+#ifdef _MOBILE_MINIGAMES
 	else if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_BUTTERED_POPCORN)
 	{
 		mCrazyDaveDialogStart = 4010;

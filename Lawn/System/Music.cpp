@@ -309,7 +309,7 @@ void Music::PlayFromOffset(MusicFile theMusicFile, int theOffset, double theVolu
 		aMusicInfo->mVolumeAdd = 0.0;
 
 		gBass->BASS_ChannelSetAttribute(aMusicInfo->mHMusic, BASS_ATTRIB_VOL, aMusicInfo->mVolume);
-		gBass->BASS_ChannelFlags(aMusicInfo->mHMusic, BASS_MUSIC_POSRESETEX | BASS_MUSIC_RAMP | BASS_MUSIC_LOOP, -1);
+		gBass->BASS_ChannelFlags(aMusicInfo->mHMusic, BASS_MUSIC_POSRESETEX | BASS_MUSIC_RAMPS | BASS_MUSIC_SURROUND | BASS_MUSIC_SURROUND2 | BASS_MUSIC_SINCINTER | BASS_MUSIC_LOOP, -1);
 		gBass->BASS_ChannelSetPosition(aMusicInfo->mHMusic, theOffset /**/, BASS_POS_MUSIC_ORDER);  // 设置偏移位置
 		gBass->BASS_ChannelPlay(aMusicInfo->mHMusic, false);  // 重新开始播放
 	}

@@ -13,6 +13,10 @@
 #include "../Sexy.TodLib/TodCommon.h"
 #include "../Resources.h"
 #include <zlib.h>
+#include <thread>
+#include <atomic>
+#include <vector>
+#include <mutex>
 
 DefSymbol gTrailFlagDefSymbols[] = {  //0x69E150
     { 0, "Loops" },                 { -1, nullptr }
@@ -335,30 +339,58 @@ bool DefinitionLoadImage(Image** theImage, const SexyString& theName)
         return true;
     }
 
-    // This for loop's performance is HORRIBLE
-    // 从可能的贴图路径中手动加载贴图
+    atomic<bool> found{false};
+    SharedImageRef foundImage;
+    std::mutex imageMutex;
+
+    vector<thread> ts;
     for (const DefLoadResPath& aLoadResPath : gDefLoadResPaths)
     {
-        int aNameLen = theName.size();
-        int aPrefixLen = strlen(aLoadResPath.mPrefix);
-        if (aPrefixLen < aNameLen)
-        {
-            SexyString aPathToTry = aLoadResPath.mDirectory + theName.substr(aPrefixLen, aNameLen);
-            SharedImageRef aImageRef = gSexyAppBase->GetSharedImage(_S("resourcepack/") + aPathToTry);
-            if ((Image*)aImageRef == nullptr) aImageRef = gSexyAppBase->GetSharedImage(_S("extension/") + aPathToTry);
-            if ((Image*)aImageRef == nullptr) aImageRef = gSexyAppBase->GetSharedImage(_S("dependency/") + aPathToTry);
-            if ((Image*)aImageRef == nullptr) aImageRef = gSexyAppBase->GetSharedImage(aPathToTry);
-            if ((Image*)aImageRef != nullptr)
+        ts.emplace_back(([theName, aLoadResPath, theImage, &found, &foundImage, &imageMutex]() {
+            if (found.load(memory_order_relaxed))
+                return;
+
+            int aNameLen = theName.size();
+            int aPrefixLen = strlen(aLoadResPath.mPrefix);
+            if (aPrefixLen < aNameLen)
             {
-                TodHesitationTrace("Load Image '%s'", theName.c_str());
-                TodAddImageToMap(&aImageRef, theName);
-                TodMarkImageForSanding((Image*)aImageRef);
-                *theImage = (Image*)aImageRef;
-                return true;
+                SexyString aPathToTry = aLoadResPath.mDirectory + theName.substr(aPrefixLen, aNameLen);
+                SharedImageRef aImageRef = gSexyAppBase->GetSharedImage(_S("resourcepack/") + aPathToTry);
+                if ((Image*)aImageRef == nullptr) aImageRef = gSexyAppBase->GetSharedImage(_S("extension/") + aPathToTry);
+                if ((Image*)aImageRef == nullptr) aImageRef = gSexyAppBase->GetSharedImage(_S("dependency/") + aPathToTry);
+                if ((Image*)aImageRef == nullptr) aImageRef = gSexyAppBase->GetSharedImage(aPathToTry);
+                if ((Image*)aImageRef != nullptr)
+                {
+                    //TodHesitationTrace("Load Image '%s'", theName.c_str());
+                    bool expected = false;
+                    if (found.compare_exchange_strong(expected, true, std::memory_order_relaxed))
+                    {
+                        lock_guard<mutex> lock(imageMutex);
+                        foundImage = aImageRef;
+                    }
+                }
             }
-        }
+        }));
     }
-    return false;
+
+    for (auto& t : ts)
+        t.join();
+
+    if (found)
+    {
+        *theImage = (Image*)foundImage;
+        TodAddImageToMap(&foundImage, theName);
+        TodMarkImageForSanding((Image*)foundImage);
+    }
+
+    return found;
+
+    // This for loop's performance is HORRIBLE
+    // 从可能的贴图路径中手动加载贴图
+    /*for (const DefLoadResPath& aLoadResPath : gDefLoadResPaths)
+    {
+        
+    }*/
 }
 
 //0x443F60

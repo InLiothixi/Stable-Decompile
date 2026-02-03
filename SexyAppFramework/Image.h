@@ -63,6 +63,8 @@ public:
 	// for animations
 	AnimInfo				*mAnimInfo;
 
+	bool					mSanded = false;
+
 public:
 	Image();
 	Image(const Image& theImage);

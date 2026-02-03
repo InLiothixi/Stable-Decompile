@@ -805,6 +805,8 @@ bool Reanimation::DrawTrack(Graphics* g, int theTrackIndex, int theRenderGroup, 
 			aImageFrame -= aImage->mNumCols;  // 确保绘制的列数不会超过贴图最后一列
 		}
 
+		if (!aImage->mSanded) FixPixelsOnAlphaEdgeForBlending(aImage);
+
 		int aCelWidth = aImage->GetCelWidth();
 		Rect aSrcRect(aImageFrame * aCelWidth, 0, aCelWidth, aImage->GetCelHeight());
 

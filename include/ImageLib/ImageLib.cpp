@@ -1614,16 +1614,28 @@ Image* ImageLib::GetImage(const SexyString& theFilename, bool lookForAlphaImage)
 			if ((anImage->mWidth == anAlphaImage->mWidth) &&
 				(anImage->mHeight == anAlphaImage->mHeight))
 			{
-				unsigned long* aBits1 = anImage->mBits;
-				unsigned long* aBits2 = anAlphaImage->mBits;
-				int aSize = anImage->mWidth*anImage->mHeight;
+				//unsigned long* aBits1 = anImage->mBits;
+				//unsigned long* aBits2 = anAlphaImage->mBits;
+				//int aSize = anImage->mWidth*anImage->mHeight;
 
-				for (int i = 0; i < aSize; i++)
+				/*for (int i = 0; i < aSize; i++)
 				{
 					*aBits1 = (*aBits1 & 0x00FFFFFF) | ((*aBits2 & 0xFF) << 24);
 					++aBits1;
 					++aBits2;
+				}*/
+
+				for (int y = 0; y < anImage->mHeight; y++)
+				{
+					unsigned long* dest = anImage->mBits + y * anImage->mWidth;
+					unsigned long* src = anAlphaImage->mBits + y * anAlphaImage->mWidth;
+
+					for (int x = 0; x < anImage->mWidth; x++)
+					{
+						dest[x] = (dest[x] & 0x00FFFFFF) | ((src[x] & 0xFF) << 24);
+					}
 				}
+
 			}
 
 			delete anAlphaImage;
@@ -1632,13 +1644,23 @@ Image* ImageLib::GetImage(const SexyString& theFilename, bool lookForAlphaImage)
 		{
 			anImage = anAlphaImage;
 
-			unsigned long* aBits1 = anImage->mBits;
+			/*unsigned long* aBits1 = anImage->mBits;
 
 			int aSize = anImage->mWidth*anImage->mHeight;
 			for (int i = 0; i < aSize; i++)
 			{
 				*aBits1 = (0x00FFFFFF) | ((*aBits1 & 0xFF) << 24);
 				++aBits1;
+			}*/
+
+			for (int y = 0; y < anImage->mHeight; y++)
+			{
+				unsigned long* dest = anImage->mBits + y * anImage->mWidth;
+
+				for (int x = 0; x < anImage->mWidth; x++)
+				{
+					dest[x] = (0xFFFFFF) | ((dest[x] & 0xFF) << 24);
+				}
 			}
 		}
 		else
@@ -1646,13 +1668,23 @@ Image* ImageLib::GetImage(const SexyString& theFilename, bool lookForAlphaImage)
 			const int aColor = gAlphaComposeColor;
 			anImage = anAlphaImage;
 
-			unsigned long* aBits1 = anImage->mBits;
+			/*unsigned long* aBits1 = anImage->mBits;
 
 			int aSize = anImage->mWidth*anImage->mHeight;
 			for (int i = 0; i < aSize; i++)
 			{
 				*aBits1 = aColor | ((*aBits1 & 0xFF) << 24);
 				++aBits1;
+			}*/
+
+			for (int y = 0; y < anImage->mHeight; y++)
+			{
+				unsigned long* dest = anImage->mBits + y * anImage->mWidth;
+
+				for (int x = 0; x < anImage->mWidth; x++)
+				{
+					dest[x] = aColor | ((dest[x] & 0xFF) << 24);
+				}
 			}
 		}
 	}

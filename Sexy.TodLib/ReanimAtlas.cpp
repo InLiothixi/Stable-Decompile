@@ -231,6 +231,8 @@ void ReanimAtlas::ReanimAtlasCreate(ReanimatorDefinition* theReanimDef)
 			// 如果存在贴图，且贴图的宽、高均不大于 254 像素，且相同的贴图未加入至图集图片数组中
 			if (aImage != nullptr && aImage->mWidth <= 254 && aImage->mHeight <= 254 && FindImage(aImage) < 0)
 				AddImage(aImage);  // 先将其加入数组中，后续再确定其位于图集中的位置
+			else
+				FixPixelsOnAlphaEdgeForBlending(aImage);
 		}
 	}
 

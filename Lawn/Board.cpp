@@ -738,7 +738,8 @@ void Board::PickZombieWaves()
 				 aGameMode == GameMode::GAMEMODE_CHALLENGE_COLUMN || mApp->IsShovelLevel() || aGameMode == GameMode::GAMEMODE_CHALLENGE_WAR_AND_PEAS_2 ||
 				 aGameMode == GameMode::GAMEMODE_CHALLENGE_WALLNUT_BOWLING_2 || aGameMode == GameMode::GAMEMODE_CHALLENGE_POGO_PARTY
 #ifdef _DS_MINIGAMES
-				|| aGameMode == GameMode::GAMEMODE_CHALLENGE_BOMB_ALL_TOGETHER
+
+			|| aGameMode == GameMode::GAMEMODE_CHALLENGE_BOMB_ALL_TOGETHER
 #endif
 			)
 			mNumWaves = 30;
@@ -954,7 +955,7 @@ void Board::PickZombieWaves()
 		}
 
 		if (mApp->mGameMode == GAMEMODE_CHALLENGE_BOMB_ALL_TOGETHER) {
-			if (aWave == 29) {
+			if (aWave == 19) {
 				PutZombieInWave(ZombieType::ZOMBIE_GARGANTUAR, aWave, &aZombiePicker);
 				PutZombieInWave(ZombieType::ZOMBIE_GARGANTUAR, aWave, &aZombiePicker);
 			}
@@ -6308,7 +6309,7 @@ void Board::UpdateZombieSpawning()
 			mZombieHealthToNextWave = RandRangeFloat(0.5f, 0.65f) * mZombieHealthWaveStart;
 			if (mApp->IsLittleTroubleLevel() || mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_COLUMN || mApp->IsLastStand() 
 #ifdef _DS_MINIGAMES
-				|| mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_HEAT_WAVE
+				|| mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_HEAT_WAVE || mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_BOMB_ALL_TOGETHER
 #endif
 #ifdef _MOBILE_MINIGAMES
 				|| mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_BUTTERED_POPCORN

@@ -6,7 +6,7 @@
 
 #ifdef _HAS_ZOMBATAR
 
-class ZombatarTOS : public LawnDialog, public ButtonListener, public CheckboxListener
+class ZombatarTOS : public LawnDialog, public CheckboxListener
 {
 private:
 	enum {

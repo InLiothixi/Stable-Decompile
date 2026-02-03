@@ -14,7 +14,7 @@ namespace Sexy
 	class Checkbox;
 };
 
-class MoreSettingsDialog : public LawnDialog, public Sexy::ButtonListener, public Sexy::CheckboxListener 
+class MoreSettingsDialog : public LawnDialog, public Sexy::CheckboxListener 
 {
 private:
 	enum {

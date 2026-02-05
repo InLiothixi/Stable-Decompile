@@ -12239,7 +12239,47 @@ void Zombie::BossStartDeath()
     mApp->PlaySample(SOUND_BOSSEXPLOSION);
     mApp->PlayFoley(FoleyType::FOLEY_GARGANTUDEATH);
 
-    BossDie();
+    //BossDie();
+
+    Reanimation* aFireBallReanim = mApp->ReanimationTryToGet(mBossFireBallReanimID);
+    if (aFireBallReanim)
+    {
+        BossDestroyIceballInRow(mTargetRow);
+        BossDestroyFireball();
+
+        aFireBallReanim->ReanimationDie();
+        mBossFireBallReanimID = ReanimationID::REANIMATIONID_NULL;
+    }
+
+    bool noMoreBoss = true;
+    {
+        Zombie* aZombie = nullptr;
+        while (mBoard->IterateZombies(aZombie))
+        {
+            Reanimation* aBodyReanim = mApp->ReanimationTryToGet(aZombie->mBodyReanimID);
+            if (aZombie->mZombieType == ZombieType::ZOMBIE_BOSS && aZombie->mBodyHealth > 1)
+            {
+                noMoreBoss = false;
+                break;
+            }
+        }
+    }
+
+    if (noMoreBoss) {
+        //mApp->mMusic->FadeOut(200);
+
+        Zombie* aZombie = nullptr;
+        while (mBoard->IterateZombies(aZombie))
+        {
+            if (aZombie != this && !aZombie->IsDeadOrDying() && !aZombie->mMindControlled && aZombie->mZombieType != ZombieType::ZOMBIE_BOSS)
+            {
+                // aZombie->DieWithLoot();
+                aZombie->ApplyBurn();
+            }
+        }
+    }
+
+    RemoveColdEffects();
 }
 
 //0x536080
@@ -12514,11 +12554,12 @@ void Zombie::BossDie()
     }
     
     bool noMoreBoss = true;
-    {
+   {
         Zombie* aZombie = nullptr;
         while (mBoard->IterateZombies(aZombie))
         {
-            if (aZombie->mZombieType == ZombieType::ZOMBIE_BOSS && aZombie->mZombiePhase != ZombiePhase::PHASE_BOSS_HEAD_LEAVE && !aZombie->IsDeadOrDying())
+            Reanimation* aBodyReanim = mApp->ReanimationTryToGet(aZombie->mBodyReanimID);
+            if (aZombie->mZombieType == ZombieType::ZOMBIE_BOSS && aZombie->mBodyHealth > 1)
             {
                 noMoreBoss = false;
                 break;

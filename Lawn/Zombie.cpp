@@ -12514,11 +12514,12 @@ void Zombie::BossDie()
     }
     
     bool noMoreBoss = true;
-    {
+   {
         Zombie* aZombie = nullptr;
         while (mBoard->IterateZombies(aZombie))
         {
-            if (aZombie->mZombieType == ZombieType::ZOMBIE_BOSS && aZombie->mZombiePhase != ZombiePhase::PHASE_BOSS_HEAD_LEAVE && !aZombie->IsDeadOrDying())
+            Reanimation* aBodyReanim = mApp->ReanimationTryToGet(aZombie->mBodyReanimID);
+            if (aZombie->mZombieType == ZombieType::ZOMBIE_BOSS && aZombie->mBodyHealth > 1)
             {
                 noMoreBoss = false;
                 break;
@@ -12527,7 +12528,8 @@ void Zombie::BossDie()
     }
 
     if (noMoreBoss) {
-        mApp->mMusic->FadeOut(200);
+        if (mApp->mMusic->mFadeOutCounter == 0)
+            mApp->mMusic->FadeOut(200);
 
         Zombie* aZombie = nullptr;
         while (mBoard->IterateZombies(aZombie))

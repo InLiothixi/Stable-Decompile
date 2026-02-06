@@ -7021,8 +7021,6 @@ void Board::DrawIce(Graphics* g, int theGridY)
 //0x416290
 void Board::DrawBackdrop(Graphics* g)
 {
-	g->PushState();
-	g->SetLinearBlend(false);
 	Image* aBgImage = nullptr;
 	switch (mBackground)
 	{
@@ -7083,7 +7081,6 @@ void Board::DrawBackdrop(Graphics* g)
 	{
 		DrawHouseDoorBottom(g);
 	}
-	g->SetLinearBlend(true);
 
 	if (StageHasPool())
 	{
@@ -7103,7 +7100,6 @@ void Board::DrawBackdrop(Graphics* g)
 	{
 		g->DrawImageF(Sexy::IMAGE_NIGHT_GRAVE_GRAPHIC, 1092, 30); // Y: 40
 	}
-	g->PopState();
 }
 
 //0x416690
@@ -7738,14 +7734,10 @@ void Board::DrawProgressMeter(Graphics* g)
 	if (!HasProgressMeter())
 		return;
 
-	g->PushState();
-
 	// ====================================================================================================
 	// ▲ 绘制进度条进度部分的贴图
 	// ====================================================================================================
-	g->SetLinearBlend(false);
 	g->DrawImageCel(Sexy::IMAGE_FLAGMETER, 600, 575, 0);
-	g->SetLinearBlend(true);
 	int aCelWidth = Sexy::IMAGE_FLAGMETER->GetCelWidth();
 	int aCelHeight = Sexy::IMAGE_FLAGMETER->GetCelHeight();
 	int aClipWidth = TodAnimateCurve(0, PROGRESS_METER_COUNTER, mProgressMeterWidth, 0, 143, TodCurves::CURVE_LINEAR);
@@ -7795,7 +7787,6 @@ void Board::DrawProgressMeter(Graphics* g)
 	}
 	else if (ProgressMeterHasFlags())
 	{
-		g->SetLinearBlend(false);
 		int aNumWavesPerFlag = GetNumWavesPerFlag();
 		int aNumFlagWaves = mNumWaves / aNumWavesPerFlag;
 		int aFlagsPosEnd = 590 + aCelWidth;  // 旗帜区域的右界横坐标
@@ -7820,7 +7811,6 @@ void Board::DrawProgressMeter(Graphics* g)
 			g->DrawImageCel(Sexy::IMAGE_FLAGMETERPARTS, aPosX, 572 - aHeight, 2, 0);
 		}
 	}
-	g->SetLinearBlend(true);
 	// ====================================================================================================
 	// ▲ 绘制进度条的额外部分
 	// ====================================================================================================
@@ -7838,13 +7828,11 @@ void Board::DrawProgressMeter(Graphics* g)
 		mApp->IsIZombieLevel() || 
 		mApp->IsFinalBossLevel())
 	{
-		g->PopState();
 		return;
 	}
 	// 绘制僵尸头
 	int aHeadProgress = TodAnimateCurve(0, 150, mProgressMeterWidth, 0, 135, CURVE_LINEAR);
 	g->DrawImageCel(Sexy::IMAGE_FLAGMETERPARTS, aCelWidth - aHeadProgress + 580, 572, 0, 0);
-	g->PopState();
 }
 
 //0x417C80

@@ -226,7 +226,29 @@ SDL3Image* ReanimatorCache::MakeBlankMemoryImage(int theWidth, int theHeight)
 	aImage->mHeight = theHeight;
 	aImage->mD3DData = SDL_CreateTexture(LawnApp::mSDLRenderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, aImage->mWidth, aImage->mHeight);
 	SDL_SetTextureBlendMode((SDL_Texture*)aImage->mD3DData, SDL_BLENDMODE_BLEND);
+
+	int aBitsCount = theWidth * theHeight;
+	aImage->mBits = new unsigned long[aBitsCount + 1];
+	aImage->mHasTrans = true;
+	aImage->mHasAlpha = true;
+	aImage->mBits[aBitsCount] = Sexy::MEMORYCHECK_ID;
+
 	return aImage;
+}
+
+void ReanimatorCache::BackUp3DDataIntoBits(SDL3Image* theImage)
+{
+	SDL_Texture* oldRenderTarget = SDL_GetRenderTarget(LawnApp::mSDLRenderer);
+	SDL_SetRenderTarget(LawnApp::mSDLRenderer, (SDL_Texture*)theImage->mD3DData);
+	SDL_Surface* surface = SDL_RenderReadPixels(LawnApp::mSDLRenderer, NULL);
+	uint8_t* srcPixels = static_cast<uint8_t*>(surface->pixels);
+	uint8_t* src = (uint8_t*)surface->pixels;
+	for (int y = 0; y < theImage->mHeight; ++y)
+	{
+		memcpy(theImage->mBits + y * theImage->mWidth, src + y * surface->pitch, theImage->mWidth);
+	}
+	SDL_SetRenderTarget(LawnApp::mSDLRenderer, oldRenderTarget);
+	SDL_DestroySurface(surface);
 }
 
 void ReanimatorCache::GetPlantImageSize(SeedType theSeedType, int& theOffsetX, int& theOffsetY, int& theWidth, int& theHeight)
@@ -309,6 +331,8 @@ SDL3Image* ReanimatorCache::MakeCachedMowerFrame(LawnMowerType theMowerType)
 		break;
 	}
 
+	if (aImage) BackUp3DDataIntoBits(aImage);
+
 	return aImage;
 }
 
@@ -367,6 +391,8 @@ SDL3Image* ReanimatorCache::MakeCachedPlantFrame(SeedType theSeedType, DrawVaria
 			DrawReanimatorFrame(&aMemoryGraphics, -aOffsetX, -aOffsetY, aPlantDef.mReanimationType, "anim_head_idle2", theDrawVariation, theFilterVariation, theDrawBitVariation);
 		}
 	}
+
+	if (aMemoryImage) BackUp3DDataIntoBits(aMemoryImage);
 
 	return aMemoryImage;
 }
@@ -657,6 +683,9 @@ SDL3Image* ReanimatorCache::MakeCachedZombieFrame(ZombieType theZombieType)
 	}
 
 	SDL_SetRenderTarget(LawnApp::mSDLRenderer, nullptr);
+
+	if (aMemoryImage) BackUp3DDataIntoBits(aMemoryImage);
+
 	return aMemoryImage;
 }
 

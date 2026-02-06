@@ -24,36 +24,6 @@ Uint32  SDL3Image::GetBlendMode(SDL_BlendModes theDrawMode)
 
 SDL_Texture* Sexy::SDL3Image::GetTexture(Image* image)
 {
-    if (auto sdlImage = dynamic_cast<SDL3Image*>(image))
-    {
-        if (sdlImage->mBits == nullptr)
-        {
-            int aBitsCount = sdlImage->mWidth * sdlImage->mHeight;
-            sdlImage->mBits = new unsigned long[aBitsCount + 1];
-            sdlImage->mHasTrans = true;
-            sdlImage->mHasAlpha = true;
-
-            SDL_Texture* oldRenderTarget = SDL_GetRenderTarget(LawnApp::mSDLRenderer);
-            SDL_SetRenderTarget(LawnApp::mSDLRenderer, (SDL_Texture*)sdlImage->mD3DData);
-            SDL_Surface* surface = SDL_RenderReadPixels(LawnApp::mSDLRenderer, NULL);
-            uint8_t* srcPixels = static_cast<uint8_t*>(surface->pixels);
-            uint8_t* src = (uint8_t*)surface->pixels;
-            for (int y = 0; y < sdlImage->mHeight; ++y)
-            {
-                memcpy(
-                    sdlImage->mBits + y * sdlImage->mWidth,
-                    src + y * surface->pitch,
-                    sdlImage->mWidth * 4
-                );
-            }
-            sdlImage->mBits[aBitsCount] = Sexy::MEMORYCHECK_ID;
-            SDL_SetRenderTarget(LawnApp::mSDLRenderer, oldRenderTarget);
-            SDL_DestroySurface(surface);
-        }
-
-        return (SDL_Texture*)sdlImage->mD3DData;
-    }
-
     if (auto memoryImage = dynamic_cast<MemoryImage*>(image))
     {
         if (memoryImage->mD3DData == nullptr)

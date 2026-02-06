@@ -49,6 +49,7 @@ public:
     /*inline*/ void         GetPlantImageSize(SeedType theSeedType, int& theOffsetX, int& theOffsetY, int& theWidth, int& theHeight);
     void                    DrawReanimatorFrame(Graphics* g, float thePosX, float thePosY, ReanimationType theReanimationType, const char* theTrackName, DrawVariation theDrawVariation, DrawFilterVariation theFilterVariation = DrawFilterVariation::FILTERVARIATION_NONE, unsigned int theBitVariation = 0U);
     void                    UpdateReanimationForVariation(Reanimation* theReanim, DrawVariation theDrawVariation, DrawFilterVariation theFilterVariation = DrawFilterVariation::FILTERVARIATION_NONE);
+    void                    BackUp3DDataIntoBits(SDL3Image* theImage); // someone have this issue for some reason
 };
 
 #endif

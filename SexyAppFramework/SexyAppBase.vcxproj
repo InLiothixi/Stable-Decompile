@@ -179,7 +179,6 @@
       <AdditionalOptions>/wd4996 %(AdditionalOptions)</AdditionalOptions>
       <PreprocessorDefinitions>_LIB;_WINDOWS;_VISUALC_;_JPEGLIB_;OPTIMIZE_SOFTWARE_DRAWING;DO_FIX_BUGS;_ENABLE_DRM_FOR__DEBUGGING;_WIN32;WIN32;_CRT_SECURE_NO_WARNINGS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeader />
-      <UseFullPaths>true</UseFullPaths>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <AdditionalIncludeDirectories>
       </AdditionalIncludeDirectories>
@@ -221,7 +220,6 @@ EXIT /B 0</Command>
       <PreprocessorDefinitions>_LIB;_WINDOWS;_VISUALC_;_JPEGLIB_;OPTIMIZE_SOFTWARE_DRAWING;DO_FIX_BUGS;_ENABLE_DRM_FOR__DEBUGGING;_WIN64;WIN64;_GOTY;GOTY</PreprocessorDefinitions>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <UseFullPaths>true</UseFullPaths>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <AdditionalIncludeDirectories>
       </AdditionalIncludeDirectories>
@@ -264,7 +262,6 @@ EXIT /B 0</Command>
       <PreprocessorDefinitions>_LIB;_WINDOWS;_VISUALC_;_JPEGLIB_;OPTIMIZE_SOFTWARE_DRAWING;DO_FIX_BUGS;_ENABLE_DRM_FOR__DEBUGGING;_WIN32;WIN32;_CRT_SECURE_NO_WARNINGS;_DEBUG;_GOTY;GOTY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <UseFullPaths>true</UseFullPaths>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <AdditionalIncludeDirectories>
@@ -308,7 +305,6 @@ EXIT /B 0</Command>
       <PreprocessorDefinitions>_LIB;_WINDOWS;_VISUALC_;_JPEGLIB_;OPTIMIZE_SOFTWARE_DRAWING;DO_FIX_BUGS;_ENABLE_DRM_FOR__DEBUGGING;_WIN64;WIN64;_GOTY;GOTY</PreprocessorDefinitions>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <UseFullPaths>true</UseFullPaths>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <DebugInformationFormat>EditAndContinue</DebugInformationFormat>
       <AdditionalIncludeDirectories>
@@ -350,18 +346,10 @@ EXIT /B 0</Command>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
       <AdditionalOptions>/Oy- /wd4996 %(AdditionalOptions)</AdditionalOptions>
-      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <PreprocessorDefinitions>_LIB;_WINDOWS;_VISUALC_;_JPEGLIB_;OPTIMIZE_SOFTWARE_DRAWING;DO_FIX_BUGS;_ENABLE_DRM_FOR__DEBUGGING;_WIN32;WIN32;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PrecompiledHeader />
-      <IntrinsicFunctions>true</IntrinsicFunctions>
-      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
-      <OmitFramePointers>true</OmitFramePointers>
-      <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
-      <FloatingPointModel>Fast</FloatingPointModel>
       <CreateHotpatchableImage>true</CreateHotpatchableImage>
-      <IntelJCCErratum>true</IntelJCCErratum>
       <AdditionalIncludeDirectories>
       </AdditionalIncludeDirectories>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -401,19 +389,11 @@ EXIT /B 0</Command>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <AdditionalOptions>/Oy- /wd4996 %(AdditionalOptions)</AdditionalOptions>
-      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <PreprocessorDefinitions>_LIB;_WINDOWS;_VISUALC_;_JPEGLIB_;OPTIMIZE_SOFTWARE_DRAWING;DO_FIX_BUGS;_ENABLE_DRM_FOR__DEBUGGING;_WIN64;WIN64;NDEBUG;_GOTY;GOTY</PreprocessorDefinitions>
-      <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
-      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
-      <OmitFramePointers>true</OmitFramePointers>
-      <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
-      <FloatingPointModel>Fast</FloatingPointModel>
       <CreateHotpatchableImage>true</CreateHotpatchableImage>
-      <IntelJCCErratum>true</IntelJCCErratum>
       <AdditionalIncludeDirectories>
       </AdditionalIncludeDirectories>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -454,19 +434,11 @@ EXIT /B 0</Command>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseGOTY|Win32'">
     <ClCompile>
       <AdditionalOptions>/Oy- /wd4996 %(AdditionalOptions)</AdditionalOptions>
-      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <PreprocessorDefinitions>_LIB;_WINDOWS;_VISUALC_;_JPEGLIB_;OPTIMIZE_SOFTWARE_DRAWING;DO_FIX_BUGS;_ENABLE_DRM_FOR__DEBUGGING;_WIN32;WIN32;NDEBUG;_GOTY;GOTY;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
-      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
-      <OmitFramePointers>true</OmitFramePointers>
-      <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
-      <FloatingPointModel>Fast</FloatingPointModel>
       <CreateHotpatchableImage>true</CreateHotpatchableImage>
-      <IntelJCCErratum>true</IntelJCCErratum>
       <AdditionalIncludeDirectories>
       </AdditionalIncludeDirectories>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -506,19 +478,11 @@ EXIT /B 0</Command>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='ReleaseGOTY|x64'">
     <ClCompile>
       <AdditionalOptions>/Oy- /wd4996 %(AdditionalOptions)</AdditionalOptions>
-      <InlineFunctionExpansion>AnySuitable</InlineFunctionExpansion>
       <PreprocessorDefinitions>_LIB;_WINDOWS;_VISUALC_;_JPEGLIB_;OPTIMIZE_SOFTWARE_DRAWING;DO_FIX_BUGS;_ENABLE_DRM_FOR__DEBUGGING;_WIN64;WIN64;NDEBUG;_GOTY;GOTY</PreprocessorDefinitions>
-      <StringPooling>true</StringPooling>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <PrecompiledHeader>
       </PrecompiledHeader>
-      <IntrinsicFunctions>true</IntrinsicFunctions>
-      <FavorSizeOrSpeed>Speed</FavorSizeOrSpeed>
-      <OmitFramePointers>true</OmitFramePointers>
-      <EnableFiberSafeOptimizations>true</EnableFiberSafeOptimizations>
-      <FloatingPointModel>Fast</FloatingPointModel>
       <CreateHotpatchableImage>true</CreateHotpatchableImage>
-      <IntelJCCErratum>true</IntelJCCErratum>
       <AdditionalIncludeDirectories>
       </AdditionalIncludeDirectories>
       <FunctionLevelLinking>true</FunctionLevelLinking>

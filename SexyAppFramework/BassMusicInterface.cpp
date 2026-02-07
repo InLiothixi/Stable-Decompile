@@ -67,7 +67,7 @@ BassMusicInterface::BassMusicInterface(HWND theHWnd)
 
 	mMaxMusicVolume = 40;
 
-	mMusicLoadFlags = BASS_MUSIC_LOOP | BASS_MUSIC_RAMPS | BASS_MUSIC_SURROUND | BASS_MUSIC_SINCINTER | BASS_MUSIC_SURROUND2;
+	mMusicLoadFlags = BASS_MUSIC_LOOP | BASS_MUSIC_RAMPS | BASS_MUSIC_SINCINTER;
 }
 
 BassMusicInterface::~BassMusicInterface()

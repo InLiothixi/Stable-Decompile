@@ -5325,8 +5325,8 @@ void Plant::DrawSeedType(Graphics* g, SeedType theSeedType, SeedType theImitater
         {
             SDL_DisplayID display = SDL_GetPrimaryDisplay();
             float scale = (float)SDL_GetCurrentDisplayMode(display)->h / 600.0f;
-            g->mScaleX *= 1.4f / scale;
-            g->mScaleY *= 1.4f / scale;
+            g->mScaleX *= 1.4f;
+            g->mScaleY *= 1.4f;
             TodDrawImageScaledF(g, IMAGE_REANIM_WALLNUT_BODY, thePosX - 53.0f, thePosY - 56.0f, g->mScaleX, g->mScaleY);
         }
         else if (aPlantDef.mReanimationType != ReanimationType::REANIM_NONE)

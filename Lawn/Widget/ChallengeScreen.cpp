@@ -469,10 +469,10 @@ void ChallengeScreen::UpdateButtons()
 				}
 			}
 
-			if (aChlDef.mPage == CHALLENGE_PAGE_CHALLENGE || aChlDef.mPage == CHALLENGE_PAGE_LIMBO_CHALLENGE || aChlDef.mPage == CHALLENGE_PAGE_PUZZLE)
+			/*if (aChlDef.mPage == CHALLENGE_PAGE_CHALLENGE || aChlDef.mPage == CHALLENGE_PAGE_LIMBO_CHALLENGE || aChlDef.mPage == CHALLENGE_PAGE_PUZZLE)
 				aButton->Resize(38 + aColumn * 155, 93 + aRow * 119 - mScrollbar->mScrollValue, 104, 115);
 			else
-				aButton->Resize(38 + aColumn * 155, 125 + aRow * 145 - mScrollbar->mScrollValue, 104, 115);
+				aButton->Resize(38 + aColumn * 155, 125 + aRow * 145 - mScrollbar->mScrollValue, 104, 115);*/
 
 			aButton->mDisabled = (MoreTrophiesNeeded(aChallengeMode) > 0) /*|| (aButton->mY + aButton->mHeight < mScrollbar->mY || aButton->mY > mScrollbar->mY + mScrollbar->mHeight)*/;
 			aButton->mDoFinger = !aButton->mDisabled;
@@ -512,21 +512,41 @@ void ChallengeScreen::DrawButton(Graphics* g, int theChallengeIndex)
 {
 	g->PushState();
 	ButtonWidget* aChallengeButton = mChallengeButtons[theChallengeIndex];
-	int aPosX = aChallengeButton->mX;
-	int aPosY = aChallengeButton->mY;
 	g->SetClipRect(mScrollbar->mViewRect);
-
-	if (aPosY + 115 < mScrollbar->mViewRect.mY || aPosY > mScrollbar->mViewRect.mY + mScrollbar->mViewRect.mHeight) 
-	{
-		g->PopState();
-		return;
-	}
 
 	if (aChallengeButton->mVisible)
 	{
 		ChallengeDefinition& aDef = GetChallengeDefinition(theChallengeIndex);
 
+		int aColumn = aDef.mCol;
+		int aRow = aDef.mRow;
+		if (aDef.mPage == ChallengePage::CHALLENGE_PAGE_LIMBO_CHALLENGE && aDef.mChallengeMode >= GameMode::GAMEMODE_CHALLENGE_HIGH_GRAVITY)
+		{
+			int newColumn = aDef.mCol - 1;
+			aColumn = newColumn % 4;
+			if (newColumn < 0)
+			{
+				aRow--;
+				aColumn = 4;
+			}
+		}
 		
+		if (aDef.mPage == CHALLENGE_PAGE_CHALLENGE || aDef.mPage == CHALLENGE_PAGE_LIMBO_CHALLENGE || aDef.mPage == CHALLENGE_PAGE_PUZZLE)
+			aChallengeButton->mY = 93 + aRow * 119 - mScrollbar->mScrollValue;
+		else
+			aChallengeButton->mY = 125 + aRow * 145 - mScrollbar->mScrollValue;
+
+		int aPosX = aChallengeButton->mX;
+		int aPosY = aChallengeButton->mY;
+
+		if (aChallengeButton->mY >= mScrollbar->mViewRect.mY + mScrollbar->mViewRect.mHeight ||
+			aChallengeButton->mY + aChallengeButton->mHeight <= mScrollbar->mViewRect.mY ||
+			mApp->mWidgetManager->mLastMouseY >= mScrollbar->mViewRect.mY + mScrollbar->mViewRect.mHeight ||
+			mApp->mWidgetManager->mLastMouseY <= mScrollbar->mViewRect.mY)
+		{
+			aChallengeButton->mY = 600;
+		}
+
 		if (aChallengeButton->mIsDown)
 		{
 			aPosX++;
@@ -829,10 +849,10 @@ void ChallengeScreen::Update()
 				}
 			}
 
-			if (aChlDef.mPage == CHALLENGE_PAGE_CHALLENGE || aChlDef.mPage == CHALLENGE_PAGE_LIMBO_CHALLENGE || aChlDef.mPage == CHALLENGE_PAGE_PUZZLE)
+			/*if (aChlDef.mPage == CHALLENGE_PAGE_CHALLENGE || aChlDef.mPage == CHALLENGE_PAGE_LIMBO_CHALLENGE || aChlDef.mPage == CHALLENGE_PAGE_PUZZLE)
 				aButton->Resize(38 + aColumn * 155, 93 + aRow * 119 - mScrollbar->mScrollValue, 104, 115);
 			else
-				aButton->Resize(38 + aColumn * 155, 125 + aRow * 145 - mScrollbar->mScrollValue, 104, 115);
+				aButton->Resize(38 + aColumn * 155, 125 + aRow * 145 - mScrollbar->mScrollValue, 104, 115);*/
 		}
 	}
 

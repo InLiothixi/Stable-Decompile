@@ -5309,6 +5309,12 @@ void Plant::DrawSeedType(Graphics* g, SeedType theSeedType, SeedType theImitater
             aZombieType = ZombieType::ZOMBIE_CACHED_POLEVAULTER_WITH_POLE;
         }
 
+        SDL_DisplayID display = SDL_GetPrimaryDisplay();
+        float scale = (float)SDL_GetCurrentDisplayMode(display)->h / 600.0f;
+
+        g->mScaleX /= scale;
+        g->mScaleY /= scale;
+
         gLawnApp->mReanimatorCache->DrawCachedZombie(g, thePosX + aOffsetX, thePosY + aOffsetY, aZombieType);
     }
     else
@@ -5317,12 +5323,25 @@ void Plant::DrawSeedType(Graphics* g, SeedType theSeedType, SeedType theImitater
 
         if (aSeedType == SeedType::SEED_GIANT_WALLNUT)
         {
-            g->mScaleX *= 1.4f;
-            g->mScaleY *= 1.4f;
+            SDL_DisplayID display = SDL_GetPrimaryDisplay();
+            float scale = (float)SDL_GetCurrentDisplayMode(display)->h / 600.0f;
+            g->mScaleX *= 1.4f / scale;
+            g->mScaleY *= 1.4f / scale;
             TodDrawImageScaledF(g, IMAGE_REANIM_WALLNUT_BODY, thePosX - 53.0f, thePosY - 56.0f, g->mScaleX, g->mScaleY);
         }
         else if (aPlantDef.mReanimationType != ReanimationType::REANIM_NONE)
         {
+            SDL_DisplayID display = SDL_GetPrimaryDisplay();
+            float scale = (float)SDL_GetCurrentDisplayMode(display)->h / 600.0f;
+            g->mScaleX /= scale;
+            g->mScaleY /= scale;
+
+            int offsetX, offsetY, aWidth, aHeight;
+            gLawnApp->mReanimatorCache->GetPlantImageSize(theSeedType, offsetX, offsetY, aWidth, aHeight);
+
+            aOffsetX += ((offsetX * (scale - 1)) / 2.0f) * g->mScaleX * scale;
+            aOffsetY += ((offsetY * (scale - 1)) / 2.0f) * g->mScaleY * scale;
+
             gLawnApp->mReanimatorCache->DrawCachedPlant(g, thePosX + aOffsetX, thePosY + aOffsetY, aSeedType, aDrawVariation, aFilterVaration, theBitVariation);
         }
         else

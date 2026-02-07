@@ -334,7 +334,7 @@ void LawnMower::Draw(Graphics* g)
         }
     }
 
-    //if (mMowerState == LawnMowerState::MOWER_TRIGGERED || mMowerState == LawnMowerState::MOWER_SQUISHED)
+    if (mMowerState == LawnMowerState::MOWER_TRIGGERED || mMowerState == LawnMowerState::MOWER_SQUISHED)
     {
         if (mMowerState == LawnMowerState::MOWER_READY) 
         {
@@ -343,15 +343,19 @@ void LawnMower::Draw(Graphics* g)
         }
         mApp->ReanimationGet(mReanimID)->Draw(g);
     }
-    /*else
+    else
     {
         LawnMowerType aMowerType = mMowerType;
         if (mMowerType == LawnMowerType::LAWNMOWER_LAWN && mBoard->mSuperMowerMode)
         {
             aMowerType = LawnMowerType::LAWNMOWER_SUPER_MOWER;
         }
+        SDL_DisplayID display = SDL_GetPrimaryDisplay();
+        float scale = (float)SDL_GetCurrentDisplayMode(display)->h / 600.0f;
+        g->mScaleX /= scale;
+        g->mScaleY /= scale;
         mApp->mReanimatorCache->DrawCachedMower(g, 0.0f, 19.0f, aMowerType);
-    }*/
+    }
     g->PopState();
 }
 

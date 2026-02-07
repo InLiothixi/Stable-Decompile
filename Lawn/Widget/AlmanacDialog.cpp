@@ -495,6 +495,13 @@ void AlmanacDialog::DrawZombies(Graphics* g)
 				{
 					g->mTransY -= 300;
 				}
+
+				SDL_DisplayID display = SDL_GetPrimaryDisplay();
+				float scale = (float)SDL_GetCurrentDisplayMode(display)->h / 600.0f;
+
+				g->mScaleX /= scale;
+				g->mScaleY /= scale;
+
 				mApp->mReanimatorCache->DrawCachedZombie(g, 0, 0, aZombieTypeToDraw);
 				g->PopState();
 				g->PushState();

@@ -2158,7 +2158,10 @@ void ZombatarWidget::DrawZombatarItem(Graphics* g, NewLawnButton* button, Zombat
 		GetZombatarItemScale(aDef->mZombatarItem, &scaleX, &scaleY);
 
 		if (aDef->mCategory == ZombatarCategory::ZombatarCategory_Clothes) {
-			TodDrawImageScaledF(g, gZombatarClothes[theItem - ZombatarItem::ZOMBATAR_CLOTHE_1], button->mX - 10.0f, button->mY - 10.0f, scaleX, scaleY);
+			SDL_DisplayID display = SDL_GetPrimaryDisplay();
+			float scale = (float)SDL_GetCurrentDisplayMode(display)->h / 600.0f;
+
+			TodDrawImageScaledF(g, gZombatarClothes[theItem - ZombatarItem::ZOMBATAR_CLOTHE_1], button->mX - 10.0f, button->mY - 10.0f, scaleX / scale, scaleY / scale);
 			g->PopState();
 			return;
 		}
@@ -2502,12 +2505,15 @@ void ZombatarWidget::CreateZombatarClothes() {
 	for (int i = ZombatarItem::ZOMBATAR_CLOTHE_1; i <= ZombatarItem::ZOMBATAR_CLOTHE_12; i++) {
 		int clotheNum = i - ZombatarItem::ZOMBATAR_CLOTHE_1;
 
+		SDL_DisplayID display = SDL_GetPrimaryDisplay();
+		float scale = (float)SDL_GetCurrentDisplayMode(display)->h / 600.0f;
+
 		SDL3Image* aImage = new SDL3Image(LawnApp::mSDLRenderer);
-		aImage->mWidth = 147;
-		aImage->mHeight = 146;
+		aImage->mWidth = 147 * scale;
+		aImage->mHeight = 146 * scale;
 		aImage->mD3DData = SDL_CreateTexture(LawnApp::mSDLRenderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, aImage->mWidth, aImage->mHeight);
 		SDL_SetTextureBlendMode((SDL_Texture*)aImage->mD3DData, SDL_BLENDMODE_BLEND);
-		int aBitsCount = 21462;
+		int aBitsCount = aImage->mWidth * aImage->mHeight;
 		aImage->mBits = new unsigned long[aBitsCount + 1];
 		aImage->mHasTrans = true;
 		aImage->mHasAlpha = true;
@@ -2519,9 +2525,9 @@ void ZombatarWidget::CreateZombatarClothes() {
 		aMemoryGraphics.PushState();
 		aMemoryGraphics.SetColorizeImages(true);
 		aMemoryGraphics.SetColor(Color(134, 147, 122));
-		aMemoryGraphics.DrawImageF(IMAGE_ZOMBATAR_ZOMBIE_BLANK_SKIN, 0, 0);
+		TodDrawImageScaledF(&aMemoryGraphics, IMAGE_ZOMBATAR_ZOMBIE_BLANK_SKIN, 0, 0, scale, scale);
 		aMemoryGraphics.PopState();
-		aMemoryGraphics.DrawImageF(IMAGE_ZOMBATAR_ZOMBIE_BLANK, 0, 0);
+		TodDrawImageScaledF(&aMemoryGraphics, IMAGE_ZOMBATAR_ZOMBIE_BLANK, 0, 0, scale, scale);
 
 		ZombatarDefinition& aDef = GetZombatarDefinition((ZombatarItem)i);
 		aMemoryGraphics.PushState();
@@ -2533,11 +2539,15 @@ void ZombatarWidget::CreateZombatarClothes() {
 		float outlineY = 0;
 		GetZombatarPortraitOffset((ZombatarItem)i, &offsetX, &offsetY);
 		GetOutlineOffset((ZombatarItem)i, &outlineX, &outlineY);
+		offsetX *= scale;
+		offsetY *= scale;
+		outlineX *= scale;
+		outlineY *= scale;
 		if (aDef.mImage)
-			aMemoryGraphics.DrawImageF(*aDef.mImage, offsetX - outlineX, offsetY - outlineY);
+			TodDrawImageScaledF(&aMemoryGraphics, *aDef.mImage, offsetX - outlineX, offsetY - outlineY, scale, scale);
 		aMemoryGraphics.SetColor(Color::White);
 		if (aDef.mOutlineImage)
-			aMemoryGraphics.DrawImageF(*aDef.mOutlineImage, offsetX, offsetY);
+			TodDrawImageScaledF(&aMemoryGraphics, *aDef.mOutlineImage, offsetX, offsetY, scale, scale);
 		aMemoryGraphics.PopState();
 		gZombatarClothes[clotheNum] = aImage;
 		SDL_SetRenderTarget(LawnApp::mSDLRenderer, nullptr);

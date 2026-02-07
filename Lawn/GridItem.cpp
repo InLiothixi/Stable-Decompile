@@ -306,7 +306,6 @@ void GridItem::DrawScaryPot(Graphics* g)
     TodDrawImageCelCenterScaledF(g, IMAGE_PLANTSHADOW2, aXPos - 5.0f, aYPos + 72.0f, 0, 1.3f, 1.3f);
 
     g->PushState();
-    g->SetLinearBlend(false);
     if (mTransparentCounter > 0)
     {
         g->DrawImageCel(IMAGE_SCARY_POT, aXPos, aYPos, aImageCol, 0);

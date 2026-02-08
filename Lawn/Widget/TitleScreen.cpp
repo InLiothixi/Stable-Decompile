@@ -55,7 +55,7 @@ TitleScreen::~TitleScreen()
 
 void TitleScreen::DrawToPreload(Graphics* g)
 {
-	g->DrawImageF(IMAGE_PLANTSHADOW, 1000.0f, 0.0f);
+	//g->DrawImageF(IMAGE_PLANTSHADOW, 1000.0f, 0.0f);
 }
 
 //0x48D730
@@ -134,7 +134,10 @@ void TitleScreen::Draw(Graphics* g)
 		return;
 	}
 	if (!mApp->IsScreenSaver() && !mApp->IsParticleEditor())
-		g->DrawImage(IMAGE_TITLESCREEN, 0, 0);
+	{
+		float scale = mApp->mWidth / 800.0f;
+		TodDrawImageCenterScaledF(g, IMAGE_TITLESCREEN, (mApp->mWidth - IMAGE_TITLESCREEN->GetWidth()) / 2.0f, (mApp->mHeight - IMAGE_TITLESCREEN->GetHeight()) / 2.0f, scale, scale);
+	}
 	if (mNeedToInit)
 	{
 		return;
@@ -152,8 +155,8 @@ void TitleScreen::Draw(Graphics* g)
 	if (!mApp->IsScreenSaver() && !mApp->IsParticleEditor())
 		g->DrawImage(IMAGE_PVZ_LOGO, mWidth / 2 - IMAGE_PVZ_LOGO->mWidth / 2, aLogoY);
 
-	int aGrassX = mStartButton->mX - 4;
-	int aGrassY = mStartButton->mY - 17;
+	int aGrassX = mStartButton->mX - 4 + g->mTransX;
+	int aGrassY = mStartButton->mY - 17 + g->mTransY;
 	if (!mApp->IsScreenSaver() && !mApp->IsParticleEditor())
 		g->DrawImage(IMAGE_LOADBAR_DIRT, aGrassX + 6, aGrassY + 18);
 
@@ -177,7 +180,7 @@ void TitleScreen::Draw(Graphics* g)
 		else
 		{
 			Graphics aClipG(*g);
-			aClipG.ClipRect(240 - 8, aGrassY, mCurBarWidth, IMAGE_LOADBAR_GRASS->mHeight);
+			aClipG.ClipRect(mStartButton->mX - 8, aGrassY, mCurBarWidth, IMAGE_LOADBAR_GRASS->mHeight);
 			aClipG.DrawImage(IMAGE_LOADBAR_GRASS, aGrassX + 4, aGrassY);
 
 			Reanimation* aReanim = nullptr;
@@ -190,7 +193,7 @@ void TitleScreen::Draw(Graphics* g)
 			float aRotation = -aRollLen / 180 * PI * 2;
 			float aScale = TodAnimateCurveFloatTime(0, mTotalBarWidth, mCurBarWidth, 1, 0.5f, TodCurves::CURVE_LINEAR);
 			SexyTransform2D aTransform;
-			TodScaleRotateTransformMatrix(aTransform, aGrassX + 11.0f + aRollLen + gSexyAppBase->mDDInterface->mWideScreenOffsetX, aGrassY - 3.0f - 35.0f * aScale + 35.0f + gSexyAppBase->mDDInterface->mWideScreenOffsetY, aRotation, aScale, aScale);
+			TodScaleRotateTransformMatrix(aTransform, aGrassX + 11.0f + aRollLen + g->mTransX, aGrassY - 3.0f - 35.0f * aScale + 35.0f + g->mTransY, aRotation, aScale, aScale);
 			Rect aSrcRect(0, 0, IMAGE_REANIM_SODROLLCAP->mWidth, IMAGE_REANIM_SODROLLCAP->mHeight);
 			TodBltMatrix(g, IMAGE_REANIM_SODROLLCAP, aTransform, g->mClipRect, Color::White, g->mDrawMode, aSrcRect);
 		}
@@ -287,7 +290,7 @@ void TitleScreen::Update()
 
 		mStartButton->mLabel = TodStringTranslate(_S("[LOADING]"));
 		mStartButton->SetFont(FONT_BRIANNETOD16);
-		mStartButton->Resize(mWidth / 2 - IMAGE_LOADBAR_DIRT->mWidth / 2, 650, mTotalBarWidth, 50);
+		mStartButton->Resize(mWidth / 2 - IMAGE_LOADBAR_DIRT->mWidth / 2, mHeight + 50, mTotalBarWidth, 50);
 		mStartButton->mVisible = !mApp->IsScreenSaver() && !mApp->IsParticleEditor();
 
 		float aEstimatedTotalLoadTime;
@@ -311,11 +314,11 @@ void TitleScreen::Update()
 	int aButtonY;
 	if (mTitleStateCounter > 10)
 	{
-		aButtonY = TodAnimateCurve(60, 10, mTitleStateCounter, 650, 534, TodCurves::CURVE_EASE_IN);
+		aButtonY = TodAnimateCurve(60, 10, mTitleStateCounter, mHeight + 50, mHeight - 66, TodCurves::CURVE_EASE_IN);
 	}
 	else
 	{
-		aButtonY = TodAnimateCurve(10, 0, mTitleStateCounter, 534, 529, TodCurves::CURVE_BOUNCE);
+		aButtonY = TodAnimateCurve(10, 0, mTitleStateCounter, mHeight - 66, mHeight - 71, TodCurves::CURVE_BOUNCE);
 	}
 	mStartButton->Resize(mStartButton->mX, aButtonY, mTotalBarWidth, mStartButton->mHeight);
 
@@ -453,8 +456,8 @@ void TitleScreen::Update()
 		if (aPrevWidth < aTriggerPoint[i] && mCurBarWidth >= aTriggerPoint[i])
 		{
 			ReanimationType aReanimType = ReanimationType::REANIM_LOADBAR_SPROUT;
-			float aPosX = aTriggerPoint[i] + 225.0f;
-			float aPosY = 511.0f;
+			float aPosX = aTriggerPoint[i] + 225.0f + mApp->mDDInterface->mWideScreenOffsetX;
+			float aPosY = mApp->mHeight - 89;
 			if (i == 4)
 			{
 				aPosX += 1;

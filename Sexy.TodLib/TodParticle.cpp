@@ -8,6 +8,7 @@
 #include "../Sexy.TodLib/FilterEffect.h"
 #include "../SexyAppFramework/DDInterface.h"
 #include "../SexyAppFramework/DDImage.h"
+#include "../LawnApp.h"
 
 int gParticleDefCount;                      // [0x6A9F08]
 TodParticleDefinition* gParticleDefArray;   // [0x6A9F0C]
@@ -1108,7 +1109,7 @@ void RenderParticle(Graphics* g, TodParticle* theParticle, const Color& theColor
 		else if (theParams->mFilterEffect == FilterEffect::FILTER_EFFECT_WHITE)
 			g->SetColor(Color::White);
 		
-		g->FillRect(-g->mTransX, -g->mTransY, 800, 600);
+		g->FillRect(-g->mTransX, -g->mTransY, gLawnApp->mWidth, gLawnApp->mHeight);
 		g->SetColor(anOldColor);
 		g->SetDrawMode(anOldDrawMode);
 	}

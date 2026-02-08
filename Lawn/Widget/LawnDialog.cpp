@@ -481,7 +481,7 @@ GameOverDialog::GameOverDialog(const SexyString& theMessage, bool theShowChallen
     mClip = false;
 
     mMenuButton = MakeButton(1, this, _S("[MAIN_MENU_BUTTON]"));
-    mMenuButton->Resize(635 - mX, -10 - mY, 163, 46);
+    mMenuButton->Resize(635 - mX + mApp->mDDInterface->mWideScreenOffsetX, -10 - mY + mApp->mDDInterface->mWideScreenOffsetY, 163, 46);
 
     gLawnApp->mBoard->mShowShovel = false;
     gLawnApp->mBoard->mMenuButton->mBtnNoDraw = true;

@@ -840,7 +840,7 @@ bool Reanimation::DrawTrack(Graphics* g, int theTrackIndex, int theRenderGroup, 
 	{
 		Color aOldColor = g->GetColor();  // 备份颜色
 		g->SetColor(aColor);
-		g->FillRect(-g->mTransX, -g->mTransY, 800, 600);
+		g->FillRect(-g->mTransX, -g->mTransY, gLawnApp->mWidth, gLawnApp->mHeight);
 		g->SetColor(aOldColor);  // 还原颜色
 	}
 	return true;

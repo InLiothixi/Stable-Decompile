@@ -416,7 +416,7 @@ void Projectile::CheckForCollision()
 
 	Zombie* aTargetZombie = mMotionType == ProjectileMotion::MOTION_HOMING ?  mBoard->ZombieTryToGet(mTargetZombieID) : nullptr;
 
-	if ((mPosX > WIDE_BOARD_WIDTH || mPosX + mWidth < 0) && !aTargetZombie)
+	if ((mPosX > WIDE_BOARD_WIDTH && mProjectileType != ProjectileType::PROJECTILE_ZOMBIE_PEA || mPosX + mWidth < 0) && !aTargetZombie)
 	{
 		Die();
 		return;
@@ -1563,7 +1563,7 @@ void Projectile::Draw(Graphics* g)
 				aScaleX *= -1;
 
 			SexyTransform2D aTransform;
-			TodScaleRotateTransformMatrix(aTransform, aOffsetX + mBoard->mX + mApp->mDDInterface->mWideScreenOffsetX, aOffsetY + mBoard->mY + mApp->mDDInterface->mWideScreenOffsetY, mRotation, aScaleX, aScaleY);
+			TodScaleRotateTransformMatrix(aTransform, aOffsetX + mBoard->mX + (g->mTransX - mX), aOffsetY + mBoard->mY + (g->mTransY - mY), mRotation, aScaleX, aScaleY);
 			TodBltMatrix(&gProj, aImage, aTransform, gProj.mClipRect, gProj.mColor, gProj.mDrawMode, aSrcRect);
 		}
 	}

@@ -5,6 +5,7 @@
 #include "../SexyAppFramework/Font.h"
 #include "../Sexy.TodLib/TodStringFile.h"
 #include "../SexyAppFramework/SysFont.h"
+#include "../LawnApp.h"
 
 using namespace Sexy;
 
@@ -131,9 +132,9 @@ void ToolTipWidget::Draw(Graphics* g)
 	{
 		aPosX = mMinLeft - (int)g->mTransX;
 	}
-	else if (aPosX + mWidth + g->mTransX > BOARD_WIDTH - WIDESCREEN_OFFSETX)
+	else if (aPosX + mWidth + g->mTransX > gLawnApp->mWidth - WIDESCREEN_OFFSETX)
 	{
-		aPosX = BOARD_WIDTH - WIDESCREEN_OFFSETX - g->mTransX - mWidth;
+		aPosX = gLawnApp->mWidth - WIDESCREEN_OFFSETX - g->mTransX - mWidth;
 	}
 
 	int aPosY = mY;

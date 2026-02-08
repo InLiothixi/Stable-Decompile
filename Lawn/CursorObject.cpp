@@ -71,6 +71,9 @@ void CursorObject::Die()
 //0x438820
 void CursorObject::Draw(Graphics* g)
 {
+    g->PushState();
+    g->TranslateF(-mApp->mDDInterface->mWideScreenOffsetX, -mApp->mDDInterface->mWideScreenOffsetY);
+
     switch (mCursorType)
     {
     case CursorType::CURSOR_TYPE_SHOVEL:
@@ -248,6 +251,7 @@ void CursorObject::Draw(Graphics* g)
         g->DrawImageF(Sexy::IMAGE_REANIM_CORNPULT_BUTTER, 11, 21);
         break;
     }
+    g->PopState();
 }
 
 //0x438D50
@@ -272,8 +276,8 @@ void CursorPreview::Update()
     }
 
     SeedType aSeedType = mBoard->GetSeedTypeInCursor();
-    int aMouseX = mApp->mWidgetManager->mLastMouseX;
-    int aMouseY = mApp->mWidgetManager->mLastMouseY;
+    int aMouseX = mApp->mWidgetManager->mLastMouseX - mApp->mDDInterface->mWideScreenOffsetX;
+    int aMouseY = mApp->mWidgetManager->mLastMouseY - mApp->mDDInterface->mWideScreenOffsetY;
     mGridX = mBoard->PlantingPixelToGridX(aMouseX, aMouseY, aSeedType);
     mGridY = mBoard->PlantingPixelToGridY(aMouseX, aMouseY, aSeedType);
     if (mGridX >= 0 && mGridX < MAX_GRID_SIZE_X && mGridY >= 0 && mGridY <= MAX_GRID_SIZE_Y)
@@ -310,6 +314,7 @@ void CursorPreview::Draw(Graphics* g)
     if (aSeedType == SeedType::SEED_NONE)
         return;
 
+    g->PushState();
     g->SetColorizeImages(true);
     g->SetColor(Color(255, 255, 255, 100));
 
@@ -400,5 +405,5 @@ void CursorPreview::Draw(Graphics* g)
         }
     }
 
-    g->SetColorizeImages(false);
+    g->PopState();
 }

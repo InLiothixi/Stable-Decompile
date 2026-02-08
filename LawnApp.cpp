@@ -365,6 +365,12 @@ void LawnApp::MakeWindow()
 		mFullScreenWindow = false;
 	}
 
+	mWidth = 1280;
+	mHeight = 720;
+
+	mDDInterface->mWideScreenOffsetX = 240;
+	mDDInterface->mWideScreenOffsetY = 60;
+
 	gBoardBounds = Rect{ 0, 0, mWidth, mHeight };
 
 	unsigned long long windowFlags = 0UL;
@@ -379,6 +385,9 @@ void LawnApp::MakeWindow()
 	SDL_SetRenderVSync(mSDLRenderer, mEnableVsync);
 	SDL_SetRenderLogicalPresentation(mSDLRenderer, mWidth, mHeight, SDL_LOGICAL_PRESENTATION_LETTERBOX);
 	mHWnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(mSDLWindow), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
+
+	mWidgetManager->mWidth = mWidth;
+	mWidgetManager->mHeight = mHeight;
 
 	mWidgetManager->mImage = new SDL3Image(mSDLRenderer);
 	mWidgetManager->mImage->mWidth = mWidth;
@@ -2276,6 +2285,11 @@ void LawnApp::Start()
 }
 
 int LawnApp::AudioCallback(const void* inputBuffer, void* outputBuffer, unsigned long framesPerBuffer, const PaStreamCallbackTimeInfo* timeInfo, PaStreamCallbackFlags statusFlags, void* userData) {
+	if (!inputBuffer) {
+		*(float*)userData = 0.0f;
+		return paContinue;
+	}
+
 	const float* input = (const float*)inputBuffer;
 	float rms = 0.0f;
 	for (unsigned long i = 0; i < framesPerBuffer; ++i) {
@@ -3202,7 +3216,7 @@ void LawnApp::ButtonDepress(int theId)
 
 void LawnApp::CenterDialog(Dialog* theDialog, int theWidth, int theHeight)
 {
-	theDialog->Resize((BOARD_WIDTH - theWidth) / 2, (BOARD_HEIGHT - theHeight) / 2, theWidth, theHeight);
+	theDialog->Resize((gLawnApp->mWidth - theWidth) / 2, (gLawnApp->mHeight - theHeight) / 2, theWidth, theHeight);
 }
 
 //0x453630

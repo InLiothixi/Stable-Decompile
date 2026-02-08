@@ -783,7 +783,7 @@ void CutScene::StartLevelIntro()
 		mBoard->mMenuButton->mBtnNoDraw = true;
 
 	mApp->mSeedChooserScreen->mMouseVisible = false;
-	mApp->mSeedChooserScreen->Move(0, SEED_CHOOSER_OFFSET_Y - WIDESCREEN_OFFSETY);
+	mApp->mSeedChooserScreen->Move(mApp->mDDInterface->mWideScreenOffsetX, SEED_CHOOSER_OFFSET_Y - WIDESCREEN_OFFSETY + mApp->mDDInterface->mWideScreenOffsetY);
 	mApp->mSeedChooserScreen->mMenuButton->mBtnNoDraw = true;
 	mBoard->mShowShovel = false;
 	mBoard->mSeedBank->mCutSceneDarken = 255;
@@ -1085,7 +1085,7 @@ void CutScene::CancelIntro()
 
 		if (!IsNonScrollingCutscene())
 		{
-			mBoard->Move(mApp->mWidth - BOARD_IMAGE_WIDTH_OFFSET - (mBoard->StageHasRoof() ? 0 : 170), 0);
+			mBoard->Move(800 - BOARD_IMAGE_WIDTH_OFFSET, 0);
 			mBoard->mTreeX = -664;
 			mBoard->mPoleX = -WIDE_BOARD_WIDTH + WIDESCREEN_OFFSETX;
 		}
@@ -1288,7 +1288,7 @@ void CutScene::AnimateBoard()
 	}
 	if (mCutsceneTime > aTimePanRightStart && mCutsceneTime <= aTimePanRightEnd)
 	{
-		int aPanOffset = CalcPosition(aTimePanRightStart, aTimePanRightEnd, -aBoardOffset, (mBoard->StageHasRoof() ? 0 : 170) + BOARD_IMAGE_WIDTH_OFFSET - mApp->mWidth);
+		int aPanOffset = CalcPosition(aTimePanRightStart, aTimePanRightEnd, -aBoardOffset, BOARD_IMAGE_WIDTH_OFFSET - 800);
 		int startOffsetX = WIDE_BOARD_WIDTH + WIDESCREEN_OFFSETX + 70;
 		mBoard->mTreeX = CalcPosition(aTimePanRightStart, aTimePanRightEnd, startOffsetX, -664);
 		mBoard->mPoleX = CalcPosition(aTimePanRightStart, aTimePanRightEnd, startOffsetX, -WIDE_BOARD_WIDTH + WIDESCREEN_OFFSETX);
@@ -1308,8 +1308,8 @@ void CutScene::AnimateBoard()
 		// ====================================================================================================
 		if (mCutsceneTime > aTimeSeedChoserSlideOnStart && mCutsceneTime <= aTimeSeedChoserSlideOnEnd)
 		{
-			aSeedChoser->Move(0, CalcPosition(aTimeSeedChoserSlideOnStart, aTimeSeedChoserSlideOnEnd, SEED_CHOOSER_OFFSET_Y - WIDESCREEN_OFFSETY, 0));
-			aSeedChoser->mMenuButton->mY = CalcPosition(aTimeSeedChoserSlideOnStart, aTimeSeedChoserSlideOnEnd, -50 + WIDESCREEN_OFFSETY, -10);
+			aSeedChoser->Move(mApp->mDDInterface->mWideScreenOffsetX, CalcPosition(aTimeSeedChoserSlideOnStart, aTimeSeedChoserSlideOnEnd, SEED_CHOOSER_OFFSET_Y - WIDESCREEN_OFFSETY, 0) + mApp->mDDInterface->mWideScreenOffsetY);
+			aSeedChoser->mMenuButton->mY = CalcPosition(aTimeSeedChoserSlideOnStart, aTimeSeedChoserSlideOnEnd, -50 + WIDESCREEN_OFFSETY, -10) + mApp->mDDInterface->mWideScreenOffsetY;
 			aSeedChoser->mMenuButton->mBtnNoDraw = false;
 		}
 		// ====================================================================================================
@@ -1319,7 +1319,7 @@ void CutScene::AnimateBoard()
 		int aTimeSeedChoserSlideOffEnd = TimeSeedChoserSlideOffEnd + mCrazyDaveTime;
 		if (mCutsceneTime > aTimeSeedChoserSlideOffStart && mCutsceneTime <= aTimeSeedChoserSlideOffEnd)
 		{
-			aSeedChoser->Move(0, CalcPosition(aTimeSeedChoserSlideOffStart, aTimeSeedChoserSlideOffEnd, 0, SEED_CHOOSER_OFFSET_Y - WIDESCREEN_OFFSETY));
+			aSeedChoser->Move(mApp->mDDInterface->mWideScreenOffsetX, CalcPosition(aTimeSeedChoserSlideOffStart, aTimeSeedChoserSlideOffEnd, 0, SEED_CHOOSER_OFFSET_Y - WIDESCREEN_OFFSETY) + mApp->mDDInterface->mWideScreenOffsetY);
 			aSeedChoser->mMenuButton->mDisabled = true;
 		}
 	}
@@ -1329,7 +1329,7 @@ void CutScene::AnimateBoard()
 	// ====================================================================================================
 	if (mCutsceneTime > aTimePanLeftStart)
 	{
-		int aPanOffset = CalcPosition(aTimePanLeftStart, aTimePanLeftEnd, (mBoard->StageHasRoof() ? 0 : 170) + BOARD_IMAGE_WIDTH_OFFSET - mApp->mWidth, 0);
+		int aPanOffset = CalcPosition(aTimePanLeftStart, aTimePanLeftEnd, BOARD_IMAGE_WIDTH_OFFSET - 800, 0);
 		int endOffsetX = WIDE_BOARD_WIDTH + WIDESCREEN_OFFSETX + 70;
 		mBoard->mTreeX = CalcPosition(aTimePanLeftStart, aTimePanLeftEnd, -664, endOffsetX);
 		mBoard->mPoleX = CalcPosition(aTimePanLeftStart, aTimePanLeftEnd, -WIDE_BOARD_WIDTH + WIDESCREEN_OFFSETX, endOffsetX);
@@ -2350,8 +2350,8 @@ void CutScene::UpdateUpsell()
 	{
 		if (!mCrazyDaveCountDown)
 		{
-			mBoard->mStoreButton->Resize(510, 420, 210, 46);
-			mBoard->mMenuButton->Resize(510, 480, 210, 46);
+			mBoard->mStoreButton->Resize(510 + mApp->mDDInterface->mWideScreenOffsetX, 420 + mApp->mDDInterface->mWideScreenOffsetY, 210, 46);
+			mBoard->mMenuButton->Resize(510 + mApp->mDDInterface->mWideScreenOffsetX, 480 + mApp->mDDInterface->mWideScreenOffsetY, 210, 46);
 			mBoard->mMenuButton->mBtnNoDraw = false;
 			mBoard->mStoreButton->mBtnNoDraw = false;
 		}

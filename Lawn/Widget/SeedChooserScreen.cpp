@@ -50,13 +50,13 @@ SeedChooserScreen::SeedChooserScreen()
 	mStartButton->mDisabledImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON_DISABLED;
 	mStartButton->mOverOverlayImage = Sexy::IMAGE_SEEDCHOOSER_BUTTON_GLOW;
 	mStartButton->SetFont(Sexy::FONT_DWARVENTODCRAFT18YELLOW);
-	mStartButton->Resize(154, 545, 156, 42);
+	mStartButton->Resize(154 + mApp->mDDInterface->mWideScreenOffsetX, 545 + mApp->mDDInterface->mWideScreenOffsetY, 156, 42);
 	mStartButton->mTextOffsetY = -1;
 	EnableStartButton(false);
 
 	mMenuButton = new GameButton(SeedChooserScreen::SeedChooserScreen_Menu);
 	mMenuButton->SetLabel(_S("[MENU_BUTTON]"));
-	mMenuButton->Resize(681, -10, 117, 46);
+	mMenuButton->Resize(681 + mApp->mDDInterface->mWideScreenOffsetX, -10 + mApp->mDDInterface->mWideScreenOffsetY, 117, 46);
 	mMenuButton->mDrawStoneButton = true;
 
 	mRandomButton = new GameButton(SeedChooserScreen::SeedChooserScreen_Random);
@@ -67,7 +67,7 @@ SeedChooserScreen::SeedChooserScreen()
 	mRandomButton->SetFont(Sexy::FONT_BRIANNETOD12);
 	mRandomButton->mColors[0] = Color(255, 240, 0);
 	mRandomButton->mColors[1] = Color(200, 200, 255);
-	mRandomButton->Resize(332, 546, 100, 30);
+	mRandomButton->Resize(332 + mApp->mDDInterface->mWideScreenOffsetX, 546 + mApp->mDDInterface->mWideScreenOffsetY, 100, 30);
 	if (!mApp->mTodCheatKeys)
 	{
 		mRandomButton->mBtnNoDraw = true;
@@ -357,8 +357,8 @@ void SeedChooserScreen::GetSeedPositionInChooser(int theIndex, int& x, int& y)
 //0x484480
 void SeedChooserScreen::GetSeedPositionInBank(int theIndex, int& x, int& y)
 {
-	x = mBoard->mSeedBank->mX - mX + mBoard->GetSeedPacketPositionX(theIndex);
-	y = mBoard->mSeedBank->mY - mY + 8;
+	x = mBoard->mSeedBank->mX - mX + mBoard->GetSeedPacketPositionX(theIndex) + mApp->mDDInterface->mWideScreenOffsetX;
+	y = mBoard->mSeedBank->mY - mY + 8 + mApp->mDDInterface->mWideScreenOffsetY;
 }
 
 //0x4844D0
@@ -488,8 +488,8 @@ void SeedChooserScreen::Draw(Graphics* g)
 			int aPosY = aChosenSeed.mY;
 			if (aSeedState == SEED_IN_BANK)
 			{
-				aPosX -= mX;
-				aPosY -= mY;
+				aPosX -= mX - mApp->mDDInterface->mWideScreenOffsetX;
+				aPosY -= mY - mApp->mDDInterface->mWideScreenOffsetY;
 			}
 			else
 			{
@@ -547,8 +547,11 @@ void SeedChooserScreen::Draw(Graphics* g)
 		mScrollbar->Draw(&mScrollG);
 		mScrollbar->mButtonNoDraw = true;
 	}
+	g->PushState();
+	g->TranslateF(-mApp->mDDInterface->mWideScreenOffsetX, -mApp->mDDInterface->mWideScreenOffsetY);
 	mStartButton->Draw(g);
 	mRandomButton->Draw(g);
+	g->PopState();
 	mViewLawnButton->Draw(g);
 	mAlmanacButton->Draw(g);
 	mStoreButton->Draw(g);
@@ -567,23 +570,23 @@ void SeedChooserScreen::UpdateViewLawn()
 	if (mViewLawnTime == 100) mBoard->DisplayAdviceAgain(_S("[CLICK_TO_CONTINUE]"), MESSAGE_STYLE_HINT_STAY, ADVICE_CLICK_TO_CONTINUE);
 	else if (mViewLawnTime == 251) mViewLawnTime = 250;
 
-	int aBoardX = (mBoard->StageHasRoof() ? 0 : 170) + BOARD_IMAGE_WIDTH_OFFSET - mApp->mWidth;
+	int aBoardX = BOARD_IMAGE_WIDTH_OFFSET - 800;
 	int aSeedChooserY = SEED_CHOOSER_OFFSET_Y - Sexy::IMAGE_SEEDCHOOSER_BACKGROUND->mHeight;
 	if (mViewLawnTime <= 100)
 	{
 		mBoard->Move(-TodAnimateCurve(0, 100, mViewLawnTime, aBoardX, 0, CURVE_EASE_IN_OUT), 0);
-		Move(0, TodAnimateCurve(0, 40, mViewLawnTime, aSeedChooserY, SEED_CHOOSER_OFFSET_Y - WIDESCREEN_OFFSETY, CURVE_EASE_IN_OUT));
+		Move(mApp->mDDInterface->mWideScreenOffsetX, TodAnimateCurve(0, 40, mViewLawnTime, aSeedChooserY, SEED_CHOOSER_OFFSET_Y - WIDESCREEN_OFFSETY, CURVE_EASE_IN_OUT) + mApp->mDDInterface->mWideScreenOffsetY);
 	}
 	else if (mViewLawnTime <= 250)
 	{
 		mBoard->Move(0, 0);
-		Move(0, SEED_CHOOSER_OFFSET_Y - WIDESCREEN_OFFSETY);
+		Move(mApp->mDDInterface->mWideScreenOffsetX, SEED_CHOOSER_OFFSET_Y - WIDESCREEN_OFFSETY + mApp->mDDInterface->mWideScreenOffsetY);
 	}
 	else if (mViewLawnTime <= 350)
 	{
 		mBoard->ClearAdvice(ADVICE_CLICK_TO_CONTINUE);
 		mBoard->Move(-TodAnimateCurve(250, 350, mViewLawnTime, 0, aBoardX, CURVE_EASE_IN_OUT), 0);
-		Move(0, TodAnimateCurve(310, 350, mViewLawnTime, SEED_CHOOSER_OFFSET_Y - WIDESCREEN_OFFSETY, aSeedChooserY, CURVE_EASE_IN_OUT));
+		Move(mApp->mDDInterface->mWideScreenOffsetX, TodAnimateCurve(310, 350, mViewLawnTime, SEED_CHOOSER_OFFSET_Y - WIDESCREEN_OFFSETY, aSeedChooserY, CURVE_EASE_IN_OUT) + mApp->mDDInterface->mWideScreenOffsetY);
 	}
 	else
 	{
@@ -933,6 +936,9 @@ void SeedChooserScreen::ButtonDepress(int theId)
 //0x485D80
 SeedType SeedChooserScreen::SeedHitTest(int x, int y)
 {
+	x -= mApp->mDDInterface->mWideScreenOffsetX;
+	y -= mApp->mDDInterface->mWideScreenOffsetY;
+
 	if (mMouseVisible)
 	{
 		for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < NUM_SEEDS_IN_CHOOSER; aSeedType = (SeedType)(aSeedType + 1))
@@ -1117,7 +1123,7 @@ void SeedChooserScreen::ShowToolTip()
 					aSeedY -= mScrollbar->mScrollValue;
 				}
 
-				mToolTip->mX = ClampInt((SEED_PACKET_WIDTH - mToolTip->mWidth) / 2 + aSeedX, 0, BOARD_WIDTH - mToolTip->mWidth);
+				mToolTip->mX = ClampInt((SEED_PACKET_WIDTH - mToolTip->mWidth) / 2 + aSeedX, 0, mApp->mWidth - mToolTip->mWidth);
 				mToolTip->mY = aSeedY + 70;
 				mToolTip->mVisible = true;
 				mToolTipSeed = aSeedType;
@@ -1239,7 +1245,10 @@ void SeedChooserScreen::MouseDown(int x, int y, int theClickCount)
 				return;
 			}
 		}
-		
+
+		x += mApp->mDDInterface->mWideScreenOffsetX;
+		y += mApp->mDDInterface->mWideScreenOffsetY;
+
 		SeedType aSeedType = SeedHitTest(x, y);
 		if (aSeedType != SEED_NONE && !SeedNotAllowedToPick(aSeedType))
 		{

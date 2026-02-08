@@ -233,7 +233,7 @@ Board::Board(LawnApp* theApp)
 	if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN || mApp->mGameMode == GameMode::GAMEMODE_TREE_OF_WISDOM)
 	{
 		mMenuButton->SetLabel(_S("[MAIN_MENU_BUTTON]"));
-		mMenuButton->Resize(628, -10, 163, 46);
+		mMenuButton->Resize(628 + mApp->mDDInterface->mWideScreenOffsetX, -10 + mApp->mDDInterface->mWideScreenOffsetY, 163, 46);
 
 		if (mApp->IsScreenSaver())
 		{
@@ -245,12 +245,12 @@ Board::Board(LawnApp* theApp)
 		mStoreButton->mOverImage = IMAGE_ZENSHOPBUTTON_HIGHLIGHT;
 		mStoreButton->mDownImage = IMAGE_ZENSHOPBUTTON_HIGHLIGHT;
 		mStoreButton->mParentWidget = this;
-		mStoreButton->Resize(678, 33, IMAGE_ZENSHOPBUTTON->mWidth, 40);
+		mStoreButton->Resize(678 + mApp->mDDInterface->mWideScreenOffsetX, 33 + mApp->mDDInterface->mWideScreenOffsetY, IMAGE_ZENSHOPBUTTON->mWidth, 40);
 	}
 	else
 	{
 		mMenuButton->SetLabel(_S("[MENU_BUTTON]"));
-		mMenuButton->Resize(681, -10, 117, 46);
+		mMenuButton->Resize(681 + mApp->mDDInterface->mWideScreenOffsetX, -10 + mApp->mDDInterface->mWideScreenOffsetY, 117, 46);
 	}
 
 	if (mApp->IsLastStand())
@@ -264,7 +264,7 @@ Board::Board(LawnApp* theApp)
 	if (mApp->mGameMode == GameMode::GAMEMODE_UPSELL)
 	{
 		mMenuButton->SetLabel(_S("[MAIN_MENU_BUTTON]"));
-		mMenuButton->Resize(628, -10, 163, 46);
+		mMenuButton->Resize(628 + mApp->mDDInterface->mWideScreenOffsetX, -10 + mApp->mDDInterface->mWideScreenOffsetY, 163, 46);
 
 		mStoreButton = new GameButton(1);
 		mStoreButton->mDrawStoneButton = true;
@@ -280,7 +280,7 @@ Board::Board(LawnApp* theApp)
 		mStoreButton->mOverImage = IMAGE_CAGEICON;
 		mStoreButton->mDownImage = IMAGE_CAGEICON;
 		mStoreButton->mParentWidget = this;
-		mStoreButton->Resize(BOARD_WIDTH - IMAGE_CAGEICON->GetWidth(), mMenuButton->mY + mMenuButton->mHeight + 10, IMAGE_CAGEICON->GetWidth(), IMAGE_CAGEICON->GetHeight());
+		mStoreButton->Resize(BOARD_WIDTH - IMAGE_CAGEICON->GetWidth() + mApp->mDDInterface->mWideScreenOffsetX, mMenuButton->mY + mMenuButton->mHeight + 10, IMAGE_CAGEICON->GetWidth(), IMAGE_CAGEICON->GetHeight());
 	}
 #endif
 }
@@ -3806,8 +3806,8 @@ void Board::UpdateMousePosition()
 	}
 
 	SeedType aCursorSeedType = GetSeedTypeInCursor();
-	int aMouseX = mApp->mWidgetManager->mLastMouseX - mX;
-	int aMouseY = mApp->mWidgetManager->mLastMouseY - mY;
+	int aMouseX = mApp->mWidgetManager->mLastMouseX - mX - mApp->mDDInterface->mWideScreenOffsetX;
+	int aMouseY = mApp->mWidgetManager->mLastMouseY - mY - mApp->mDDInterface->mWideScreenOffsetY;
 
 	// 破罐者关卡中，检测并高亮鼠标悬浮的罐子
 	if (mApp->IsScaryPotterLevel())
@@ -3858,11 +3858,14 @@ void Board::UpdateMousePosition()
 		return;
 	}
 
+	const int aLastMouseX = mApp->mWidgetManager->mLastMouseX - mApp->mDDInterface->mWideScreenOffsetX;
+	const int aLastMouseY = mApp->mWidgetManager->mLastMouseY - mApp->mDDInterface->mWideScreenOffsetY;
+
 	// 咖啡豆及坚果包扎术
 	if (aCursorSeedType == SeedType::SEED_INSTANT_COFFEE)
 	{
-		int aGridX = PlantingPixelToGridX(mApp->mWidgetManager->mLastMouseX, mApp->mWidgetManager->mLastMouseY, aCursorSeedType);
-		int aGridY = PlantingPixelToGridY(mApp->mWidgetManager->mLastMouseX, mApp->mWidgetManager->mLastMouseY, aCursorSeedType);
+		int aGridX = PlantingPixelToGridX(aLastMouseX, aLastMouseY, aCursorSeedType);
+		int aGridY = PlantingPixelToGridY(aLastMouseX, aLastMouseY, aCursorSeedType);
 
 		Plant* aPlant = GetTopPlantAt(aGridX, aGridY, PlantPriority::TOPPLANT_ONLY_NORMAL_POSITION);
 		if (aPlant && aPlant->mIsAsleep && CanPlantAt(aGridX, aGridY, SeedType::SEED_INSTANT_COFFEE) == PlantingReason::PLANTING_OK)
@@ -3872,8 +3875,8 @@ void Board::UpdateMousePosition()
 	}
 	else if (aCursorSeedType == SeedType::SEED_WALLNUT || aCursorSeedType == SeedType::SEED_TALLNUT)
 	{
-		int aGridX = PlantingPixelToGridX(mApp->mWidgetManager->mLastMouseX, mApp->mWidgetManager->mLastMouseY, aCursorSeedType);
-		int aGridY = PlantingPixelToGridY(mApp->mWidgetManager->mLastMouseX, mApp->mWidgetManager->mLastMouseY, aCursorSeedType);
+		int aGridX = PlantingPixelToGridX(aLastMouseX, aLastMouseY, aCursorSeedType);
+		int aGridY = PlantingPixelToGridY(aLastMouseX, aLastMouseY, aCursorSeedType);
 
 		Plant* aPlant = GetTopPlantAt(aGridX, aGridY, PlantPriority::TOPPLANT_ONLY_PUMPKIN);
 		if (aPlant && aPlant->mSeedType == aCursorSeedType && CanPlantAt(aGridX, aGridY, aCursorSeedType) == PlantingReason::PLANTING_OK)
@@ -3883,8 +3886,8 @@ void Board::UpdateMousePosition()
 	}
 	else if (aCursorSeedType == SeedType::SEED_PUMPKINSHELL)
 	{
-		int aGridX = PlantingPixelToGridX(mApp->mWidgetManager->mLastMouseX, mApp->mWidgetManager->mLastMouseY, aCursorSeedType);
-		int aGridY = PlantingPixelToGridY(mApp->mWidgetManager->mLastMouseX, mApp->mWidgetManager->mLastMouseY, aCursorSeedType);
+		int aGridX = PlantingPixelToGridX(aLastMouseX, aLastMouseY, aCursorSeedType);
+		int aGridY = PlantingPixelToGridY(aLastMouseX, aLastMouseY, aCursorSeedType);
 
 		Plant* aPlant = GetTopPlantAt(aGridX, aGridY, PlantPriority::TOPPLANT_ONLY_NORMAL_POSITION);
 		if (aPlant && aPlant->mSeedType == SeedType::SEED_PUMPKINSHELL && CanPlantAt(aGridX, aGridY, SeedType::SEED_PUMPKINSHELL) == PlantingReason::PLANTING_OK)
@@ -3909,8 +3912,8 @@ void Board::UpdateToolTip()
 		return;
 	}
 
-	int aMouseX = mWidgetManager->mLastMouseX - mX;
-	int aMouseY = mWidgetManager->mLastMouseY - mY;
+	int aMouseX = mWidgetManager->mLastMouseX - mX - mApp->mDDInterface->mWideScreenOffsetX;
+	int aMouseY = mWidgetManager->mLastMouseY - mY - mApp->mDDInterface->mWideScreenOffsetY;
 
 	if (mApp->mGameScene == GameScenes::SCENE_LEVEL_INTRO)
 	{
@@ -3962,18 +3965,18 @@ void Board::UpdateToolTip()
 		mToolTip->mMinLeft = IMAGE_SEEDCHOOSER_BACKGROUND->GetWidth();
 		if (mApp->mSeedChooserScreen->mAlmanacButton->mBtnNoDraw && mApp->mSeedChooserScreen->mStoreButton->mBtnNoDraw)
 		{
-			mToolTip->mMaxBottom = 600;
+			mToolTip->mMaxBottom = mApp->mHeight;
 		}
 		else
 		{
-			mToolTip->mMaxBottom = 570;
+			mToolTip->mMaxBottom = mApp->mHeight - 30;
 		}
 		if (!mApp->mSeedChooserScreen->mImitaterButton->mBtnNoDraw)
 		{
 			mToolTip->CalculateSize();
 			if (mX + mToolTip->mX - mToolTip->mWidth / 2 < 524)
 			{
-				mToolTip->mMaxBottom = 503;
+				mToolTip->mMaxBottom = mApp->mHeight - 97;
 			}
 		}
 
@@ -5191,6 +5194,9 @@ void Board::PickUpTool(GameObjectType theObjectType)
 void Board::MouseDown(int x, int y, int theClickCount)
 {
 	Widget::MouseDown(x, y, theClickCount);
+
+	x -= mApp->mDDInterface->mWideScreenOffsetX;
+	y -= mApp->mDDInterface->mWideScreenOffsetY;
 
 	if (mApp->IsScreenSaver())
 		return;
@@ -8653,13 +8659,13 @@ void Board::DrawTopRightUI(Graphics* g)
 	{
 		if (mChallenge->mChallengeState == STATECHALLENGE_ZEN_FADING)
 		{
-			mMenuButton->mY = TodAnimateCurve(50, 0, mChallenge->mChallengeStateCounter, -10, -50 + WIDESCREEN_OFFSETY, TodCurves::CURVE_EASE_IN_OUT);
-			mStoreButton->mX = TodAnimateCurve(50, 0, mChallenge->mChallengeStateCounter, 678, 800 - WIDESCREEN_OFFSETX, TodCurves::CURVE_EASE_IN_OUT);
+			mMenuButton->mY = TodAnimateCurve(50, 0, mChallenge->mChallengeStateCounter, -10 + mApp->mDDInterface->mWideScreenOffsetY, -50 + WIDESCREEN_OFFSETY + mApp->mDDInterface->mWideScreenOffsetY, TodCurves::CURVE_EASE_IN_OUT);
+			mStoreButton->mX = TodAnimateCurve(50, 0, mChallenge->mChallengeStateCounter, 678 + mApp->mDDInterface->mWideScreenOffsetX, mWidth - WIDESCREEN_OFFSETX + mApp->mDDInterface->mWideScreenOffsetX, TodCurves::CURVE_EASE_IN_OUT);
 		}
 		else
 		{
-			mMenuButton->mY = -10;
-			mStoreButton->mX = 678;
+			mMenuButton->mY = -10 + mApp->mDDInterface->mWideScreenOffsetY;
+			mStoreButton->mX = 678 + mApp->mDDInterface->mWideScreenOffsetX;
 		}
 	}
 
@@ -8669,9 +8675,12 @@ void Board::DrawTopRightUI(Graphics* g)
 		g->SetColor(GetFlashingColor(mMainCounter, 75));
 	}
 
-	if (mApp->mGameMode == GameMode::GAMEMODE_UPSELL)
+	//if (mApp->mGameMode == GameMode::GAMEMODE_UPSELL)
 	{
+		g->PushState();
+		g->TranslateF(-mApp->mDDInterface->mWideScreenOffsetX, -mApp->mDDInterface->mWideScreenOffsetY);
 		mMenuButton->Draw(g);
+		g->PopState();
 	}
 
 	g->SetColorizeImages(false);
@@ -8693,6 +8702,7 @@ void Board::DrawTopRightUI(Graphics* g)
 		{
 			g->TranslateF(1.0f, 1.0f);
 		}
+		g->TranslateF(-mApp->mDDInterface->mWideScreenOffsetX, -mApp->mDDInterface->mWideScreenOffsetY);
 		mStoreButton->Draw(g);
 		g->PopState();
 		g->SetColorizeImages(false);
@@ -8790,8 +8800,8 @@ void Board::DrawUIBottom(Graphics* g)
 			g->DrawImageF(IMAGE_BRAIN, fX, 0.0f);
 			SexyTransform2D aTransform;
 			aTransform.LoadIdentity();
-			aTransform.m02 = fX + 5;
-			aTransform.m12 = IMAGE_BRAIN->GetHeight();
+			aTransform.m02 = fX + 5 + g->mTransX;
+			aTransform.m12 = IMAGE_BRAIN->GetHeight() + g->mTransY;
 			TodDrawStringMatrix(g, Sexy::FONT_CONTINUUMBOLD14OUTLINE, aTransform, to_string(4), Color::Black);
 			TodDrawStringMatrix(g, Sexy::FONT_CONTINUUMBOLD14, aTransform, to_string(4), Color::White);
 		}
@@ -8977,10 +8987,6 @@ void Board::DrawFog(Graphics* g)
 			g->PushState();
 			g->SetColorizeImages(true);
 			g->SetColor(Color(aColorVariant, aColorVariant, aLightnessVariant, aFadeAmount));
-
-			g->ClearClipRect();
-			g->mClipRect.mWidth = BOARD_WIDTH;
-			g->mClipRect.mHeight = BOARD_HEIGHT;
 
 			Rect srcRect(aImageFog->GetCelWidth() * aCelCol, 0, aImageFog->GetCelWidth(), aImageFog->GetCelHeight());
 			g->DrawImageF(aImageFog, aPosX, aPosY, srcRect);
@@ -9330,7 +9336,7 @@ void Board::DrawUITop(Graphics* g)
 
 	//DrawUIBottom(g);
 
-	mMenuButton->Draw(g);
+	// mMenuButton->Draw(g);
 
 	if (!mApp->IsScreenSaver() && StageHasFog())
 	{
@@ -9379,6 +9385,7 @@ void Board::DrawUITop(Graphics* g)
 			g->TranslateF(1.0f, 1.0f);
 		}
 #endif
+		g->TranslateF(-mApp->mDDInterface->mWideScreenOffsetX, -mApp->mDDInterface->mWideScreenOffsetY);
 		mStoreButton->Draw(g);
 		g->PopState();
 
@@ -9392,6 +9399,7 @@ void Board::DrawUITop(Graphics* g)
 				g->SetColorizeImages(true);
 				g->SetColor(Color::White);
 				g->mColor.mAlpha = 64;
+				g->TranslateF(-mApp->mDDInterface->mWideScreenOffsetX, -mApp->mDDInterface->mWideScreenOffsetY);
 				mStoreButton->Draw(g);
 				g->PopState();
 			}
@@ -9415,13 +9423,11 @@ void Board::DrawUITop(Graphics* g)
 
 	if (LawnApp::ChallengeUsesMicrophone(mApp->mGameMode) && mApp->mGameScene == SCENE_PLAYING) {
 		g->PushState();
+		g->SetColorizeImages(true);
 		g->mTransX = mApp->mDDInterface->mWideScreenOffsetX;
 		g->mTransY = mApp->mDDInterface->mWideScreenOffsetY;
 		int volume = min((int)(mApp->mVoiceVolume / SHOUT_THRESHOLD * 100), 100);
 		for (int i = 0; i < 100; i++) {
-			g->PushState();
-			g->SetColorizeImages(true);
-
 			int currentY = 588 - 2 * i;
 
 			int red, green;
@@ -9441,15 +9447,9 @@ void Board::DrawUITop(Graphics* g)
 
 			g->mColor = Color(red, green, 0, 64);
 			g->FillRect(10, currentY, 20, 2);
-			g->PopState();
 		}
 
 		for (int i = 0; i < volume; i++) {
-			g->PushState();
-			g->mTransX = mApp->mDDInterface->mWideScreenOffsetX;
-			g->mTransY = mApp->mDDInterface->mWideScreenOffsetY;
-			g->SetColorizeImages(true);
-
 			int currentY = 588 - 2 * i;
 
 			int red, green;
@@ -9469,7 +9469,6 @@ void Board::DrawUITop(Graphics* g)
 
 			g->mColor = Color(red, green, 0);
 			g->FillRect(10, currentY, 20, 2);
-			g->PopState();
 		}
 		g->PopState();
 	}
@@ -9527,7 +9526,7 @@ void Board::DrawUITop(Graphics* g)
 		g->mTransX = 0;
 		g->mTransY = 0;
 		g->SetColor(Color(0, 0, 0));
-		g->FillRect(0, 0, 800, 600);
+		g->FillRect(0, 0, mApp->mWidth, mApp->mHeight);
 		g->PopState();
 	}
 
@@ -9604,6 +9603,7 @@ void Board::Draw(Graphics* g)
 	}
 
 	mDrawCount++;
+	g->Translate(mApp->mDDInterface->mWideScreenOffsetX, mApp->mDDInterface->mWideScreenOffsetY);
 	DrawGameObjects(g);
 	g->PopState();
 }

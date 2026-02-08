@@ -624,6 +624,9 @@ bool Challenge::BeghouledTwistMoveCausesMatch(int theGridX, int theGridY, Beghou
 //0x420220
 bool Challenge::BeghouledTwistSquareFromMouse(int theX, int theY, int& theGridX, int& theGridY)
 {
+	theX -= mApp->mDDInterface->mWideScreenOffsetX;
+	theY -= mApp->mDDInterface->mWideScreenOffsetY;
+
 	theGridX = mBoard->PixelToGridX(theX - 40, theY - 40);
 	theGridY = mBoard->PixelToGridY(theX - 40, theY - 40);
 	if (theGridX == -1 || theGridY == -1 || theGridX > 6 || theGridY > 3)
@@ -640,6 +643,9 @@ void Challenge::BeghouledTwistMouseDown(int x, int y)
 {
 	if (mBoard->HasLevelAwardDropped())
 		return;
+
+	x += mApp->mDDInterface->mWideScreenOffsetX;
+	y += mApp->mDDInterface->mWideScreenOffsetY;
 
 	BeghouledBoardState aBoardState;
 	LoadBeghouledBoardState(&aBoardState);
@@ -709,8 +715,8 @@ bool Challenge::BeghouledIsValidMove(int theFromX, int theFromY, int theToX, int
 //0x420760
 void Challenge::BeghouledDragUpdate(int x, int y)
 {
-	int aDeltaX = x - mBeghouledMouseDownX;
-	int aDeltaY = y - mBeghouledMouseDownY;
+	int aDeltaX = x - mBeghouledMouseDownX - mApp->mDDInterface->mWideScreenOffsetX;
+	int aDeltaY = y - mBeghouledMouseDownY - mApp->mDDInterface->mWideScreenOffsetY;
 	if (abs(aDeltaX) >= 10 || abs(aDeltaY) >= 10)
 	{
 		mBoard->ClearAdvice(ADVICE_BEGHOULED_DRAG_TO_MATCH_3);
@@ -5679,12 +5685,12 @@ void Challenge::LastStandUpdate()
 		if (mSurvivalStage == 0)
 		{
 			aButton->SetLabel(_S("[START_ONSLAUGHT]"));
-			aButton->Resize(300, 559, 210, 46);
+			aButton->Resize(300 + mApp->mDDInterface->mWideScreenOffsetX, 559 + mApp->mDDInterface->mWideScreenOffsetY, 210, 46);
 		}
 		else
 		{
 			aButton->SetLabel(_S("[CONTINUE_ONSLAUGHT]"));
-			aButton->Resize(270, 559, 257, 46);
+			aButton->Resize(270 + mApp->mDDInterface->mWideScreenOffsetX, 559 + mApp->mDDInterface->mWideScreenOffsetY, 257, 46);
 		}
 	}
 
@@ -5755,7 +5761,7 @@ void Challenge::TreeOfWisdomDraw(Graphics* g)
 	g->PushState();
 	g->mTransX += WIDESCREEN_OFFSETX;
 	g->mTransY += WIDESCREEN_OFFSETY;
-	bool aMouseOn = TreeOfWisdomMouseOn(mApp->mWidgetManager->mLastMouseX - mBoard->mX, mApp->mWidgetManager->mLastMouseY - mBoard->mY);
+	bool aMouseOn = TreeOfWisdomMouseOn(mApp->mWidgetManager->mLastMouseX - mBoard->mX - mApp->mDDInterface->mWideScreenOffsetX, mApp->mWidgetManager->mLastMouseY - mBoard->mY - mApp->mDDInterface->mWideScreenOffsetY);
 
 	Reanimation* aReanimTree = mApp->ReanimationGet(mReanimChallenge);
 	aReanimTree->mEnableExtraOverlayDraw = false;
@@ -5833,7 +5839,7 @@ void Challenge::TreeOfWisdomDraw(Graphics* g)
 		float aStrHeight = Sexy::FONT_HOUSEOFTERROR16->mAscent * aScale;
 
 		SexyTransform2D aMatrix;
-		TodScaleTransformMatrix(aMatrix, 400.0f - aStrWidth * 0.5f + mApp->mDDInterface->mWideScreenOffsetX, 20.0f + aStrHeight * 0.5f + mApp->mDDInterface->mWideScreenOffsetY, aScale, aScale);
+		TodScaleTransformMatrix(aMatrix, 400.0f - aStrWidth * 0.5f + g->mTransX, 20.0f + aStrHeight * 0.5f + g->mTransY, aScale, aScale);
 		TodDrawStringMatrix(g, Sexy::FONT_HOUSEOFTERROR16, aMatrix, aSizeStr, Color(255, 255, 255));
 	}
 }

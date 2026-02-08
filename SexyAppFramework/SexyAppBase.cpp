@@ -2731,7 +2731,7 @@ bool SexyAppBase::DrawDirtyStuff()
 		if (mShowFPS)
 		{
 			Graphics g(mWidgetManager->mImage);
-			g.DrawImage(gFPSImage, 800-gFPSImage->GetWidth()-10, 590-gFPSImage->GetHeight());
+			g.DrawImage(gFPSImage, mWidth-gFPSImage->GetWidth()-10, mHeight-gFPSImage->GetHeight()-10);
 			/*SDL_FRect dstRect = {(float)(790 - gFPSImage->GetWidth()), (float)(590 - gFPSImage->GetHeight()), gFPSImage->GetWidth(), gFPSImage->GetHeight()};
 			SDL_RenderTexture(LawnApp::mSDLRenderer, (SDL_Texture*)gFPSImage->mD3DData, nullptr, &dstRect);*/
 		

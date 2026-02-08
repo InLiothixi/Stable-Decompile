@@ -419,10 +419,10 @@ void Coin::CoinInitialize(int theX, int theY, CoinType theCoinType, CoinMotion t
         AttachmentOverrideColor(mAttachmentID, GetColor());
         AttachmentOverrideScale(mAttachmentID, mScale);
 
-        if ((!mHitGround || mIsBeingCollected) && (mType == CoinType::COIN_SILVER || mType == CoinType::COIN_GOLD))
-        {
-            AttachmentOverrideColor(mAttachmentID, Color(0, 0, 0, 0));  // 运动中的金币和银币使用贴图，故以此法隐藏附件的动画
-        }
+        //if ((!mHitGround || mIsBeingCollected) && (mType == CoinType::COIN_SILVER || mType == CoinType::COIN_GOLD))
+        //{
+        //    AttachmentOverrideColor(mAttachmentID, Color(0, 0, 0, 0));  // 运动中的金币和银币使用贴图，故以此法隐藏附件的动画
+        //}
     }
 }
 
@@ -803,10 +803,10 @@ void Coin::Update()
         AttachmentOverrideColor(mAttachmentID, GetColor());
         AttachmentOverrideScale(mAttachmentID, mScale);
 
-        if ((!mHitGround || mIsBeingCollected) && (mType == CoinType::COIN_SILVER || mType == CoinType::COIN_GOLD))
-        {
-            AttachmentOverrideColor(mAttachmentID, Color(0, 0, 0, 0));  // 运动中的金币和银币使用贴图，故以此法隐藏附件的动画
-        }
+        //if ((!mHitGround || mIsBeingCollected) && (mType == CoinType::COIN_SILVER || mType == CoinType::COIN_GOLD))
+        //{
+        //    AttachmentOverrideColor(mAttachmentID, Color(0, 0, 0, 0));  // 运动中的金币和银币使用贴图，故以此法隐藏附件的动画
+        //}
     }
 }
 
@@ -879,7 +879,7 @@ void Coin::Draw(Graphics* g)
         g->PopState();
     }
 
-    if ((mType == CoinType::COIN_SILVER || mType == CoinType::COIN_GOLD) && mHitGround && !mIsBeingCollected)
+    if ((mType == CoinType::COIN_SILVER || mType == CoinType::COIN_GOLD) /*&& mHitGround && !mIsBeingCollected*/)
     {
         return;
     }

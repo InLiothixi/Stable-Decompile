@@ -588,8 +588,8 @@ void Challenge::StartLevel()
 	if (aGameMode == GameMode::GAMEMODE_CHALLENGE_ZOMBIE_TRAP)
 	{
 		mBrainHealth = 300;
-		mBrainX = (BOARD_WIDTH - IMAGE_BRAIN->GetWidth()) / 2.0f;
-		mBrainY = 0;
+		mBrainX = mBoard->GridToPixelX(4, 2);
+		mBrainY = mBoard->GridToPixelY(4, 2);
 		mBrainRow = 2;
 		mBrainAltitude = 50 - WIDESCREEN_OFFSETY;
 		mBrainRenderOrder = Board::MakeRenderOrder(RENDER_LAYER_TOP, mBrainRow, 0);

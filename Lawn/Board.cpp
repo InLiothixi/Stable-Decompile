@@ -3559,8 +3559,8 @@ void Board::UpdateCursor()
 #endif
 		)return;
 
-	int aMouseX = mApp->mWidgetManager->mLastMouseX - mX;
-	int aMouseY = mApp->mWidgetManager->mLastMouseY - mY;
+	int aMouseX = mApp->mWidgetManager->mLastMouseX - mX - mApp->mDDInterface->mWideScreenOffsetX;
+	int aMouseY = mApp->mWidgetManager->mLastMouseY - mY - mApp->mDDInterface->mWideScreenOffsetY;
 	bool aShowFinger = false;
 	bool aShowDrag = false;
 	bool aHideCursor = false;
@@ -8459,14 +8459,18 @@ void Board::DrawDebugText(Graphics* g)
 		break;
 	}
 
+	g->PushState();
 	g->SetFont(mDebugFont);
 	g->SetColor(Color::Black);
-	g->DrawStringWordWrapped(aText, 10, 89);
-	g->DrawStringWordWrapped(aText, 11, 91);
-	g->DrawStringWordWrapped(aText, 9, 90);
-	g->DrawStringWordWrapped(aText, 11, 90);
+	const int offsetX = mApp->mDDInterface->mWideScreenOffsetX;
+	const int offsetY = mApp->mDDInterface->mWideScreenOffsetY;
+	g->DrawStringWordWrapped(aText, 10 + offsetX, 89 + offsetY);
+	g->DrawStringWordWrapped(aText, 11 + offsetX, 91 + offsetY);
+	g->DrawStringWordWrapped(aText, 9 + offsetX, 90 + offsetY);
+	g->DrawStringWordWrapped(aText, 11 + offsetX, 90 + offsetY);
 	g->SetColor(Color(255, 255, 255));
-	g->DrawStringWordWrapped(aText, 10, 90);
+	g->DrawStringWordWrapped(aText, 10 + offsetX, 90 + offsetY);
+	g->PopState();
 }
 
 //0x419AE0

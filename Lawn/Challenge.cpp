@@ -326,6 +326,12 @@ Challenge::Challenge()
 	mChallengePoints = 0;
 	mHadInitBombs = false;
 	mBombsLeft = -1;
+	mBBLeft = 3;
+	mCageLeft = 7;
+	mDoesBrainAttracts = false;
+	mBrainHealth = 0;
+	mBrainX = 0;
+	mBrainY = 0;
 	for (int i = 0; i < 6; i++)
 		mReanimClouds[i] = REANIMATIONID_NULL;
 	memset(mBeghouledEated, 0, sizeof(mBeghouledEated));
@@ -578,6 +584,15 @@ void Challenge::StartLevel()
 		mBombsLeft = 25;
 		mBoard->ClearAdvice(ADVICE_NONE);
 		mBoard->DisplayAdvice("[ADVICE_BOMB_ALL_TOGETHER]", MESSAGE_STYLE_HINT_TALL_UNLOCKMESSAGE, ADVICE_NONE);
+	}
+	if (aGameMode == GameMode::GAMEMODE_CHALLENGE_ZOMBIE_TRAP)
+	{
+		mBrainHealth = 300;
+		mBrainX = (BOARD_WIDTH - IMAGE_BRAIN->GetWidth()) / 2.0f;
+		mBrainY = 0;
+		mBrainRow = 2;
+		mBrainAltitude = 50 - WIDESCREEN_OFFSETY;
+		mBrainRenderOrder = Board::MakeRenderOrder(RENDER_LAYER_TOP, mBrainRow, 0);
 	}
 #endif
 }

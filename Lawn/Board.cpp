@@ -9004,9 +9004,6 @@ void Board::DrawFog(Graphics* g)
 void Board::DrawCover(Graphics* g)
 {
 	g->PushState();
-	g->ClearClipRect();
-	g->mClipRect.mWidth = BOARD_WIDTH + mApp->mDDInterface->mWideScreenExtraWidth;
-	g->mClipRect.mHeight = BOARD_HEIGHT + mApp->mDDInterface->mWideScreenExtraHeight;
 	switch (mBackground)
 	{
 	case BackgroundType::BACKGROUND_1_DAY:

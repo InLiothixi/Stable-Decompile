@@ -116,7 +116,7 @@ intptr_t TodPickFromArray(const intptr_t* theArray, int theCount)
 	return theCount > 0 ? theArray[Sexy::Rand(theCount)] : 0;
 }
 
-int TodPickFromWeightedArray(const TodWeightedArray* theArray, int theCount)
+intptr_t TodPickFromWeightedArray(const TodWeightedArray* theArray, int theCount)
 {
 	return TodPickArrayItemFromWeightedArray(theArray, theCount)->mItem;
 }

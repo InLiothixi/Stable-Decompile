@@ -75,6 +75,15 @@ public:
     int                     mChallengePoints;
     bool                    mHadInitBombs;
     int                     mBombsLeft;
+    int                     mBBLeft; // short for brain bait
+    int                     mCageLeft;
+    bool                    mDoesBrainAttracts;
+    int                     mBrainHealth;
+    int                     mBrainX;
+    int                     mBrainY;
+    float                   mBrainAltitude;
+    int                     mBrainRow;
+    int                     mBrainRenderOrder;
 
 public:
     Challenge();

@@ -10039,10 +10039,10 @@ Rect Zombie::GetZombieRect()
         aZombieRect.mX = mWidth - aZombieRect.mX - aZombieRect.mWidth;
     }
 
-    if (mZombieType == ZombieType::ZOMBIE_BOBSLED && mFromWave == Zombie::ZOMBIE_WAVE_CUTSCENE)
+    /*if (mZombieType == ZombieType::ZOMBIE_BOBSLED && mFromWave == Zombie::ZOMBIE_WAVE_CUTSCENE)
     {
         aZombieRect.mY -= 30;
-    }
+    }*/
 
     if (mZombiePhase == ZombiePhase::PHASE_ZAMBONI_FLAT && mZamboniFall)
     {
@@ -11849,7 +11849,7 @@ void Zombie::BossSpawnContact()
             aZombieTypeCount--;
         }
 
-        aZombieType = (ZombieType)TodPickFromArray((intptr_t*)gBossZombieList, aZombieTypeCount);
+        aZombieType = (ZombieType)TodPickFromArray(gBossZombieList, aZombieTypeCount);
     }
 
     Zombie* aZombie = mBoard->AddZombieInRow(aZombieType, mTargetRow, 0);
@@ -11876,7 +11876,7 @@ bool Zombie::BossIsAbleToStomp()
 void Zombie::BossStompAttack()
 {
     int aRowsCount = 0;
-    intptr_t aRowArray[MAX_GRID_SIZE_Y];
+    int aRowArray[MAX_GRID_SIZE_Y];
     for (int i = 0; i < 4; i++)
     {
         if (BossCanStompRow(i))

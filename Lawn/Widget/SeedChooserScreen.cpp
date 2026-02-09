@@ -242,7 +242,8 @@ SeedChooserScreen::SeedChooserScreen()
 	UpdateImitaterButton();
 }
 
-int SeedChooserScreen::PickFromWeightedArrayUsingSpecialRandSeed(TodWeightedArray* theArray, int theCount, MTRand& theLevelRNG)
+template <typename T>
+T SeedChooserScreen::PickFromWeightedArrayUsingSpecialRandSeed(TodWeightedArray<T>* theArray, int theCount, MTRand& theLevelRNG)
 {
 	int aTotalWeight = 0;
 	for (int i = 0; i < theCount; i++)
@@ -256,14 +257,14 @@ int SeedChooserScreen::PickFromWeightedArrayUsingSpecialRandSeed(TodWeightedArra
 		aWeight += theArray[j].mWeight;
 		if (aWeight > aRndResult) return theArray[j].mItem;
 	}
-	return 0;
+	return T{};
 	//DBG_ASSERT(false);
 }
 
 //0x483F70
 void SeedChooserScreen::CrazyDavePickSeeds()
 {
-	TodWeightedArray aSeedArray[NUM_SEED_TYPES];
+	TodWeightedArray<SeedType> aSeedArray[NUM_SEED_TYPES];
 	for (SeedType aSeedType = SEED_PEASHOOTER; aSeedType < NUM_SEEDS_IN_CHOOSER; aSeedType = (SeedType)(aSeedType + 1))
 	{
 		aSeedArray[aSeedType].mItem = aSeedType;

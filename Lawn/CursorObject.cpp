@@ -77,7 +77,7 @@ void CursorObject::Draw(Graphics* g)
     switch (mCursorType)
     {
     case CursorType::CURSOR_TYPE_SHOVEL:
-        g->DrawImage(IMAGE_SHOVEL, 10, -30);
+        TodDrawImageScaledF(g, IMAGE_SHOVEL_HI_RES, 22, -22, 0.5f, 0.5f);
         break;
 
     case CursorType::CURSOR_TYPE_WATERING_CAN:

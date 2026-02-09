@@ -2499,7 +2499,7 @@ void ZombatarWidget::UpdateZombieAvatar() {
 	}
 }
 
-SDL3Image* gZombatarClothes[NUM_CLOTHES];
+MemoryImage* gZombatarClothes[NUM_CLOTHES];
 
 void ZombatarWidget::CreateZombatarClothes() {
 	for (int i = ZombatarItem::ZOMBATAR_CLOTHE_1; i <= ZombatarItem::ZOMBATAR_CLOTHE_12; i++) {
@@ -2508,19 +2508,14 @@ void ZombatarWidget::CreateZombatarClothes() {
 		SDL_DisplayID display = SDL_GetPrimaryDisplay();
 		float scale = (float)SDL_GetCurrentDisplayMode(display)->h / 600.0f;
 
-		SDL3Image* aImage = new SDL3Image(LawnApp::mSDLRenderer);
-		aImage->mWidth = 147 * scale;
-		aImage->mHeight = 146 * scale;
-		aImage->mD3DData = SDL_CreateTexture(LawnApp::mSDLRenderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, aImage->mWidth, aImage->mHeight);
-		SDL_SetTextureBlendMode((SDL_Texture*)aImage->mD3DData, SDL_BLENDMODE_BLEND);
-		int aBitsCount = aImage->mWidth * aImage->mHeight;
-		aImage->mBits = new unsigned long[aBitsCount + 1];
-		aImage->mHasTrans = true;
-		aImage->mHasAlpha = true;
-		aImage->mBits[aBitsCount] = Sexy::MEMORYCHECK_ID;
+		SDL3Image* theImage = new SDL3Image(LawnApp::mSDLRenderer);
+		theImage->mWidth = 147 * scale;
+		theImage->mHeight = 146 * scale;
+		theImage->mD3DData = SDL_CreateTexture(LawnApp::mSDLRenderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, theImage->mWidth, theImage->mHeight);
+		SDL_SetTextureBlendMode((SDL_Texture*)theImage->mD3DData, SDL_BLENDMODE_BLEND);
 
-		Graphics aMemoryGraphics(aImage);
-		SDL_SetRenderTarget(LawnApp::mSDLRenderer, (SDL_Texture*)aImage->mD3DData);
+		Graphics aMemoryGraphics(theImage);
+		SDL_SetRenderTarget(LawnApp::mSDLRenderer, (SDL_Texture*)theImage->mD3DData);
 		aMemoryGraphics.SetLinearBlend(true);
 		aMemoryGraphics.PushState();
 		aMemoryGraphics.SetColorizeImages(true);
@@ -2549,25 +2544,40 @@ void ZombatarWidget::CreateZombatarClothes() {
 		if (aDef.mOutlineImage)
 			TodDrawImageScaledF(&aMemoryGraphics, *aDef.mOutlineImage, offsetX, offsetY, scale, scale);
 		aMemoryGraphics.PopState();
-		gZombatarClothes[clotheNum] = aImage;
+
 		SDL_SetRenderTarget(LawnApp::mSDLRenderer, nullptr);
 
+		MemoryImage* aImage = new MemoryImage();
+		int aBitsCount = theImage->mWidth * theImage->mHeight;
+		aImage->mWidth = theImage->mWidth;
+		aImage->mHeight = theImage->mHeight;
+		aImage->mBits = new unsigned long[aBitsCount + 1];
+		aImage->mHasTrans = true;
+		aImage->mHasAlpha = true;
+		memset(aImage->mBits, 0, aBitsCount * sizeof(unsigned long));
+		aImage->mBits[aBitsCount] = Sexy::MEMORYCHECK_ID;
+
 		SDL_Texture* oldRenderTarget = SDL_GetRenderTarget(LawnApp::mSDLRenderer);
-		SDL_SetRenderTarget(LawnApp::mSDLRenderer, (SDL_Texture*)aImage->mD3DData);
+		SDL_SetRenderTarget(LawnApp::mSDLRenderer, (SDL_Texture*)theImage->mD3DData);
+
 		SDL_Surface* surface = SDL_RenderReadPixels(LawnApp::mSDLRenderer, NULL);
-		uint8_t* srcPixels = static_cast<uint8_t*>(surface->pixels);
-		uint8_t* src = (uint8_t*)surface->pixels;
-		for (int y = 0; y < aImage->mHeight; ++y)
+		uint8_t* srcBytes = static_cast<uint8_t*>(surface->pixels);
+
+		for (int y = 0; y < theImage->mHeight; ++y)
 		{
-			memcpy(aImage->mBits + y * aImage->mWidth, src + y * surface->pitch, aImage->mWidth);
+			memcpy(aImage->mBits + y * theImage->mWidth, srcBytes + y * surface->pitch, theImage->mWidth * 4);
 		}
+
 		SDL_SetRenderTarget(LawnApp::mSDLRenderer, oldRenderTarget);
 		SDL_DestroySurface(surface);
+
+		gZombatarClothes[clotheNum] = aImage;
+		delete theImage;
 	}
 }
 
 void DisposeZombatarClothesCache() {
-	for (SDL3Image* aImage : gZombatarClothes) {
+	for (MemoryImage* aImage : gZombatarClothes) {
 		delete aImage;
 	}
 }

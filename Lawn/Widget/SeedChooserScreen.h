@@ -90,7 +90,8 @@ public:
     SeedChooserScreen();
     ~SeedChooserScreen();
 
-    static /*inline*/ int   PickFromWeightedArrayUsingSpecialRandSeed(TodWeightedArray* theArray, int theCount, MTRand& theLevelRNG);
+    template <typename T>
+    static /*inline*/ T   PickFromWeightedArrayUsingSpecialRandSeed(TodWeightedArray<T>* theArray, int theCount, MTRand& theLevelRNG);
     void                    CrazyDavePickSeeds();
     bool                    Has7Rows();
     void                    GetSeedPositionInChooser(int theIndex, int& x, int& y);

@@ -44,7 +44,7 @@ void SeedPacket::PickNextSlotMachineSeed()
 	};
 
 	int aSeedsCount = 0;
-	TodWeightedArray aSeedWeightArray[(int)SeedType::NUM_SEED_TYPES];
+	TodWeightedArray<SeedType> aSeedWeightArray[(int)SeedType::NUM_SEED_TYPES];
 	for (int i = 0; i < LENGTH(SLOT_SEED_TYPES); i++)
 	{
 		SeedType aSeedType = SLOT_SEED_TYPES[i];

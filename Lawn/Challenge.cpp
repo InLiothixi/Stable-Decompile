@@ -1042,7 +1042,7 @@ SeedType Challenge::BeghouledPickSeed(int theGridX, int theGridY, BeghouledBoard
 	TOD_ASSERT(theBoardState->mSeedType[theGridX][theGridY] == SEED_NONE);
 	SeedType* aSeedState = &theBoardState->mSeedType[theGridX][theGridY];
 	int aCount = 0;
-	intptr_t aPickArray[6];
+	SeedType aPickArray[6];
 	
 	for (int i = 0; i < 6; i++)
 	{
@@ -1745,7 +1745,7 @@ void Challenge::UpdateConveyorBelt()
 	int aNumSeedsOnConveyor = mBoard->mSeedBank->GetNumSeedsOnConveyorBelt();
 	mConveyorBeltCounter = aConveyorSpeedMultiplier * (aNumSeedsOnConveyor > 8 ? 1000 : aNumSeedsOnConveyor > 6 ? 500 : aNumSeedsOnConveyor > 4 ? 425 : 400);
 
-	TodWeightedArray aSeedPickArray[20];
+	TodWeightedArray<int> aSeedPickArray[20];
 	int aSeedPickCount = 0;
 	if (mBoard->mLevel == 10)
 	{
@@ -1974,7 +1974,7 @@ void Challenge::UpdateConveyorBelt()
 
 	for (int i = 0; i < aSeedPickCount; i++)
 	{
-		TodWeightedArray& aSeedPick = aSeedPickArray[i];
+		TodWeightedArray<int>& aSeedPick = aSeedPickArray[i];
 		SeedType aSeedType = (SeedType)aSeedPick.mItem;
 		int aCountInBank = mBoard->mSeedBank->CountOfTypeOnConveyorBelt(aSeedType);
 		int aTotalCount = mBoard->CountPlantByType(aSeedType) + aCountInBank;
@@ -3196,7 +3196,7 @@ void Challenge::WhackAZombieSpawning()
 			aZombieType = ZOMBIE_TRAFFIC_CONE;
 		}
 
-		TodWeightedArray aGridPicks[MAX_GRAVE_STONES];
+		TodWeightedArray<GridItem*> aGridPicks[MAX_GRAVE_STONES];
 		int aGridPicksCount = 0;
 
 		GridItem* aGridItem = nullptr;
@@ -3207,7 +3207,7 @@ void Challenge::WhackAZombieSpawning()
 				Plant* aPlant = mBoard->GetTopPlantAt(aGridItem->mGridX, aGridItem->mGridY, TOPPLANT_ONLY_NORMAL_POSITION);
 				if (aPlant == nullptr || aPlant->mSeedType != SEED_GRAVEBUSTER)
 				{
-					aGridPicks[aGridPicksCount].mItem = reinterpret_cast<intptr_t>(aGridItem);
+					aGridPicks[aGridPicksCount].mItem = aGridItem;
 					aGridPicks[aGridPicksCount].mWeight = 1;
 					aGridPicksCount++;
 				}
@@ -3221,7 +3221,7 @@ void Challenge::WhackAZombieSpawning()
 
 		for (int i = 0; i < aZombieCount; i++)
 		{
-			TodWeightedArray* aGrid = TodPickArrayItemFromWeightedArray(aGridPicks, aGridPicksCount);
+			TodWeightedArray<GridItem*>* aGrid = TodPickArrayItemFromWeightedArray(aGridPicks, aGridPicksCount);
 			GridItem* aGraveStone = (GridItem*)aGrid->mItem;
 			aGrid->mWeight = 0;
 
@@ -3628,7 +3628,7 @@ GridItem* Challenge::GetPortalAt(int theGridX, int theGridY)
 //0x427470
 void Challenge::MoveAPortal()
 {
-	TodWeightedArray aPickArray[MAX_PORTALS];
+	TodWeightedArray<GridItem*> aPickArray[MAX_PORTALS];
 	int aNumpicks = 0;
 
 	GridItem* aGridItem = nullptr;
@@ -3638,7 +3638,7 @@ void Challenge::MoveAPortal()
 		{
 			TOD_ASSERT(aNumpicks < MAX_PORTALS);
 			aPickArray[aNumpicks].mWeight = 1;
-			aPickArray[aNumpicks].mItem = reinterpret_cast<intptr_t>(aGridItem);
+			aPickArray[aNumpicks].mItem = aGridItem;
 			aNumpicks++;
 		}
 	}
@@ -4202,7 +4202,7 @@ void Challenge::ScaryPotterPlacePot(ScaryPotType theScaryPotType, ZombieType the
 //0x428620
 void Challenge::ScaryPotterChangePotType(GridItemState thePotType, int theCount)
 {
-	TodWeightedArray aPotArray[MAX_SCARY_POTS];
+	TodWeightedArray<GridItem*> aPotArray[MAX_SCARY_POTS];
 	int aPotCount = 0;
 
 	GridItem* aGridItem = nullptr;
@@ -4213,7 +4213,7 @@ void Challenge::ScaryPotterChangePotType(GridItemState thePotType, int theCount)
 			if ((thePotType == GRIDITEM_STATE_SCARY_POT_LEAF && aGridItem->mScaryPotType == SCARYPOT_SEED) ||
 				(thePotType == GRIDITEM_STATE_SCARY_POT_ZOMBIE && aGridItem->mZombieType == ZOMBIE_GARGANTUAR))
 			{
-				aPotArray[aPotCount].mItem = reinterpret_cast<intptr_t>(aGridItem);
+				aPotArray[aPotCount].mItem = aGridItem;
 				aPotArray[aPotCount].mWeight = 1;
 				aPotCount++;
 			}
@@ -4226,7 +4226,7 @@ void Challenge::ScaryPotterChangePotType(GridItemState thePotType, int theCount)
 
 	for (int i = 0; i < theCount; i++)
 	{
-		TodWeightedArray* aScaryPotArray = TodPickArrayItemFromWeightedArray(aPotArray, aPotCount);
+		TodWeightedArray<GridItem*>* aScaryPotArray = TodPickArrayItemFromWeightedArray(aPotArray, aPotCount);
 		aScaryPotArray->mWeight = 0;
 		((GridItem*)(aScaryPotArray->mItem))->mGridItemState = thePotType;
 	}
@@ -5880,7 +5880,7 @@ void Challenge::TreeOfWisdomInit()
 
 	mApp->mPlayerInfo->mChallengeRecords[mApp->GetCurrentChallengeIndex()] = max(1, mApp->mPlayerInfo->mChallengeRecords[mApp->GetCurrentChallengeIndex()]);
 
-	int aTreeSize = ClampInt(TreeOfWisdomGetSize(), 1, 50);
+	int aTreeSize = ClampInt(TreeOfWisdomGetSize(), 1, 51);
 	aReanimTree->PlayReanim(StrFormat("anim_grow%d", aTreeSize).c_str(), REANIM_PLAY_ONCE_AND_HOLD, 0, 18.0f);
 	if (aTreeSize == 1 && mApp->mPlayerInfo->mPurchases[STORE_ITEM_TREE_FOOD] < PURCHASE_COUNT_OFFSET)
 	{

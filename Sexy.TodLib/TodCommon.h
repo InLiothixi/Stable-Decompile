@@ -3,6 +3,7 @@
 #include "../Lawn/LawnCommon.h"
 #include "../SexyAppFramework/Common.h"
 #include "../SexyAppFramework/ResourceManager.h"
+#include "TodDebug.h"
 
 struct TodAllocator;
 namespace Sexy
@@ -20,9 +21,10 @@ using namespace Sexy;
 
 // #################################################################################################### //
 
+template <typename T>
 struct TodWeightedArray
 {
-	intptr_t mItem;
+	T mItem;
 	int mWeight;
 };
 
@@ -33,22 +35,108 @@ struct TodWeightedGridArray
 	int mWeight;
 };
 
+template <typename T>
 class TodSmoothArray
 {
 public:
-	intptr_t	mItem;
+	T	mItem;
 	float		mWeight;
 	float		mLastPicked;
 	float		mSecondLastPicked;
 };
 
-/*inline*/ intptr_t			TodPickFromArray(const intptr_t* theArray, int theCount);
-intptr_t					TodPickFromWeightedArray(const TodWeightedArray* theArray, int theCount);
-TodWeightedArray* TodPickArrayItemFromWeightedArray(const TodWeightedArray* theArray, int theCount);
+template <typename T>
+T TodPickFromArray(const T* theArray, int theCount)
+{
+	TOD_ASSERT(theCount > 0);
+	return theCount > 0 ? theArray[Sexy::Rand(theCount)] : T{};
+}
+
+template <typename T>
+T TodPickFromWeightedArray(const TodWeightedArray<T>* theArray, int theCount)
+{
+	return TodPickArrayItemFromWeightedArray(theArray, theCount)->mItem;
+}
+
+template <typename T>
+//0x511520
+TodWeightedArray<T>* TodPickArrayItemFromWeightedArray(const TodWeightedArray<T>* theArray, int theCount)
+{
+	if (theCount <= 0)
+		return nullptr;
+
+	int aTotalWeight = 0;
+	for (int i = 0; i < theCount; i++)
+	{
+		aTotalWeight += theArray[i].mWeight;
+	}
+	TOD_ASSERT(aTotalWeight > 0);
+
+	aTotalWeight = Sexy::Rand(aTotalWeight);
+
+	for (int i = 0; i < theCount; i++)
+	{
+		aTotalWeight -= theArray[i].mWeight;
+		if (aTotalWeight < 0)
+		{
+			return (TodWeightedArray<T>*)&theArray[i];
+		}
+	}
+
+	TOD_ASSERT();
+	return nullptr;
+}
 TodWeightedGridArray* TodPickFromWeightedGridArray(const TodWeightedGridArray* theArray, int theCount);
 float					TodCalcSmoothWeight(float aWeight, float aLastPicked, float aSecondLastPicked);
-void					TodUpdateSmoothArrayPick(TodSmoothArray* theArray, int theCount, int thePickIndex);
-int						TodPickFromSmoothArray(TodSmoothArray* theArray, int theCount);
+//0x5117F0
+template <typename T>
+void TodUpdateSmoothArrayPick(TodSmoothArray<T>* theArray, int theCount, int thePickIndex)
+{
+	for (int i = 0; i < theCount; i++)
+	{
+		if (theArray[i].mWeight > 0.0f)
+		{
+			theArray[i].mLastPicked += 1.0f;
+			theArray[i].mSecondLastPicked += 1.0f;
+		}
+	}
+
+	theArray[thePickIndex].mSecondLastPicked = theArray[thePickIndex].mLastPicked;
+	theArray[thePickIndex].mLastPicked = 0.0f;
+}
+template <typename T>
+T TodPickFromSmoothArray(TodSmoothArray<T>* theArray, int theCount)
+{
+	float aTotalWeight = 0.0f;
+	for (int i = 0; i < theCount; i++)
+	{
+		aTotalWeight += theArray[i].mWeight;
+	}
+	TOD_ASSERT(aTotalWeight > 0.0f);
+
+	float aNormalizeFactor = 1.0f / aTotalWeight;
+	float aTotalAdjustedWeight = 0.0f;
+	for (int j = 0; j < theCount; j++)
+	{
+		aTotalAdjustedWeight += TodCalcSmoothWeight(theArray[j].mWeight * aNormalizeFactor, theArray[j].mLastPicked, theArray[j].mSecondLastPicked);
+	}
+	TOD_ASSERT(aTotalAdjustedWeight > 0.0f);
+
+	float aRandWeight = Rand(aTotalAdjustedWeight);
+	float aAccumulatedWeight = 0.0f;
+	int k;
+	for (k = 0; k < theCount - 1; k++)
+	{
+		aAccumulatedWeight += TodCalcSmoothWeight(theArray[k].mWeight * aNormalizeFactor, theArray[k].mLastPicked, theArray[k].mSecondLastPicked);
+		if (aRandWeight <= aAccumulatedWeight)
+		{
+			break;
+		}
+	}
+
+	TodUpdateSmoothArrayPick(theArray, theCount, k);
+	return theArray[k].mItem;
+}
 
 // #################################################################################################### //
 

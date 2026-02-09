@@ -134,8 +134,6 @@ void ReanimatorCache::UpdateReanimationForVariation(Reanimation* theReanim, Draw
 //0x46F100
 void ReanimatorCache::DrawReanimatorFrame(Graphics* g, float thePosX, float thePosY, ReanimationType theReanimationType, const char* theTrackName, DrawVariation theDrawVariation, DrawFilterVariation theFilterVariation, unsigned int theDrawBitVariation)
 {
-	SDL_SetRenderTarget(LawnApp::mSDLRenderer, (SDL_Texture*)dynamic_cast<SDL3Image*>(g->mDestImage)->mD3DData);
-
 	Reanimation aReanim;
 	aReanim.ReanimationInitializeType(thePosX, thePosY, theReanimationType);
 
@@ -214,12 +212,10 @@ void ReanimatorCache::DrawReanimatorFrame(Graphics* g, float thePosX, float theP
 	{
 		aReanim.Draw(g);
 	}
-
-	SDL_SetRenderTarget(LawnApp::mSDLRenderer, nullptr);
 }
 
 //0x46F280
-SDL3Image* ReanimatorCache::MakeBlankMemoryImage(int theWidth, int theHeight)
+SDL3Image* ReanimatorCache::MakeBlankSDL3Image(int theWidth, int theHeight)
 {
 	SDL_DisplayID display = SDL_GetPrimaryDisplay();
 	float scale = (float)SDL_GetCurrentDisplayMode(display)->h / 600.0f;
@@ -231,29 +227,37 @@ SDL3Image* ReanimatorCache::MakeBlankMemoryImage(int theWidth, int theHeight)
 	aImage->mHeight = theHeight;
 	aImage->mD3DData = SDL_CreateTexture(LawnApp::mSDLRenderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, aImage->mWidth, aImage->mHeight);
 	SDL_SetTextureBlendMode((SDL_Texture*)aImage->mD3DData, SDL_BLENDMODE_BLEND);
-
-	int aBitsCount = theWidth * theHeight;
-	aImage->mBits = new unsigned long[aBitsCount + 1];
-	aImage->mHasTrans = true;
-	aImage->mHasAlpha = true;
-	aImage->mBits[aBitsCount] = Sexy::MEMORYCHECK_ID;
-
 	return aImage;
 }
 
-void ReanimatorCache::BackUp3DDataIntoBits(SDL3Image* theImage)
+MemoryImage* ReanimatorCache::ConvertSDL3ImageToMemoryImage(SDL3Image* theImage)
 {
+	MemoryImage* aImage = new MemoryImage();
+	int aBitsCount = theImage->mWidth * theImage->mHeight;
+	aImage->mWidth = theImage->mWidth;
+	aImage->mHeight = theImage->mHeight;
+	aImage->mBits = new unsigned long[aBitsCount + 1];
+	aImage->mHasTrans = true;
+	aImage->mHasAlpha = true;
+	memset(aImage->mBits, 0, aBitsCount * sizeof(unsigned long));
+	aImage->mBits[aBitsCount] = Sexy::MEMORYCHECK_ID;
+
 	SDL_Texture* oldRenderTarget = SDL_GetRenderTarget(LawnApp::mSDLRenderer);
 	SDL_SetRenderTarget(LawnApp::mSDLRenderer, (SDL_Texture*)theImage->mD3DData);
+
 	SDL_Surface* surface = SDL_RenderReadPixels(LawnApp::mSDLRenderer, NULL);
-	uint8_t* srcPixels = static_cast<uint8_t*>(surface->pixels);
-	uint8_t* src = (uint8_t*)surface->pixels;
+	uint8_t* srcBytes = static_cast<uint8_t*>(surface->pixels);
+
 	for (int y = 0; y < theImage->mHeight; ++y)
 	{
-		memcpy(theImage->mBits + y * theImage->mWidth, src + y * surface->pitch, theImage->mWidth);
+		memcpy(aImage->mBits + y * theImage->mWidth, srcBytes + y * surface->pitch, theImage->mWidth * 4);
 	}
+
 	SDL_SetRenderTarget(LawnApp::mSDLRenderer, oldRenderTarget);
 	SDL_DestroySurface(surface);
+
+	delete theImage; // gonna dispose the SDL3Image
+	return aImage;
 }
 
 void ReanimatorCache::GetPlantImageSize(SeedType theSeedType, int& theOffsetX, int& theOffsetY, int& theWidth, int& theHeight)
@@ -285,7 +289,7 @@ void ReanimatorCache::GetPlantImageSize(SeedType theSeedType, int& theOffsetX, i
 }
 
 //0x46F330
-SDL3Image* ReanimatorCache::MakeCachedMowerFrame(LawnMowerType theMowerType)
+MemoryImage* ReanimatorCache::MakeCachedMowerFrame(LawnMowerType theMowerType)
 {
 	SDL3Image* aImage;
 
@@ -296,7 +300,10 @@ SDL3Image* ReanimatorCache::MakeCachedMowerFrame(LawnMowerType theMowerType)
 	{
 	case LawnMowerType::LAWNMOWER_LAWN:
 	{
-		aImage = MakeBlankMemoryImage(90 * scale, 100 * scale);
+		aImage = MakeBlankSDL3Image(90 * scale, 100 * scale);
+		SDL_SetRenderTarget(LawnApp::mSDLRenderer, (SDL_Texture*)aImage->mD3DData);
+		SDL_SetRenderDrawColor(LawnApp::mSDLRenderer, 0, 0, 0, SDL_ALPHA_TRANSPARENT);
+		SDL_RenderClear(LawnApp::mSDLRenderer);
 		Graphics aMemoryGraphics(aImage);
 		aMemoryGraphics.SetLinearBlend(true);
 		aMemoryGraphics.mScaleX = 0.85f * scale;
@@ -306,7 +313,10 @@ SDL3Image* ReanimatorCache::MakeCachedMowerFrame(LawnMowerType theMowerType)
 	}
 	case LawnMowerType::LAWNMOWER_POOL:
 	{
-		aImage = MakeBlankMemoryImage(90 * scale, 100 * scale);
+		aImage = MakeBlankSDL3Image(90 * scale, 100 * scale);
+		SDL_SetRenderTarget(LawnApp::mSDLRenderer, (SDL_Texture*)aImage->mD3DData);
+		SDL_SetRenderDrawColor(LawnApp::mSDLRenderer, 0, 0, 0, SDL_ALPHA_TRANSPARENT);
+		SDL_RenderClear(LawnApp::mSDLRenderer);
 		Graphics aMemoryGraphics(aImage);
 		aMemoryGraphics.SetLinearBlend(true);
 		aMemoryGraphics.mScaleX = 0.8f * scale;
@@ -316,7 +326,10 @@ SDL3Image* ReanimatorCache::MakeCachedMowerFrame(LawnMowerType theMowerType)
 	}
 	case LawnMowerType::LAWNMOWER_ROOF:
 	{
-		aImage = MakeBlankMemoryImage(90 * scale, 100 * scale);
+		aImage = MakeBlankSDL3Image(90 * scale, 100 * scale);
+		SDL_SetRenderTarget(LawnApp::mSDLRenderer, (SDL_Texture*)aImage->mD3DData);
+		SDL_SetRenderDrawColor(LawnApp::mSDLRenderer, 0, 0, 0, SDL_ALPHA_TRANSPARENT);
+		SDL_RenderClear(LawnApp::mSDLRenderer);
 		Graphics aMemoryGraphics(aImage);
 		aMemoryGraphics.SetLinearBlend(true);
 		aMemoryGraphics.mScaleX = 0.85f * scale;
@@ -326,7 +339,10 @@ SDL3Image* ReanimatorCache::MakeCachedMowerFrame(LawnMowerType theMowerType)
 	}
 	case LawnMowerType::LAWNMOWER_SUPER_MOWER:
 	{
-		aImage = MakeBlankMemoryImage(90 * scale, 100 * scale);
+		aImage = MakeBlankSDL3Image(90 * scale, 100 * scale);
+		SDL_SetRenderTarget(LawnApp::mSDLRenderer, (SDL_Texture*)aImage->mD3DData);
+		SDL_SetRenderDrawColor(LawnApp::mSDLRenderer, 0, 0, 0, SDL_ALPHA_TRANSPARENT);
+		SDL_RenderClear(LawnApp::mSDLRenderer);
 		Graphics aMemoryGraphics(aImage);
 		aMemoryGraphics.SetLinearBlend(true);
 		aMemoryGraphics.mScaleX = 0.85f * scale;
@@ -339,13 +355,13 @@ SDL3Image* ReanimatorCache::MakeCachedMowerFrame(LawnMowerType theMowerType)
 		break;
 	}
 
-	if (aImage) BackUp3DDataIntoBits(aImage);
+	SDL_SetRenderTarget(LawnApp::mSDLRenderer, nullptr);
 
-	return aImage;
+	return ConvertSDL3ImageToMemoryImage(aImage);
 }
 
 //0x46F550
-SDL3Image* ReanimatorCache::MakeCachedPlantFrame(SeedType theSeedType, DrawVariation theDrawVariation, DrawFilterVariation theFilterVariation, unsigned int theDrawBitVariation)
+MemoryImage* ReanimatorCache::MakeCachedPlantFrame(SeedType theSeedType, DrawVariation theDrawVariation, DrawFilterVariation theFilterVariation, unsigned int theDrawBitVariation)
 {
 	int aOffsetX, aOffsetY, aWidth, aHeight;
 	GetPlantImageSize(theSeedType, aOffsetX, aOffsetY, aWidth, aHeight);
@@ -357,7 +373,12 @@ SDL3Image* ReanimatorCache::MakeCachedPlantFrame(SeedType theSeedType, DrawVaria
 	aWidth *= scale;
 	aHeight *= scale;
 
-	SDL3Image* aMemoryImage = MakeBlankMemoryImage(aWidth, aHeight);
+	SDL3Image* aMemoryImage = MakeBlankSDL3Image(aWidth, aHeight);
+
+	SDL_SetRenderTarget(LawnApp::mSDLRenderer, (SDL_Texture*)aMemoryImage->mD3DData);
+	SDL_SetRenderDrawColor(LawnApp::mSDLRenderer, 0, 0, 0, SDL_ALPHA_TRANSPARENT);
+	SDL_RenderClear(LawnApp::mSDLRenderer);
+
 	Graphics aMemoryGraphics(aMemoryImage);
 	aMemoryGraphics.SetLinearBlend(true);
 
@@ -411,13 +432,13 @@ SDL3Image* ReanimatorCache::MakeCachedPlantFrame(SeedType theSeedType, DrawVaria
 		}
 	}
 
-	if (aMemoryImage) BackUp3DDataIntoBits(aMemoryImage);
+	SDL_SetRenderTarget(LawnApp::mSDLRenderer, nullptr);
 
-	return aMemoryImage;
+	return ConvertSDL3ImageToMemoryImage(aMemoryImage);
 }
 
 //0x46F8A0
-SDL3Image* ReanimatorCache::MakeCachedZombieFrame(ZombieType theZombieType)
+MemoryImage* ReanimatorCache::MakeCachedZombieFrame(ZombieType theZombieType)
 {
 	int maxWidth = 200;
 	int maxHeight = 210;
@@ -431,7 +452,7 @@ SDL3Image* ReanimatorCache::MakeCachedZombieFrame(ZombieType theZombieType)
 	maxWidth *= scale;
 	maxHeight *= scale;
 
-	SDL3Image* aMemoryImage = MakeBlankMemoryImage(maxWidth, maxHeight);
+	SDL3Image* aMemoryImage = MakeBlankSDL3Image(maxWidth, maxHeight);
 	SDL_SetRenderTarget(LawnApp::mSDLRenderer, (SDL_Texture*)aMemoryImage->mD3DData);
 	Graphics aMemoryGraphics(aMemoryImage);
 	aMemoryGraphics.SetLinearBlend(true);
@@ -610,7 +631,7 @@ SDL3Image* ReanimatorCache::MakeCachedZombieFrame(ZombieType theZombieType)
 		}
 		aMemoryGraphics.SetLinearBlend(true);
 
-		SDL3Image* aMemoryImage2 = MakeBlankMemoryImage(200 * scale, 210 * scale);
+		SDL3Image* aMemoryImage2 = MakeBlankSDL3Image(200 * scale, 210 * scale);
 		Graphics aMemoryGraphics2(aMemoryImage2);
 		aMemoryGraphics2.SetLinearBlend(true);
 		SDL_SetRenderTarget(LawnApp::mSDLRenderer, (SDL_Texture*)aMemoryImage2->mD3DData);
@@ -730,9 +751,7 @@ SDL3Image* ReanimatorCache::MakeCachedZombieFrame(ZombieType theZombieType)
 
 	SDL_SetRenderTarget(LawnApp::mSDLRenderer, nullptr);
 
-	if (aMemoryImage) BackUp3DDataIntoBits(aMemoryImage);
-
-	return aMemoryImage;
+	return ConvertSDL3ImageToMemoryImage(aMemoryImage);
 }
 
 //0x46FDC0
@@ -770,7 +789,7 @@ void ReanimatorCache::DrawCachedPlant(Graphics* g, float thePosX, float thePosY,
 {
 	TOD_ASSERT(theSeedType >= 0 && theSeedType < SeedType::NUM_SEED_TYPES);
 
-	SDL3Image* aImage = nullptr;
+	MemoryImage* aImage = nullptr;
 	if (theDrawVariation != DrawVariation::VARIATION_NORMAL)
 	{
 		for (TodListNode<ReanimCacheImageVariation>* aNode = mImageVariationList.mHead; aNode != nullptr; aNode = aNode->mNext)

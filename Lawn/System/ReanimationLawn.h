@@ -19,7 +19,7 @@ public:
     DrawVariation           mDrawVariation;
     DrawFilterVariation     mFilterVariation;
     unsigned int            mDrawBitVariation;
-    SDL3Image*            mImage;
+    MemoryImage*              mImage;
 };
 typedef TodList<ReanimCacheImageVariation> ImageVariationList;
 
@@ -27,10 +27,10 @@ class Reanimation;
 class ReanimatorCache
 {
 public:
-    SDL3Image*			mPlantImages[SeedType::NUM_SEED_TYPES];
+    MemoryImage*			mPlantImages[SeedType::NUM_SEED_TYPES];
     ImageVariationList      mImageVariationList;
-    SDL3Image*            mLawnMowers[LawnMowerType::NUM_MOWER_TYPES];
-    SDL3Image*            mZombieImages[ZombieType::NUM_CACHED_ZOMBIE_TYPES];
+    MemoryImage*            mLawnMowers[LawnMowerType::NUM_MOWER_TYPES];
+    MemoryImage*            mZombieImages[ZombieType::NUM_CACHED_ZOMBIE_TYPES];
     LawnApp*                mApp;
 
 public:
@@ -42,14 +42,14 @@ public:
     void                    DrawCachedPlant(Graphics* g, float thePosX, float thePosY, SeedType theSeedType, DrawVariation theDrawVariation, DrawFilterVariation theFilterVariation = DrawFilterVariation::FILTERVARIATION_NONE, unsigned int theBitVariation = 0U);
     void                    DrawCachedMower(Graphics* g, float thePosX, float thePosY, LawnMowerType theMowerType, DrawFilterVariation theFilterVariation = DrawFilterVariation::FILTERVARIATION_NONE);
     void                    DrawCachedZombie(Graphics* g, float thePosX, float thePosY, ZombieType theZombieType, DrawFilterVariation theFilterVariation = DrawFilterVariation::FILTERVARIATION_NONE);
-    SDL3Image*            MakeBlankMemoryImage(int theWidth, int theHeight);
-    SDL3Image*            MakeCachedPlantFrame(SeedType theSeedType, DrawVariation theDrawVariation, DrawFilterVariation theFilterVariation = DrawFilterVariation::FILTERVARIATION_NONE, unsigned int theBitVariation = 0U);
-    SDL3Image*            MakeCachedMowerFrame(LawnMowerType theMowerType);
-    SDL3Image*            MakeCachedZombieFrame(ZombieType theZombieType);
+    SDL3Image*              MakeBlankSDL3Image(int theWidth, int theHeight);
+    MemoryImage*            ConvertSDL3ImageToMemoryImage(SDL3Image* theImage);
+    MemoryImage*            MakeCachedPlantFrame(SeedType theSeedType, DrawVariation theDrawVariation, DrawFilterVariation theFilterVariation = DrawFilterVariation::FILTERVARIATION_NONE, unsigned int theBitVariation = 0U);
+    MemoryImage*            MakeCachedMowerFrame(LawnMowerType theMowerType);
+    MemoryImage*            MakeCachedZombieFrame(ZombieType theZombieType);
     /*inline*/ void         GetPlantImageSize(SeedType theSeedType, int& theOffsetX, int& theOffsetY, int& theWidth, int& theHeight);
     void                    DrawReanimatorFrame(Graphics* g, float thePosX, float thePosY, ReanimationType theReanimationType, const char* theTrackName, DrawVariation theDrawVariation, DrawFilterVariation theFilterVariation = DrawFilterVariation::FILTERVARIATION_NONE, unsigned int theBitVariation = 0U);
     void                    UpdateReanimationForVariation(Reanimation* theReanim, DrawVariation theDrawVariation, DrawFilterVariation theFilterVariation = DrawFilterVariation::FILTERVARIATION_NONE);
-    void                    BackUp3DDataIntoBits(SDL3Image* theImage); // someone have this issue for some reason
 };
 
 #endif

@@ -134,7 +134,7 @@ public:
 extern Color gZombatarSkinPalletes[NUM_SKIN_COLOR_PALLETES];
 extern Color gZombatarDimPalletes[NUM_COLOR_PALLETES];
 extern Color gZombatarBrightPalletes[NUM_COLOR_PALLETES];
-extern SDL3Image* gZombatarClothes[NUM_CLOTHES];
+extern MemoryImage* gZombatarClothes[NUM_CLOTHES];
 
 void DisposeZombatarClothesCache();
 #endif

@@ -337,6 +337,13 @@ void GridItem::DrawScaryPot(Graphics* g)
                 aOffsetX += 9.0f;
                 aOffsetY += 7.0f;
             }
+
+            SDL_DisplayID display = SDL_GetPrimaryDisplay();
+            float scale = (float)SDL_GetCurrentDisplayMode(display)->h / 600.0f;
+
+            g->mScaleX /= scale;
+            g->mScaleY /= scale;
+
             mApp->mReanimatorCache->DrawCachedZombie(g, aXPos + aOffsetX, aYPos + aOffsetY, mZombieType);
         }
         else if (mScaryPotType == ScaryPotType::SCARYPOT_SUN)
@@ -441,7 +448,7 @@ void GridItem::OpenPortal()
     Reanimation* aPortalReanim = mApp->ReanimationTryToGet(mGridItemReanimID);
     if (aPortalReanim == nullptr)
     {
-        ReanimationType aReanimType = ReanimationType::REANIM_PORTAL_CIRCLE;
+        ReanimationType aReanimType = ReanimationType::REANIM_PORTAL_CIRCLE;//
         if (mGridItemType == GridItemType::GRIDITEM_PORTAL_SQUARE)
         {
             aYPos += 25.0f;

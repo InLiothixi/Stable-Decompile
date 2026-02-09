@@ -1,5 +1,4 @@
 #include "TodList.h"
-#include "TodDebug.h"
 #include "TodCommon.h"
 #include "../LawnApp.h"
 #include "EffectSystem.h"
@@ -110,45 +109,6 @@ bool TodAppCloseRequest()
 	return false;
 }
 
-intptr_t TodPickFromArray(const intptr_t* theArray, int theCount)
-{
-	TOD_ASSERT(theCount > 0);
-	return theCount > 0 ? theArray[Sexy::Rand(theCount)] : 0;
-}
-
-intptr_t TodPickFromWeightedArray(const TodWeightedArray* theArray, int theCount)
-{
-	return TodPickArrayItemFromWeightedArray(theArray, theCount)->mItem;
-}
-
-//0x511520
-TodWeightedArray* TodPickArrayItemFromWeightedArray(const TodWeightedArray* theArray, int theCount)
-{
-	if (theCount <= 0)
-		return nullptr;
-
-	int aTotalWeight = 0;
-	for (int i = 0; i < theCount; i++)
-	{
-		aTotalWeight += theArray[i].mWeight;
-	}
-	TOD_ASSERT(aTotalWeight > 0);
-
-	aTotalWeight = Sexy::Rand(aTotalWeight);
-
-	for (int i = 0; i < theCount; i++)
-	{
-		aTotalWeight -= theArray[i].mWeight;
-		if (aTotalWeight < 0)
-		{
-			return (TodWeightedArray*)&theArray[i];
-		}
-	}
-
-	TOD_ASSERT();
-	return nullptr;
-}
-
 //0x511570
 TodWeightedGridArray* TodPickFromWeightedGridArray(const TodWeightedGridArray* theArray, int theCount)
 {
@@ -193,55 +153,6 @@ float TodCalcSmoothWeight(float aWeight, float aLastPicked, float aSecondLastPic
 	float aFactor2 = 1.0f + aAdvancedLength2 / aExpectedLength2 * 2.0f;		// = aSecondLastPicked * aWeight + aWeight - 1
 	float aFactorFinal = ClampFloat(aFactor1 * 0.75f + aFactor2 * 0.25f, 0.01f, 100.0f);
 	return aWeight * aFactorFinal;
-}
-
-int TodPickFromSmoothArray(TodSmoothArray* theArray, int theCount)
-{
-	float aTotalWeight = 0.0f;
-	for (int i = 0; i < theCount; i++)
-	{
-		aTotalWeight += theArray[i].mWeight;
-	}
-	TOD_ASSERT(aTotalWeight > 0.0f);
-
-	float aNormalizeFactor = 1.0f / aTotalWeight;
-	float aTotalAdjustedWeight = 0.0f;
-	for (int j = 0; j < theCount; j++)
-	{
-		aTotalAdjustedWeight += TodCalcSmoothWeight(theArray[j].mWeight * aNormalizeFactor, theArray[j].mLastPicked, theArray[j].mSecondLastPicked);
-	}
-	TOD_ASSERT(aTotalAdjustedWeight > 0.0f);
-
-	float aRandWeight = Rand(aTotalAdjustedWeight);
-	float aAccumulatedWeight = 0.0f;
-	int k;
-	for (k = 0; k < theCount - 1; k++)
-	{
-		aAccumulatedWeight += TodCalcSmoothWeight(theArray[k].mWeight * aNormalizeFactor, theArray[k].mLastPicked, theArray[k].mSecondLastPicked);
-		if (aRandWeight <= aAccumulatedWeight)
-		{
-			break;
-		}
-	}
-
-	TodUpdateSmoothArrayPick(theArray, theCount, k);
-	return theArray[k].mItem;
-}
-
-//0x5117F0
-void TodUpdateSmoothArrayPick(TodSmoothArray* theArray, int theCount, int thePickIndex)
-{
-	for (int i = 0; i < theCount; i++)
-	{
-		if (theArray[i].mWeight > 0.0f)
-		{
-			theArray[i].mLastPicked += 1.0f;
-			theArray[i].mSecondLastPicked += 1.0f;
-		}
-	}
-
-	theArray[thePickIndex].mSecondLastPicked = theArray[thePickIndex].mLastPicked;
-	theArray[thePickIndex].mLastPicked = 0.0f;
 }
 
 float TodCurveQuad(float theTime)

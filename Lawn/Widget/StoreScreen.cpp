@@ -763,7 +763,7 @@ void StoreScreen::Update()
                 mAmbientSpeechCountDown--;
                 if (mAmbientSpeechCountDown <= 0)
                 {
-                    TodWeightedArray aPickArray[4];
+                    TodWeightedArray<int> aPickArray[4];
                     for (int i = 0; i < 4; i++)
                     {
                         int aMessage = 2015 + i;

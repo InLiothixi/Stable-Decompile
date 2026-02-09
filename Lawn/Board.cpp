@@ -190,21 +190,21 @@ Board::Board(LawnApp* theApp)
 	mMenuButton->mDrawStoneButton = true;
 #ifdef _REPLANTED_SPEED_CONTROL
 		mSlowdownButton = MakeNewButton(Board::SLOWDOWN, this, "", nullptr, Sexy::IMAGE_SLOWDOWN_BUTTON, Sexy::IMAGE_SLOWDOWN_BUTTON_PRESSED, Sexy::IMAGE_SLOWDOWN_BUTTON_PRESSED);
-		mSlowdownButton->Resize(0, 0, Sexy::IMAGE_SLOWDOWN_BUTTON->GetWidth(), Sexy::IMAGE_SLOWDOWN_BUTTON->GetHeight());
+		mSlowdownButton->Resize(mApp->mDDInterface->mWideScreenOffsetX, mApp->mDDInterface->mWideScreenOffsetY, Sexy::IMAGE_SLOWDOWN_BUTTON->GetWidth(), Sexy::IMAGE_SLOWDOWN_BUTTON->GetHeight());
 		mSlowdownButton->mBtnNoDraw = true;
 		mSlowdownButton->mDoFinger = true;
 		mSlowdownButton->mTranslateX = 0;
 		mSlowdownButton->mTranslateY = 0;
 
 		mPauseButton = MakeNewButton(Board::PAUSE, this, "", nullptr, Sexy::IMAGE_PAUSE_BUTTON, Sexy::IMAGE_PAUSE_BUTTON_PRESSED, Sexy::IMAGE_PAUSE_BUTTON_PRESSED);
-		mPauseButton->Resize(0, 0, Sexy::IMAGE_PAUSE_BUTTON->GetWidth(), Sexy::IMAGE_PAUSE_BUTTON->GetHeight());
+		mPauseButton->Resize(mApp->mDDInterface->mWideScreenOffsetX, mApp->mDDInterface->mWideScreenOffsetY, Sexy::IMAGE_PAUSE_BUTTON->GetWidth(), Sexy::IMAGE_PAUSE_BUTTON->GetHeight());
 		mPauseButton->mBtnNoDraw = true;
 		mPauseButton->mDoFinger = true;
 		mPauseButton->mTranslateX = 0;
 		mPauseButton->mTranslateY = 0;
 
 		mSpeedupButton = MakeNewButton(Board::SPEEDUP, this, "", nullptr, Sexy::IMAGE_SPEEDUP_BUTTON, Sexy::IMAGE_SPEEDUP_BUTTON_PRESSED, Sexy::IMAGE_SPEEDUP_BUTTON_PRESSED);
-		mSpeedupButton->Resize(0, 0, Sexy::IMAGE_SPEEDUP_BUTTON->GetWidth(), Sexy::IMAGE_SPEEDUP_BUTTON->GetHeight());
+		mSpeedupButton->Resize(mApp->mDDInterface->mWideScreenOffsetX, mApp->mDDInterface->mWideScreenOffsetY, Sexy::IMAGE_SPEEDUP_BUTTON->GetWidth(), Sexy::IMAGE_SPEEDUP_BUTTON->GetHeight());
 		mSpeedupButton->mBtnNoDraw = true;
 		mSpeedupButton->mDoFinger = true;
 		mSpeedupButton->mTranslateX = 0;
@@ -809,7 +809,7 @@ void Board::PickZombieWaves()
 
 			if (mApp->mGameMode != GameMode::GAMEMODE_CHALLENGE_WAR_AND_PEAS && mApp->mGameMode != GameMode::GAMEMODE_CHALLENGE_WAR_AND_PEAS_2)
 			{
-				if (mZombieAllowed[ZombieType::ZOMBIE_NORMAL])
+				//if (mZombieAllowed[ZombieType::ZOMBIE_NORMAL])
 				{
 					for (int _i = 0; _i < aPlainZombiesNum; _i++)
 					{
@@ -2006,7 +2006,7 @@ void Board::PlaceRake()
 	}
 
 	int aPickCount = 0;
-	TodWeightedArray aPickArray[MAX_GRID_SIZE_Y];
+	TodWeightedArray<int> aPickArray[MAX_GRID_SIZE_Y];
 	for (int aRow = 0; aRow < MAX_GRID_SIZE_Y; aRow++)
 	{
 		if (aRow != 5 && mPlantRow[aRow] == PlantRowType::PLANTROW_NORMAL)
@@ -2923,7 +2923,7 @@ ZombieType Board::GetIntroducedZombieType()
 //0x40D770
 ZombieType Board::PickGraveRisingZombieType(int theZombiePoints)
 {
-	TodWeightedArray aZombieWeightArray[(int)ZombieType::NUM_ZOMBIE_TYPES];
+	TodWeightedArray<ZombieType> aZombieWeightArray[(int)ZombieType::NUM_ZOMBIE_TYPES];
 	int aCount = 2;
 	aZombieWeightArray[0].mItem = ZombieType::ZOMBIE_NORMAL;
 	aZombieWeightArray[0].mWeight = GetZombieDefinition(ZombieType::ZOMBIE_NORMAL).mPickWeight;
@@ -2950,14 +2950,14 @@ ZombieType Board::PickGraveRisingZombieType(int theZombiePoints)
 		}
 	}
 
-	return (ZombieType)TodPickFromWeightedArray(aZombieWeightArray, aCount);
+	return (ZombieType)TodPickFromWeightedArray<ZombieType>(aZombieWeightArray, aCount);
 }
 
 //0x40D8A0
 ZombieType Board::PickZombieType(int theZombiePoints, int theWaveIndex, ZombiePicker* theZombiePicker)
 {
 	int aPickCount = 0;
-	TodWeightedArray aZombieWeightArray[ZombieType::NUM_ZOMBIE_TYPES];
+	TodWeightedArray<int> aZombieWeightArray[ZombieType::NUM_ZOMBIE_TYPES];
 	for (int aZombieType = ZombieType::ZOMBIE_NORMAL; aZombieType < ZombieType::NUM_ZOMBIE_TYPES; aZombieType++)
 	{
 		if (!mZombieAllowed[aZombieType])
@@ -2978,7 +2978,11 @@ ZombieType Board::PickZombieType(int theZombiePoints, int theWaveIndex, ZombiePi
 			}
 		}
 		// 僵尸最早出现的波数的限制（出怪限制）
-		//else if (aGameMode != GameMode::GAMEMODE_CHALLENGE_POGO_PARTY && aGameMode != GameMode::GAMEMODE_CHALLENGE_BOBSLED_BONANZA && aGameMode != GameMode::GAMEMODE_CHALLENGE_AIR_RAID)
+		else if (aGameMode != GameMode::GAMEMODE_CHALLENGE_POGO_PARTY && aGameMode != GameMode::GAMEMODE_CHALLENGE_BOBSLED_BONANZA && aGameMode != GameMode::GAMEMODE_CHALLENGE_AIR_RAID
+#ifdef _MOBILE_MINIGAMES
+			&& aGameMode != GameMode::GAMEMODE_CHALLENGE_HEAT_WAVE
+#endif
+			)
 		{
 			int aFirstAllowedWave = aZombieDef.mFirstAllowedWave;
 			// 无尽模式中，僵尸最早可出现的波数逐渐前移
@@ -3068,7 +3072,7 @@ ZombieType Board::PickZombieType(int theZombiePoints, int theWaveIndex, ZombiePi
 		}
 #endif
 
-		if (aPickWeight <= 0)	continue;
+		// if (aPickWeight <= 0)	continue;
 
 		aZombieWeightArray[aPickCount].mItem = aZombieType;
 		aZombieWeightArray[aPickCount].mWeight = aPickWeight;
@@ -3078,7 +3082,7 @@ ZombieType Board::PickZombieType(int theZombiePoints, int theWaveIndex, ZombiePi
 	if (aPickCount <= 0)	return ZombieType::ZOMBIE_INVALID;
 
 	// 加权随机地取得一种可能的僵尸类型并返回
-	return (ZombieType)TodPickFromWeightedArray(aZombieWeightArray, aPickCount);
+	return (ZombieType)TodPickFromWeightedArray<int>(aZombieWeightArray, aPickCount);
 }
 
 bool Board::IsZombieTypePoolOnly(ZombieType theZombieType)
@@ -3108,10 +3112,10 @@ bool Board::RowCanHaveZombieType(int theRow, ZombieType theZombieType, int theWa
 	}
 
 	int aCurrentWave = theWave;
-	if (mApp->IsLastStand() || mApp->IsSurvivalMode())
+	/*if (mApp->IsLastStand() || mApp->IsSurvivalMode())
 	{
 		aCurrentWave += mChallenge->mSurvivalStage * GetNumWavesPerSurvivalStage();
-	}
+	}*/
 	// 非水路不能刷出水路僵尸；前 5 小波，水面仅刷出潜水僵尸或海豚骑士僵尸
 	if (mPlantRow[theRow] == PlantRowType::PLANTROW_POOL)
 	{
@@ -3965,18 +3969,18 @@ void Board::UpdateToolTip()
 		mToolTip->mMinLeft = IMAGE_SEEDCHOOSER_BACKGROUND->GetWidth();
 		if (mApp->mSeedChooserScreen->mAlmanacButton->mBtnNoDraw && mApp->mSeedChooserScreen->mStoreButton->mBtnNoDraw)
 		{
-			mToolTip->mMaxBottom = mApp->mHeight;
+			mToolTip->mMaxBottom = 600 + mApp->mDDInterface->mWideScreenOffsetY;
 		}
 		else
 		{
-			mToolTip->mMaxBottom = mApp->mHeight - 30;
+			mToolTip->mMaxBottom = 570 + mApp->mDDInterface->mWideScreenOffsetY;
 		}
 		if (!mApp->mSeedChooserScreen->mImitaterButton->mBtnNoDraw)
 		{
 			mToolTip->CalculateSize();
 			if (mX + mToolTip->mX - mToolTip->mWidth / 2 < 524)
 			{
-				mToolTip->mMaxBottom = mApp->mHeight - 97;
+				mToolTip->mMaxBottom = 503 + mApp->mDDInterface->mWideScreenOffsetY;
 			}
 		}
 
@@ -5578,7 +5582,7 @@ void Board::PickSpecialGraveStone()
 
 	if (aPickCount > 0)
 	{
-		((GridItem*)TodPickFromArray((intptr_t*)aPicks, aPickCount))->mGridItemState = GridItemState::GRIDITEM_STATE_GRAVESTONE_SPECIAL;
+		((GridItem*)TodPickFromArray(aPicks, aPickCount))->mGridItemState = GridItemState::GRIDITEM_STATE_GRAVESTONE_SPECIAL;
 	}
 }
 
@@ -8023,33 +8027,33 @@ void Board::DrawSpeed(Graphics* g)
 		aPosY -= Sexy::IMAGE_FLAGMETERPARTS->GetHeight() + 8;
 	}
 
-	mSpeedupButton->mX = aPosX - aStrWidth - 12 - Sexy::IMAGE_SPEEDUP_BUTTON->GetWidth();
-	mSpeedupButton->mY = aPosY - fontHeight / 2 - 4;
+	mSpeedupButton->mX = aPosX - aStrWidth - 12 - Sexy::IMAGE_SPEEDUP_BUTTON->GetWidth() + mApp->mDDInterface->mWideScreenOffsetX;
+	mSpeedupButton->mY = aPosY - fontHeight / 2 - 4 + mApp->mDDInterface->mWideScreenOffsetY;
 
 	mSlowdownButton->mButtonImage = mSpeedMod < SpeedMod::SPEED_NORMAL ? IMAGE_SLOWDOWN_BUTTON_PRESSED : IMAGE_SLOWDOWN_BUTTON;
 	mSpeedupButton->mButtonImage = mSpeedMod > SpeedMod::SPEED_NORMAL ? IMAGE_SPEEDUP_BUTTON_PRESSED : IMAGE_SPEEDUP_BUTTON;
 
-	mPauseButton->mX = mSpeedupButton->mX - Sexy::IMAGE_SPEEDUP_BUTTON->GetWidth() - 4;
+	mPauseButton->mX = mSpeedupButton->mX - Sexy::IMAGE_SPEEDUP_BUTTON->GetWidth() - 4 ;
 	mPauseButton->mY = mSpeedupButton->mY;
 
 	mSlowdownButton->mX = mPauseButton->mX - Sexy::IMAGE_SLOWDOWN_BUTTON->GetWidth() - 4;
 	mSlowdownButton->mY = mPauseButton->mY;
 
 	Graphics gSlowdownButton(*g);
-	gSlowdownButton.mTransX = mSlowdownButton->mX + mApp->mDDInterface->mWideScreenOffsetX;
-	gSlowdownButton.mTransY = mSlowdownButton->mY + mApp->mDDInterface->mWideScreenOffsetY;
+	gSlowdownButton.mTransX = mSlowdownButton->mX;
+	gSlowdownButton.mTransY = mSlowdownButton->mY;
 	gSlowdownButton.mTransX += TodAnimateCurve(12, 0, mShakeCounter, 0, mShakeAmountX, TodCurves::CURVE_BOUNCE);
 	gSlowdownButton.mTransY += TodAnimateCurve(12, 0, mShakeCounter, 0, mShakeAmountY, TodCurves::CURVE_BOUNCE);
 
 	Graphics gPauseButton(*g);
-	gPauseButton.mTransX = mPauseButton->mX + mApp->mDDInterface->mWideScreenOffsetX;
-	gPauseButton.mTransY = mPauseButton->mY + mApp->mDDInterface->mWideScreenOffsetY;
+	gPauseButton.mTransX = mPauseButton->mX;
+	gPauseButton.mTransY = mPauseButton->mY;
 	gPauseButton.mTransX += TodAnimateCurve(12, 0, mShakeCounter, 0, mShakeAmountX, TodCurves::CURVE_BOUNCE);
 	gPauseButton.mTransY += TodAnimateCurve(12, 0, mShakeCounter, 0, mShakeAmountY, TodCurves::CURVE_BOUNCE);
 
 	Graphics gSpeedupButton(*g);
-	gSpeedupButton.mTransX = mSpeedupButton->mX + mApp->mDDInterface->mWideScreenOffsetX;
-	gSpeedupButton.mTransY = mSpeedupButton->mY + mApp->mDDInterface->mWideScreenOffsetY;
+	gSpeedupButton.mTransX = mSpeedupButton->mX;
+	gSpeedupButton.mTransY = mSpeedupButton->mY;
 	gSpeedupButton.mTransX += TodAnimateCurve(12, 0, mShakeCounter, 0, mShakeAmountX, TodCurves::CURVE_BOUNCE);
 	gSpeedupButton.mTransY += TodAnimateCurve(12, 0, mShakeCounter, 0, mShakeAmountY, TodCurves::CURVE_BOUNCE);
 
@@ -8269,7 +8273,7 @@ void Board::DrawShovel(Graphics* g)
 					g->SetColorizeImages(true);
 					g->SetColor(GetFlashingColor(mMainCounter, 75));
 				}
-				g->DrawImage(Sexy::IMAGE_SHOVEL, aShovelRect.mX - 7, aShovelRect.mY - 3);
+				TodDrawImageScaledF(g, Sexy::IMAGE_SHOVEL_HI_RES, aShovelRect.mX + 5, aShovelRect.mY + 5, 0.5f, 0.5f);
 				g->SetColorizeImages(false);
 			}
 		}
@@ -9580,6 +9584,7 @@ void Board::Draw(Graphics* g)
 	if (mApp->GetDialog(Dialogs::DIALOG_STORE) || mApp->GetDialog(Dialogs::DIALOG_ALMANAC))
 		return;
 	g->PushState();
+	g->ClearClipRect();
 	g->SetLinearBlend(true);
 
 	if (mDrawCount && mCutScene->mPreloaded)

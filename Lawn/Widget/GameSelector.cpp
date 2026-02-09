@@ -151,7 +151,7 @@ GameSelector::GameSelector(LawnApp* theApp)
 		Sexy::IMAGE_SELECTORSCREEN_ACHIEVEMENTS_PEDESTAL_PRESS,
 		Sexy::IMAGE_SELECTORSCREEN_ACHIEVEMENTS_PEDESTAL_PRESS
 	);
-	mAchievementsButton->Resize(0, 0, Sexy::IMAGE_SELECTORSCREEN_ACHIEVEMENTS_PEDESTAL->mWidth, Sexy::IMAGE_SELECTORSCREEN_ACHIEVEMENTS_PEDESTAL->mHeight);
+	mAchievementsButton->Resize(mApp->mDDInterface->mWideScreenOffsetX, mApp->mDDInterface->mWideScreenOffsetY, Sexy::IMAGE_SELECTORSCREEN_ACHIEVEMENTS_PEDESTAL->mWidth, Sexy::IMAGE_SELECTORSCREEN_ACHIEVEMENTS_PEDESTAL->mHeight);
 	mAchievementsButton->mClip = false;
 	//mAchievementsButton->mBtnNoDraw = true;
 	mAchievementsButton->mMouseVisible = false;
@@ -402,7 +402,8 @@ GameSelector::GameSelector(LawnApp* theApp)
 
 	SyncProfile(false);
 
-	TrackButton(mAdventureButton, mShowStartButton ? "SelectorScreen_StartAdventure_button" : "SelectorScreen_Adventure_button", 0.0f, 0.0f);
+	TrackButton(mAdventureButton, "SelectorScreen_Adventure_button", 0.0f, 0.0f);
+	TrackButton(mAdventureButton, "SelectorScreen_StartAdventure_button", 0.0f, 0.0f);
 	TrackButton(mMinigameButton, "SelectorScreen_Survival_button", 0.0f, 0.0f);
 	TrackButton(mPuzzleButton, "SelectorScreen_Challenges_button", 0.0f, 0.0f);
 	TrackButton(mSurvivalButton, "SelectorScreen_ZenGarden_button", 0.0f, 0.0f);
@@ -432,19 +433,19 @@ GameSelector::GameSelector(LawnApp* theApp)
 	mDestY = 0;
 #ifdef _HAS_ZOMBATAR
 	mZombatarWidget = new ZombatarWidget(this->mApp);
-	mZombatarWidget->Move(mApp->mWidth, 0);
+	mZombatarWidget->Move(800 + mApp->mDDInterface->mWideScreenOffsetX, mApp->mDDInterface->mWideScreenOffsetY);
 #endif
 #ifdef _HAS_ACHIEVEMENTS
 	mAchievementsWidget = new AchievementsWidget(this->mApp);
-	mAchievementsWidget->Move(0, mApp->mHeight);
+	mAchievementsWidget->Move(mApp->mDDInterface->mWideScreenOffsetX, 600 + mApp->mDDInterface->mWideScreenOffsetY);
 #endif
 #ifdef _HAS_MORESCREEN
 	mMoreWidget = new MoreWidget(this->mApp);
-	mMoreWidget->Move(-mApp->mWidth, 0);
+	mMoreWidget->Move(-800 + mApp->mDDInterface->mWideScreenOffsetX, mApp->mDDInterface->mWideScreenOffsetY);
 #endif
 #ifdef _HAS_LEVELSELECTOR
 	mLevelSelectorWidget = new QuickplayWidget(this->mApp);
-	mLevelSelectorWidget->Move(mApp->mWidth, 0);
+	mLevelSelectorWidget->Move(800 + mApp->mDDInterface->mWideScreenOffsetX, mApp->mDDInterface->mWideScreenOffsetY);
 #endif
 	TodHesitationTrace("gameselectorinit");
 }
@@ -702,7 +703,37 @@ void GameSelector::Draw(Graphics* g)
 	g->PushState();
 	g->ClearClipRect();
 	g->SetLinearBlend(true);
+	g->TranslateF(mApp->mDDInterface->mWideScreenOffsetX, mApp->mDDInterface->mWideScreenOffsetY);
 	Reanimation* aSelectorReanim = mApp->ReanimationGet(mSelectorReanimID);
+	if (aSelectorReanim && mWidgetManager->mFocusWidget == this && mSlideCounter == 0)
+	{
+		int aTrackIndex = aSelectorReanim->FindTrackIndex("SelectorScreen_BG_Right");
+		ReanimatorTransform aTransform;
+		aSelectorReanim->GetCurrentTransform(aTrackIndex, &aTransform);
+		aTransform.mTransX += g->mTransX;
+		aTransform.mTransY += g->mTransY;
+
+		aTransform.mTransY += mOverlayWidget->mY;
+		aTransform.mTransY -= 41.0f;
+#ifdef _HAS_ZOMBATAR
+		mZombatarWidget->mX = g->mTransX + 800;
+		mZombatarWidget->mY = aTransform.mTransY;
+#endif
+#ifdef _HAS_ACHIEVEMENTS
+		mAchievementsWidget->mX = g->mTransX;
+		mAchievementsWidget->mY = aTransform.mTransY + 600;
+#endif
+#ifdef _HAS_LEVELSELECTOR
+		mLevelSelectorWidget->mY = aTransform.mTransY;
+#endif
+
+		aTrackIndex = aSelectorReanim->FindTrackIndex("SelectorScreen_BG_Left");
+		aSelectorReanim->GetCurrentTransform(aTrackIndex, &aTransform);
+		aTransform.mTransY += mOverlayWidget->mY;
+#ifdef _HAS_MORESCREEN
+		mMoreWidget->mY = aTransform.mTransY + 80.0f;
+#endif
+	}
 
 	aSelectorReanim->DrawRenderGroup(g, 1);  // "SelectorScreen_BG"
 
@@ -778,7 +809,7 @@ void GameSelector::Draw(Graphics* g)
 		float aStringWidth = Sexy::FONT_BRIANNETOD16->StringWidth(aWelcomeStr);
 		SexyTransform2D aOffsetMatrix;
 		// @Patoke: add position so it moves when sliding to position
-		aOffsetMatrix.Translate(170.5f - (int)(aStringWidth * 0.5f) + mX, 102.5f + mY);
+		aOffsetMatrix.Translate(170.5f - (int)(aStringWidth * 0.5f) + mX + mApp->mDDInterface->mWideScreenOffsetX, 102.5f + mY + mApp->mDDInterface->mWideScreenOffsetY);
 		TodDrawStringMatrix(g, Sexy::FONT_BRIANNETOD16, aOverlayMatrix * aOffsetMatrix, aWelcomeStr, Color(255, 245, 200));
 	}
 	g->PopState();
@@ -787,12 +818,14 @@ void GameSelector::Draw(Graphics* g)
 //0x44AB50
 void GameSelector::DrawOverlay(Graphics* g)
 {
+	g->PushState();
 	g->SetLinearBlend(true);
+	g->ClearClipRect();
+	g->TranslateF(mApp->mDDInterface->mWideScreenOffsetX, mApp->mDDInterface->mWideScreenOffsetY);
 
 #ifdef _HAS_UNLOCK
 	{
 		g->PushState();
-
 		Reanimation* aSelectorReanim = mApp->ReanimationGet(mSelectorReanimID);
 		int aTrackIndex = aSelectorReanim->FindTrackIndex("SelectorScreen_BG_Right");
 		ReanimatorTransform aTransform;
@@ -807,6 +840,11 @@ void GameSelector::DrawOverlay(Graphics* g)
 		}
 		g->DrawImageF(buttonImg, 0, 0);
 		g->PopState();
+#ifndef _HAS_MORESCREEN
+		aTrackIndex = aSelectorReanim->FindTrackIndex("SelectorScreen_BG_Left");
+		aSelectorReanim->GetCurrentTransform(aTrackIndex, &aTransform);
+		g->DrawImage(IMAGE_SELECTORSCREEN_MOREWAYSTOPLAY_BG, -800, aTransform.mTransY + 80);
+#endif
 	}
 #endif
 
@@ -947,8 +985,8 @@ void GameSelector::DrawOverlay(Graphics* g)
 
 		if (mZenGardenButton->mVisible && mApp->mZenGarden->PlantsNeedWater())
 		{
-			g->DrawImage(Sexy::IMAGE_PLANTSPEECHBUBBLE, mZenGardenButton->mX + 106, mZenGardenButton->mY + 36);
-			g->DrawImage(Sexy::IMAGE_WATERDROP, mZenGardenButton->mX + 123, mZenGardenButton->mY + 45);
+			g->DrawImage(Sexy::IMAGE_PLANTSPEECHBUBBLE, mZenGardenButton->mX + 106 - mApp->mDDInterface->mWideScreenOffsetX, mZenGardenButton->mY + 36 - mApp->mDDInterface->mWideScreenOffsetY);
+			g->DrawImage(Sexy::IMAGE_WATERDROP, mZenGardenButton->mX + 123 - mApp->mDDInterface->mWideScreenOffsetX, mZenGardenButton->mY + 45 - mApp->mDDInterface->mWideScreenOffsetY);
 		}
 	}
 
@@ -978,7 +1016,12 @@ void GameSelector::DrawOverlay(Graphics* g)
 	}
 
 	if (mWidgetManager->mFocusWidget == this)
+	{
+		g->PushState();
+		g->mTransY -= mY;
 		mToolTip->Draw(g);
+		g->PopState();
+	}
 
 	Reanimation* aHandReanim = mApp->ReanimationTryToGet(mHandReanimID);
 	if (aHandReanim)
@@ -1031,6 +1074,8 @@ void GameSelector::DrawOverlay(Graphics* g)
 			g->PopState();
 		}
 	} 
+
+	g->PopState();
 }
 
 //0x44B0D0
@@ -1094,13 +1139,13 @@ void GameSelector::Update()
 		// @Patoke: not from the original binaries but fixes bugs
 		mOverlayWidget->Move(aNewX, aNewY);
 #ifdef _HAS_ZOMBATAR
-		mZombatarWidget->Move(aNewX + mApp->mWidth, aNewY);
+		mZombatarWidget->Move(aNewX + 800 + mApp->mDDInterface->mWideScreenOffsetX, aNewY + mApp->mDDInterface->mWideScreenOffsetY);
 #endif
 #ifdef _HAS_ACHIEVEMENTS
-		mAchievementsWidget->Move(aNewX, aNewY + mApp->mHeight);
+		mAchievementsWidget->Move(aNewX + mApp->mDDInterface->mWideScreenOffsetX, aNewY + 600 + mApp->mDDInterface->mWideScreenOffsetY);
 #endif
 #ifdef _HAS_MORESCREEN
-		mMoreWidget->Move(aNewX - mApp->mWidth, aNewY);
+		mMoreWidget->Move(aNewX - 800 + mApp->mDDInterface->mWideScreenOffsetX, aNewY + mApp->mDDInterface->mWideScreenOffsetY);
 #endif
 		mAdventureButton->SetOffset(aNewX, aNewY);
 		mMinigameButton->SetOffset(aNewX, aNewY);
@@ -1128,7 +1173,7 @@ void GameSelector::Update()
 #endif
 
 #ifdef _HAS_LEVELSELECTOR
-		mLevelSelectorWidget->Move(aNewX + mApp->mWidth, aNewY);
+		mLevelSelectorWidget->Move(aNewX + 800 + mApp->mDDInterface->mWideScreenOffsetX, aNewY + mApp->mDDInterface->mWideScreenOffsetY);
 		// @Patoke: make sure these are drawn even outside of bounds (force redraw)
 #endif
 #ifdef _HAS_ACHIEVEMENTS
@@ -1208,12 +1253,14 @@ void GameSelector::Update()
 	}
 
 	Reanimation* aSelectorReanim = mApp->ReanimationTryToGet(mSelectorReanimID);
-
-	if (aSelectorReanim)
+	if (aSelectorReanim && mWidgetManager->mFocusWidget == this && mSlideCounter == 0)
 	{
 		int aTrackIndex = aSelectorReanim->FindTrackIndex("SelectorScreen_BG_Right");
 		ReanimatorTransform aTransform;
 		aSelectorReanim->GetCurrentTransform(aTrackIndex, &aTransform);
+		aTransform.mTransX += mApp->mDDInterface->mWideScreenOffsetX;
+		aTransform.mTransY += mApp->mDDInterface->mWideScreenOffsetY;
+
 		aTransform.mTransY += mOverlayWidget->mY;
 		aTransform.mTransY -= 41.0f;
 #ifdef _HAS_ZOMBATAR
@@ -1223,7 +1270,7 @@ void GameSelector::Update()
 		mLevelSelectorWidget->mY = aTransform.mTransY;
 		mAchievementsWidget->mY = aTransform.mTransY + BOARD_HEIGHT;
 #endif
-		
+
 		aTrackIndex = aSelectorReanim->FindTrackIndex("SelectorScreen_BG_Left");
 		aSelectorReanim->GetCurrentTransform(aTrackIndex, &aTransform);
 		aTransform.mTransY += mOverlayWidget->mY;
@@ -1231,7 +1278,6 @@ void GameSelector::Update()
 		mMoreWidget->mY = aTransform.mTransY + 80.0f;
 #endif
 	}
-
 	Reanimation* aWoodSignReanim = mApp->ReanimationGet(mWoodSignID);
 
 	switch (mSelectorState)
@@ -1399,7 +1445,8 @@ void GameSelector::Update()
 		aSpotLight->Update();
 	}
 
-	TrackButton(mAdventureButton, mShowStartButton ? "SelectorScreen_StartAdventure_button" : "SelectorScreen_Adventure_button", 0.0f, 0.0f);
+	TrackButton(mAdventureButton, "SelectorScreen_Adventure_button", 0.0f, 0.0f);
+	TrackButton(mAdventureButton, "SelectorScreen_StartAdventure_button", 0.0f, 0.0f);
 	TrackButton(mMinigameButton, "SelectorScreen_Survival_button", 0.0f, 0.0f);
 	TrackButton(mPuzzleButton, "SelectorScreen_Challenges_button", 0.0f, 0.0f);
 	TrackButton(mSurvivalButton, "SelectorScreen_ZenGarden_button", 0.0f, 0.0f);
@@ -1421,8 +1468,8 @@ void GameSelector::Update()
 		ReanimatorTransform aTransform;
 		aWoodSignReanim->GetCurrentTransform(aTrackIndex, &aTransform);
 
-		mChangeUserButton->mX = (int)(aTransform.mTransX + 24.0f);
-		mChangeUserButton->mY = (int)(aTransform.mTransY + 10.0f);
+		mChangeUserButton->mX = (int)(aTransform.mTransX + 24.0f) + mApp->mDDInterface->mWideScreenOffsetX;
+		mChangeUserButton->mY = (int)(aTransform.mTransY + 10.0f) + mApp->mDDInterface->mWideScreenOffsetY;
 	}
 
 	{
@@ -1433,8 +1480,8 @@ void GameSelector::Update()
 
 #ifdef _HAS_ZOMBATAR
 		
-			mZombatarButton->mX = (int)(aTransform.mTransX);
-			mZombatarButton->mY = (int)(aTransform.mTransY);
+			mZombatarButton->mX = (int)(aTransform.mTransX) + mApp->mDDInterface->mWideScreenOffsetX;
+			mZombatarButton->mY = (int)(aTransform.mTransY) + mApp->mDDInterface->mWideScreenOffsetY;
 #endif
 	}
 #ifdef _HAS_ACHIEVEMENTS
@@ -1473,8 +1520,8 @@ void GameSelector::TrackButton(DialogButton* theButton, const char* theTrackName
 	ReanimatorTransform aTransform;
 	aSelectorReanim->GetCurrentTransform(aTrackIndex, &aTransform);
 	
-	theButton->mX = (int)(aTransform.mTransX + theOffsetX);
-	theButton->mY = (int)(aTransform.mTransY + theOffsetY);
+	theButton->mX = (int)(aTransform.mTransX + theOffsetX) + mApp->mDDInterface->mWideScreenOffsetX;
+	theButton->mY = (int)(aTransform.mTransY + theOffsetY) + mApp->mDDInterface->mWideScreenOffsetY;
 }
 
 //0x44BBC0
@@ -2092,7 +2139,7 @@ void GameSelector::SlideTo(int theX, int theY) {
 #ifdef _HAS_ACHIEVEMENTS
 // GOTY @Patoke: 0x450200
 void GameSelector::ShowAchievementsScreen() {
-	SlideTo(0, -mApp->mHeight);
+	SlideTo(0, -600);
 
 	mWidgetManager->SetFocus(mAchievementsWidget);
 
@@ -2104,7 +2151,7 @@ void GameSelector::ShowAchievementsScreen() {
 #endif
 #ifdef _HAS_ZOMBATAR
 void GameSelector::ShowZombatarScreen() {
-	SlideTo(-mApp->mWidth, 0);
+	SlideTo(-800, 0);
 	mWidgetManager->SetFocus(mZombatarWidget);
 #if defined(_HAS_LEVELSELECTOR) && defined(_HAS_ZOMBATAR)
 	mWidgetManager->PutBehind(mLevelSelectorWidget, mZombatarWidget);
@@ -2122,7 +2169,7 @@ void GameSelector::ShowZombatarScreen() {
 #endif
 #ifdef _HAS_MORESCREEN
 void GameSelector::ShowMoreScreen() {
-	SlideTo(mApp->mWidth, 0);
+	SlideTo(800, 0);
 
 	mWidgetManager->SetFocus(mMoreWidget);
 	mMoreWidget->DisableButtons(false);
@@ -2131,7 +2178,7 @@ void GameSelector::ShowMoreScreen() {
 #endif
 #ifdef _HAS_LEVELSELECTOR
 void GameSelector::ShowQuickplayScreen() {
-	SlideTo(-mApp->mWidth, 0);
+	SlideTo(-800, 0);
 
 	mWidgetManager->SetFocus(mLevelSelectorWidget);
 	mWidgetManager->PutBehind(mZombatarWidget, mLevelSelectorWidget);

@@ -364,12 +364,19 @@ void LawnApp::MakeWindow()
 		mIsWindowed = true;
 		mFullScreenWindow = false;
 	}
-
+#define _ULTRA_WIDESCREEN
+#ifdef _ULTRA_WIDESCREEN
 	mWidth = 1280;
 	mHeight = 720;
 
 	mDDInterface->mWideScreenOffsetX = 240;
 	mDDInterface->mWideScreenOffsetY = 60;
+#elif _WIDE_SCREEN 
+	mWidth = 1066;
+	mHeight = 600;
+
+	mDDInterface->mWideScreenOffsetX = 133;
+#endif
 
 	gBoardBounds = Rect{ 0, 0, mWidth, mHeight };
 
@@ -407,6 +414,8 @@ void LawnApp::MakeWindow()
 
 	ImGui_ImplSDL3_InitForSDLRenderer(mSDLWindow, mSDLRenderer);
 	ImGui_ImplSDLRenderer3_Init(mSDLRenderer);
+
+	SDL_RaiseWindow(mSDLWindow);
 
 	if (IsScreenSaver()) {
 		SDL_HideCursor();
@@ -2265,6 +2274,7 @@ void LawnApp::Init()
 #endif
 	mTimer.Start();
 
+	SDL_RaiseWindow(LawnApp::mSDLWindow);
 	if (!IsScreenSaver() && !IsParticleEditor())
 		PlayVideo(StrFormat("%svideos/intro.mp4", SDL_GetBasePath()).c_str(), true);
 }

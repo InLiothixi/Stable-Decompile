@@ -168,7 +168,7 @@ public:
 	int								mIceMinX[MAX_GRID_SIZE_Y];								//+0x60C
 	int								mIceTimer[MAX_GRID_SIZE_Y];								//+0x624
 	ParticleSystemID				mIceParticleID[MAX_GRID_SIZE_Y];						//+0x63C
-	TodSmoothArray					mRowPickingArray[MAX_GRID_SIZE_Y];						//+0x654
+	TodSmoothArray<int>				mRowPickingArray[MAX_GRID_SIZE_Y];						//+0x654
 	ZombieType						mZombiesInWave[MAX_ZOMBIE_WAVES][MAX_ZOMBIES_IN_WAVE];	//+0x6B4
 	bool							mZombieAllowed[100];									//+0x54D4
 	int								mSunCountDown;											//+0x5538

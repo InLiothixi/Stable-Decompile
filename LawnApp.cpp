@@ -372,7 +372,7 @@ void LawnApp::MakeWindow()
 
 	mDDInterface->mWideScreenOffsetX = 240;
 	mDDInterface->mWideScreenOffsetY = 60;
-#elif _WIDE_SCREEN 
+#elif defined(_WIDE_SCREEN)
 	mWidth = 1066;
 	mHeight = 600;
 
@@ -2379,7 +2379,7 @@ bool LawnApp::UpdatePlayerProfileForFinishingLevel()
 				mPlayerInfo->SetLevel(mBoard->mLevel + 1);  // 存档进入下一关
 		}
 
-		if (!HasFinishedAdventure() && abs(mBoard->mLevel) == 34)
+		if (!HasFinishedAdventure() && abs(mPlayerInfo->mLevel) == 34)
 		{
 			mPlayerInfo->mNeedsMagicTacoReward = 1;
 		}
@@ -2393,7 +2393,7 @@ bool LawnApp::UpdatePlayerProfileForFinishingLevel()
 		{
 			ReportAchievement::GiveAchievement(this, AchievementId::Grounded, false);
 		}
-		if (mBoard->StageIsNight() && !mBoard->mMushroomsUsed && mBoard->mLevel != 35 && mBoard->mLevel != 40)
+		if (mBoard->StageIsNight() && !mBoard->mMushroomsUsed && mPlayerInfo->mLevel != 35 && mPlayerInfo->mLevel != 40)
 		{
 			ReportAchievement::GiveAchievement(this, AchievementId::NoFungusAmongUs, false);
 		}
@@ -2406,7 +2406,7 @@ bool LawnApp::UpdatePlayerProfileForFinishingLevel()
 		{
 			ReportAchievement::GiveAchievement(this, AchievementId::FaceToFace, false);
 		}
-		if (!mBoard->mHadPlantedNuts && mBoard->mLevel > 3) 
+		if (!mBoard->mHadPlantedNuts && mPlayerInfo->mLevel > 3)
 		{
 			ReportAchievement::GiveAchievement(this, AchievementId::MayNotContainNuts, true);
 		}

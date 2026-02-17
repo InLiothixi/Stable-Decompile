@@ -365,7 +365,7 @@ void LawnApp::MakeWindow()
 		mFullScreenWindow = false;
 	}
 
-//#define _ULTRA_WIDESCREEN
+#define _WIDE_SCREEN
 #ifdef _ULTRA_WIDESCREEN
 	mWidth = 1280;
 	mHeight = 720;

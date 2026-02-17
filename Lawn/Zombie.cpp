@@ -12523,6 +12523,7 @@ void Zombie::UpdateBoss()
         if (aBodyReanim->ShouldTriggerTimedEvent(0.48f) || aBodyReanim->ShouldTriggerTimedEvent(0.8f))
         {
             mApp->PlayFoley(FoleyType::FOLEY_THUMP);
+            mBoard->ShakeBoard(1, 4);
         }
 
         if (aBodyReanim->mLoopCount > 0)

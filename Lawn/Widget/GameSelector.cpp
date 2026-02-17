@@ -28,6 +28,8 @@ static float gFlowerCenter[3][2] = { { 765.0f, 483.0f }, { 663.0f, 455.0f }, { 7
 //0x448C80
 void GameSelectorOverlay::Draw(Graphics* g)
 { 
+	if (gLawnApp->GetDialog(Dialogs::DIALOG_STORE) || gLawnApp->GetDialog(Dialogs::DIALOG_ALMANAC))
+		return;
 	mParent->DrawOverlay(g);
 }
 
@@ -153,7 +155,7 @@ GameSelector::GameSelector(LawnApp* theApp)
 	);
 	mAchievementsButton->Resize(mApp->mDDInterface->mWideScreenOffsetX, mApp->mDDInterface->mWideScreenOffsetY, Sexy::IMAGE_SELECTORSCREEN_ACHIEVEMENTS_PEDESTAL->mWidth, Sexy::IMAGE_SELECTORSCREEN_ACHIEVEMENTS_PEDESTAL->mHeight);
 	mAchievementsButton->mClip = false;
-	//mAchievementsButton->mBtnNoDraw = true;
+	mAchievementsButton->mBtnNoDraw = true;
 	mAchievementsButton->mMouseVisible = false;
 	mAchievementsButton->mTranslateX = 0;
 	mAchievementsButton->mTranslateY = 0;
@@ -206,6 +208,7 @@ GameSelector::GameSelector(LawnApp* theApp)
 	mZenGardenButton->mClip = false;
 	mZenGardenButton->mTranslateX = 0;
 	mZenGardenButton->mTranslateY = 0;
+	mZenGardenButton->mBtnNoDraw = true;
 
 	mOptionsButton = MakeNewButton(
 		GameSelector::GameSelector_Options, 
@@ -289,7 +292,8 @@ GameSelector::GameSelector(LawnApp* theApp)
 	mStoreButton->mMouseVisible = false;
 	mStoreButton->mTranslateX = 0;
 	mStoreButton->mTranslateY = 0;
-	
+	mStoreButton->mBtnNoDraw = true;
+
 	mAlmanacButton = MakeNewButton(
 		GameSelector::GameSelector_Almanac, 
 		this, 
@@ -304,6 +308,7 @@ GameSelector::GameSelector(LawnApp* theApp)
 	mAlmanacButton->mMouseVisible = false;
 	mAlmanacButton->mTranslateX = 0;
 	mAlmanacButton->mTranslateY = 0;
+	mAlmanacButton->mBtnNoDraw = true;
 
 #ifdef _HAS_UNLOCK
 	mUnlockButton = MakeNewButton(
@@ -330,6 +335,7 @@ GameSelector::GameSelector(LawnApp* theApp)
 	mUnlockSelectorCheat = false;
 	mTrophyParticleID = ParticleSystemID::PARTICLESYSTEMID_NULL;
 	mShowStartButton = false;
+	mScrollOffset = 0;
 
 	Reanimation* aSelectorReanim = mApp->AddReanimation(0.5f, 0.5f, 0, ReanimationType::REANIM_SELECTOR_SCREEN);
 	aSelectorReanim->PlayReanim("anim_open", ReanimLoopType::REANIM_PLAY_ONCE_AND_HOLD, 0, 30.0f);
@@ -433,19 +439,19 @@ GameSelector::GameSelector(LawnApp* theApp)
 	mDestY = 0;
 #ifdef _HAS_ZOMBATAR
 	mZombatarWidget = new ZombatarWidget(this->mApp);
-	mZombatarWidget->Move(800 + mApp->mDDInterface->mWideScreenOffsetX, mApp->mDDInterface->mWideScreenOffsetY);
+	mZombatarWidget->Move(800 + mApp->mDDInterface->mWideScreenOffsetX + 0.5f, mApp->mDDInterface->mWideScreenOffsetY + 2.5f);
 #endif
 #ifdef _HAS_ACHIEVEMENTS
 	mAchievementsWidget = new AchievementsWidget(this->mApp);
-	mAchievementsWidget->Move(mApp->mDDInterface->mWideScreenOffsetX, 600 + mApp->mDDInterface->mWideScreenOffsetY);
+	mAchievementsWidget->Move(mApp->mDDInterface->mWideScreenOffsetX + 0.5f, 600 + mApp->mDDInterface->mWideScreenOffsetY + 0.5f);
 #endif
 #ifdef _HAS_MORESCREEN
 	mMoreWidget = new MoreWidget(this->mApp);
-	mMoreWidget->Move(-800 + mApp->mDDInterface->mWideScreenOffsetX, mApp->mDDInterface->mWideScreenOffsetY);
+	mMoreWidget->Move(-800 + mApp->mDDInterface->mWideScreenOffsetX + 0.5f, mApp->mDDInterface->mWideScreenOffsetY + 0.5f);
 #endif
 #ifdef _HAS_LEVELSELECTOR
 	mLevelSelectorWidget = new QuickplayWidget(this->mApp);
-	mLevelSelectorWidget->Move(800 + mApp->mDDInterface->mWideScreenOffsetX, mApp->mDDInterface->mWideScreenOffsetY);
+	mLevelSelectorWidget->Move(800 + mApp->mDDInterface->mWideScreenOffsetX + 0.5f, mApp->mDDInterface->mWideScreenOffsetY + 0.5f);
 #endif
 	TodHesitationTrace("gameselectorinit");
 }
@@ -716,8 +722,8 @@ void GameSelector::Draw(Graphics* g)
 		aTransform.mTransY += mOverlayWidget->mY;
 		aTransform.mTransY -= 41.0f;
 #ifdef _HAS_ZOMBATAR
-		mZombatarWidget->mX = g->mTransX + 800;
-		mZombatarWidget->mY = aTransform.mTransY;
+		mZombatarWidget->mX = 800 + mApp->mDDInterface->mWideScreenOffsetX + 0.5f;
+		mZombatarWidget->mY = aTransform.mTransY + 2.5f;
 #endif
 #ifdef _HAS_ACHIEVEMENTS
 		mAchievementsWidget->mX = g->mTransX;
@@ -812,7 +818,89 @@ void GameSelector::Draw(Graphics* g)
 		aOffsetMatrix.Translate(170.5f - (int)(aStringWidth * 0.5f) + mX + mApp->mDDInterface->mWideScreenOffsetX, 102.5f + mY + mApp->mDDInterface->mWideScreenOffsetY);
 		TodDrawStringMatrix(g, Sexy::FONT_BRIANNETOD16, aOverlayMatrix * aOffsetMatrix, aWelcomeStr, Color(255, 245, 200));
 	}
-	g->PopState();
+
+	Graphics gAchievementButton(*g);
+	if (mAdventureButton->mVisible)
+	{
+		gAchievementButton.mTransX = mAchievementsButton->mX;
+		gAchievementButton.mTransY = mAchievementsButton->mY;
+		mAchievementsButton->Render(&gAchievementButton);
+	}
+
+	Graphics gAdventureButton(*g);
+	if (mAdventureButton->mVisible)
+	{
+		gAdventureButton.mTransX = mAdventureButton->mX;
+		gAdventureButton.mTransY = mAdventureButton->mY;
+		mAdventureButton->Render(&gAdventureButton);
+	}
+
+	Graphics gMinigamesButton(*g);
+	if (mMinigameButton->mVisible)
+	{
+		gMinigamesButton.mTransX = mMinigameButton->mX;
+		gMinigamesButton.mTransY = mMinigameButton->mY;
+		mMinigameButton->Render(&gMinigamesButton);
+	}
+
+	Graphics gPuzzleButton(*g);
+	if (mPuzzleButton->mVisible)
+	{
+		gPuzzleButton.mTransX = mPuzzleButton->mX;
+		gPuzzleButton.mTransY = mPuzzleButton->mY;
+		mPuzzleButton->Render(&gPuzzleButton);
+	}
+
+	Graphics gSurvivalButton(*g);
+	if (mSurvivalButton->mVisible)
+	{
+		gSurvivalButton.mTransX = mSurvivalButton->mX;
+		gSurvivalButton.mTransY = mSurvivalButton->mY;
+		mSurvivalButton->Render(&gSurvivalButton);
+	}
+
+	Graphics gZenGardenButton(*g);
+	if (mZenGardenButton->mVisible)
+	{
+		gZenGardenButton.mTransX = mZenGardenButton->mX;
+		gZenGardenButton.mTransY = mZenGardenButton->mY;
+		mZenGardenButton->Render(&gZenGardenButton);
+	}
+	Graphics gAlmanacButton(*g);
+	if (mAlmanacButton->mVisible)
+	{
+		gAlmanacButton.mTransX = mAlmanacButton->mX;
+		gAlmanacButton.mTransY = mAlmanacButton->mY;
+		mAlmanacButton->Render(&gAlmanacButton);
+	}
+	Graphics gStoreButton(*g);
+	if (mStoreButton->mVisible)
+	{
+		gStoreButton.mTransX = mStoreButton->mX;
+		gStoreButton.mTransY = mStoreButton->mY;
+		mStoreButton->Render(&gStoreButton);
+	}
+	Graphics gOptionsButton(*g);
+	if (mOptionsButton->mVisible)
+	{
+		gOptionsButton.mTransX = mOptionsButton->mX;
+		gOptionsButton.mTransY = mOptionsButton->mY;
+		mOptionsButton->Render(&gOptionsButton);
+	}
+	Graphics gHelpButton(*g);
+	if (mHelpButton->mVisible)
+	{
+		gHelpButton.mTransX = mHelpButton->mX;
+		gHelpButton.mTransY = mHelpButton->mY;
+		mHelpButton->Render(&gHelpButton);
+	}
+	Graphics gQuitButton(*g);
+	if (mQuitButton->mVisible)
+	{
+		gQuitButton.mTransX = mQuitButton->mX;
+		gQuitButton.mTransY = mQuitButton->mY;
+		mQuitButton->Render(&gQuitButton);
+	}
 }
 
 //0x44AB50
@@ -843,7 +931,7 @@ void GameSelector::DrawOverlay(Graphics* g)
 #ifndef _HAS_MORESCREEN
 		aTrackIndex = aSelectorReanim->FindTrackIndex("SelectorScreen_BG_Left");
 		aSelectorReanim->GetCurrentTransform(aTrackIndex, &aTransform);
-		g->DrawImage(IMAGE_SELECTORSCREEN_MOREWAYSTOPLAY_BG, -800, aTransform.mTransY + 80);
+		g->DrawImage(IMAGE_SELECTORSCREEN_MOREWAYSTOPLAY_BG, -800+0.5f, aTransform.mTransY + 80+mScrollOffset + 0.5f);
 #endif
 	}
 #endif
@@ -913,6 +1001,8 @@ void GameSelector::DrawOverlay(Graphics* g)
 				}
 			}
 
+			g->PushState();
+			g->mTransY += mScrollOffset;
 			g->SetColorizeImages(true);
 			g->SetColor(mAdventureButton->mColors[ButtonWidget::COLOR_BKG]);
 #ifdef _GOTY
@@ -979,7 +1069,7 @@ void GameSelector::DrawOverlay(Graphics* g)
 				}
 			}
 #endif
-			g->SetColorizeImages(false);
+			g->PopState();
 		}
 
 
@@ -1002,8 +1092,8 @@ void GameSelector::DrawOverlay(Graphics* g)
 		float theY = aTransformLeft.mTransY + 390.0f;
 
 #ifdef _HAS_ACHIEVEMENTS
-		theX += 2.0f;
-		theY -= 45;
+		theX += 0.5f;
+		theY -= 42.5f;
 #endif
 		if (mApp->EarnedGoldTrophy())
 			TodDrawImageCelF(g, Sexy::IMAGE_SUNFLOWER_TROPHY, theX, theY, 1, 0);
@@ -1032,6 +1122,7 @@ void GameSelector::DrawOverlay(Graphics* g)
 		g->PopState();
 	}
 
+	g->mTransY += mScrollOffset;
 	mApp->ReanimationGet(mLeafReanimID)->Draw(g);
 
 #ifndef _DEBUG 
@@ -1088,9 +1179,9 @@ void GameSelector::UpdateTooltip()
 	{
 		int aMouseX = mX + mApp->mWidgetManager->mLastMouseX;
 		int aMouseY = mY + mApp->mWidgetManager->mLastMouseY;
-		if (aMouseX >= mX + 50 && aMouseX < mX + 135 && aMouseY >= mY + 280 && aMouseY <= mY + 505
+		if (/*aMouseX >= mX + 50 && aMouseX < mX + 135 && aMouseY >= mY + 280 && aMouseY <= mY + 505*/
 #ifdef _HAS_ACHIEVEMENTS 
-			|| mTrophyButton && mTrophyButton->mIsOver
+			/*||*/ mTrophyButton && mTrophyButton->mIsOver
 #endif 
 		)
 		{
@@ -1189,8 +1280,9 @@ void GameSelector::Update()
 		mOptionsButton->MarkDirty();
 		mHelpButton->MarkDirty();
 		mQuitButton->MarkDirty();
-		mStoreButton->MarkDirty();
-		mZenGardenButton->MarkDirty();
+		//mAlmanacButton->MarkDirty
+		//mStoreButton->MarkDirty();
+		//mZenGardenButton->MarkDirty();
 
 		mSlideCounter--;
 	}
@@ -1264,11 +1356,14 @@ void GameSelector::Update()
 		aTransform.mTransY += mOverlayWidget->mY;
 		aTransform.mTransY -= 41.0f;
 #ifdef _HAS_ZOMBATAR
-		mZombatarWidget->mY = aTransform.mTransY;
+		mZombatarWidget->mX = 800 + mApp->mDDInterface->mWideScreenOffsetX + 0.5f;
+		mZombatarWidget->mY = aTransform.mTransY + 2.5f;
+#endif
+#ifdef _HAS_ACHIEVEMENTS
+		mAchievementsWidget->mY = aTransform.mTransY + BOARD_HEIGHT;
 #endif
 #ifdef _HAS_LEVELSELECTOR
 		mLevelSelectorWidget->mY = aTransform.mTransY;
-		mAchievementsWidget->mY = aTransform.mTransY + BOARD_HEIGHT;
 #endif
 
 		aTrackIndex = aSelectorReanim->FindTrackIndex("SelectorScreen_BG_Left");
@@ -1288,7 +1383,10 @@ void GameSelector::Update()
 #ifdef DO_FIX_BUGS
 		aSelectorReanim->AssignRenderGroupToPrefix("SelectorScreen_Adventure_button", RENDER_GROUP_HIDDEN);
 		aSelectorReanim->AssignRenderGroupToPrefix("SelectorScreen_StartAdventure_button", RENDER_GROUP_HIDDEN);
-		mAdventureButton->mBtnNoDraw = false;
+		aSelectorReanim->AssignRenderGroupToTrack("SelectorScreen_Survival_button", RENDER_GROUP_HIDDEN);
+		aSelectorReanim->AssignRenderGroupToTrack("SelectorScreen_Challenges_button", RENDER_GROUP_HIDDEN);
+		aSelectorReanim->AssignRenderGroupToTrack("SelectorScreen_ZenGarden_button", RENDER_GROUP_HIDDEN);
+		//mAdventureButton->mBtnNoDraw = false;
 #endif
 		if (aSelectorReanim->mLoopCount > 0)
 		{
@@ -1297,20 +1395,22 @@ void GameSelector::Update()
 			aSelectorReanim->AssignRenderGroupToTrack("SelectorScreen_Survival_button", RENDER_GROUP_HIDDEN);
 			aSelectorReanim->AssignRenderGroupToTrack("SelectorScreen_Challenges_button", RENDER_GROUP_HIDDEN);
 			aSelectorReanim->AssignRenderGroupToTrack("SelectorScreen_ZenGarden_button", RENDER_GROUP_HIDDEN);
-			mAdventureButton->mBtnNoDraw = false;
-			mMinigameButton->mBtnNoDraw = false;
-			mPuzzleButton->mBtnNoDraw = false;
-			mSurvivalButton->mBtnNoDraw = false;
-			mZenGardenButton->mBtnNoDraw = false;
-			mHelpButton->mBtnNoDraw = false;
-			mOptionsButton->mBtnNoDraw = false;
-			mQuitButton->mBtnNoDraw = false;
+			//mAdventureButton->mBtnNoDraw = false;
+			//mMinigameButton->mBtnNoDraw = false;
+			//mPuzzleButton->mBtnNoDraw = false;
+			//mSurvivalButton->mBtnNoDraw = false;
+			//mZenGardenButton->mBtnNoDraw = false;
+			//mAlmanacButton->mBtnNoDraw = false;
+			//mStoreButton->mBtnNoDraw = false;
+			//mHelpButton->mBtnNoDraw = false;
+			//mOptionsButton->mBtnNoDraw = false;
+			//mQuitButton->mBtnNoDraw = false;
 #ifdef _HAS_ZOMBATAR
 			mZombatarButton->mBtnNoDraw = false; // @Patoke: new widgets
 #endif
 #ifdef _HAS_ACHIEVEMENTS
-			mAchievementsButton->mBtnNoDraw = false;
-			mTrophyButton->mBtnNoDraw = false;
+			//mAchievementsButton->mBtnNoDraw = false;
+			//mTrophyButton->mBtnNoDraw = false;
 #endif
 #ifdef _HAS_MORESCREEN
 			mQuickPlayButton->mBtnNoDraw = false;
@@ -1521,7 +1621,7 @@ void GameSelector::TrackButton(DialogButton* theButton, const char* theTrackName
 	aSelectorReanim->GetCurrentTransform(aTrackIndex, &aTransform);
 	
 	theButton->mX = (int)(aTransform.mTransX + theOffsetX) + mApp->mDDInterface->mWideScreenOffsetX;
-	theButton->mY = (int)(aTransform.mTransY + theOffsetY) + mApp->mDDInterface->mWideScreenOffsetY;
+	theButton->mY = (int)(aTransform.mTransY + theOffsetY) + mApp->mDDInterface->mWideScreenOffsetY + mScrollOffset;
 }
 
 //0x44BBC0

@@ -107,7 +107,7 @@ const int           STORESCREEN_PAGESTRING_Y = 500;
 //#define _HAS_SCORE_SYSTEM
 
 // Quality Of Life
-//#define _HAS_HEALTHBAR_TOGGLE
+#define _HAS_HEALTHBAR_TOGGLE
 //#define _ALLOW_SWIPE
 //#define _HAS_GAMESELECTOR_SPOTLIGHT
 #define _HAS_ANIMATED_WOOD_SIGN

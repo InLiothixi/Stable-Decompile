@@ -683,6 +683,9 @@ void ZombatarWidget::Update() {
 }
 
 void ZombatarWidget::Draw(Graphics* g) {
+	if (mApp->GetDialog(Dialogs::DIALOG_STORE) || mApp->GetDialog(Dialogs::DIALOG_ALMANAC))
+		return;
+
 	g->PushState();
 	g->SetLinearBlend(true);
 	g->DrawImage(IMAGE_ZOMBATAR_MAIN_BG, 0, 0);

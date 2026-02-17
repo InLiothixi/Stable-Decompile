@@ -364,7 +364,8 @@ void LawnApp::MakeWindow()
 		mIsWindowed = true;
 		mFullScreenWindow = false;
 	}
-#define _ULTRA_WIDESCREEN
+
+//#define _ULTRA_WIDESCREEN
 #ifdef _ULTRA_WIDESCREEN
 	mWidth = 1280;
 	mHeight = 720;
@@ -416,10 +417,6 @@ void LawnApp::MakeWindow()
 	ImGui_ImplSDLRenderer3_Init(mSDLRenderer);
 
 	SDL_RaiseWindow(mSDLWindow);
-
-	if (IsScreenSaver()) {
-		SDL_HideCursor();
-	}
 }
 
 bool LawnApp::DrawDirtyStuff()
@@ -3587,7 +3584,7 @@ int LawnApp::GetSeedsAvailable()
 	int aLevel = mBoard && mBoard->mIsReplay && mPlayerLevelRef > 4 ? mPlayerLevelRef : mPlayerInfo->GetLevel();
 	int maxPlants = 49;
 
-	if (HasFinishedAdventure() || aLevel > 50 || mPlayerInfo && mPlayerInfo->mHasUsedCheatKeys)
+	if (HasFinishedAdventure() || aLevel > 50 && mPlayerInfo && mPlayerInfo->mHasUsedCheatKeys)
 	{
 		if (mTodCheatKeys || mDebugKeysEnabled || mPlayerInfo && mPlayerInfo->mHasUsedCheatKeys) maxPlants += NUM_SEEDS_IN_CHOOSER - SEED_IMITATER - 1;
 		return maxPlants;

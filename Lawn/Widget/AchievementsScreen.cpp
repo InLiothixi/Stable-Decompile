@@ -78,7 +78,8 @@ AchievementsWidget::~AchievementsWidget() {
 
 // GOTY @Patoke: 0x401A10
 void AchievementsWidget::Update() {
-	if ((aBackButtonRect.Contains(mWidgetManager->mLastMouseX - mX, mWidgetManager->mLastMouseY - mY) || mMoreRockRect.Contains(mWidgetManager->mLastMouseX - mX, mWidgetManager->mLastMouseY - mY)) && mApp->mGameSelector->mSlideCounter <= 0)
+	if ((aBackButtonRect.Contains(mWidgetManager->mLastMouseX - mX, mWidgetManager->mLastMouseY - mY) || 
+		mMoreRockRect.Contains(mWidgetManager->mLastMouseX - mX, mWidgetManager->mLastMouseY - mY)) && mApp->mGameSelector->mSlideCounter <= 0)
 	{
 		if (!isOnBackButton) {
 			mApp->PlayFoley(FoleyType::FOLEY_BLEEP);
@@ -99,16 +100,24 @@ void AchievementsWidget::Update() {
 	mScrollValue -= mScrollDecay;
 
 	int aNewY = mY + mScrollValue * mScrollDirection;
-	if (aNewY >= -1)
-		aNewY = -1;
+	if (aNewY >= mApp->mDDInterface->mWideScreenOffsetY)
+		aNewY = mApp->mDDInterface->mWideScreenOffsetY;
 	//if (aNewY >= mApp->mHeight)
 	//	aNewY = mApp->mHeight;
 
-	int aMaxScroll = 2 * mApp->mHeight + 50 - mHeight;
+	int aMaxScroll = 2 * 600 + 50 - mHeight;
 	if (aNewY <= aMaxScroll)
 		aNewY = aMaxScroll;
 
 	mY = aNewY;
+
+	mApp->mGameSelector->mScrollOffset = aNewY - mApp->mDDInterface->mWideScreenOffsetY;
+
+
+	mApp->mGameSelector->mY = mY - 600 - mApp->mDDInterface->mWideScreenOffsetY;
+#ifdef _HAS_ZOMBATAR
+	mApp->mGameSelector->mZombatarWidget->mY = mY - 600;
+#endif
 
 	int aDelta = aNewY - mY;
 	mMoreRockRect.mY += aDelta;
@@ -133,6 +142,9 @@ void AchievementsWidget::Update() {
 
 // GOTY @Patoke: 0x401160
 void AchievementsWidget::Draw(Graphics* g) {
+	if (mApp->GetDialog(Dialogs::DIALOG_STORE) || mApp->GetDialog(Dialogs::DIALOG_ALMANAC))
+		return;
+
 	g->DrawImage(IMAGE_SELECTORSCREEN_ACHIEVEMENTS_BG, 0, 0);
 
 	int aHeight = IMAGE_SELECTORSCREEN_ACHIEVEMENTS_BG->mHeight;
@@ -147,7 +159,6 @@ void AchievementsWidget::Draw(Graphics* g) {
 	g->DrawImage(IMAGE_ACHEESEMENTS_ZUMA, 0, 11250);
 
 	g->DrawImage(IMAGE_ACHEESEMENTS_CHINA, 0, mHeight - IMAGE_ACHEESEMENTS_CHINA->mHeight - /*50*/ 650);
-
 
 	bool isHand = false;
 	

@@ -177,8 +177,8 @@ void AlmanacDialog::SetupZombie()
 	mZombie = new Zombie();
 	mZombie->mBoard = nullptr;
 	mZombie->ZombieInitialize(0, mSelectedZombie, false, nullptr, Zombie::ZOMBIE_WAVE_UI);
-	mZombie->mX = mZombie->mPosX = ALMANAC_ZOMBIE_POSITION_X;
-	mZombie->mY = mZombie->mPosY = ALMANAC_ZOMBIE_POSITION_Y;
+	mZombie->mPosX = mZombie->mX = mZombie->mPosX = ALMANAC_ZOMBIE_POSITION_X;
+	mZombie->mPosY = mZombie->mY = ALMANAC_ZOMBIE_POSITION_Y;
 
 	if (mSelectedZombie == ZombieType::ZOMBIE_BOBSLED)
 	{
@@ -224,8 +224,8 @@ void AlmanacDialog::SetPage(AlmanacPage thePage)
 		mZombie = new Zombie();
 		mZombie->mBoard = nullptr;
 		mZombie->ZombieInitialize(0, ZombieType::ZOMBIE_NORMAL, false, nullptr, Zombie::ZOMBIE_WAVE_UI);
-		mZombie->mPosX = ALMANAC_INDEXZOMBIE_POSITION_X;
-		mZombie->mPosY = ALMANAC_INDEXZOMBIE_POSITION_Y;
+		mZombie->mX = mZombie->mPosX = ALMANAC_INDEXZOMBIE_POSITION_X;
+		mZombie->mY = mZombie->mPosY = ALMANAC_INDEXZOMBIE_POSITION_Y;
 
 		mIndexButton->mBtnNoDraw = true;
 		mPlantButton->mBtnNoDraw = false;

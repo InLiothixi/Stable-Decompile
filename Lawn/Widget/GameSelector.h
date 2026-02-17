@@ -123,6 +123,7 @@ public:
 #endif
     ReanimationID               mWoodSignID;            
     ReanimationID               mSpotLightID;
+    int                         mScrollOffset;
 
 public:
     GameSelector(LawnApp* theApp);

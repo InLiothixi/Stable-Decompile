@@ -188,6 +188,7 @@ Board::Board(LawnApp* theApp)
 	mDebugTextMode = DebugTextMode::DEBUG_TEXT_NONE;
 	mMenuButton = new GameButton(0);
 	mMenuButton->mDrawStoneButton = true;
+	mTicks = 0;
 #ifdef _REPLANTED_SPEED_CONTROL
 		mSlowdownButton = MakeNewButton(Board::SLOWDOWN, this, "", nullptr, Sexy::IMAGE_SLOWDOWN_BUTTON, Sexy::IMAGE_SLOWDOWN_BUTTON_PRESSED, Sexy::IMAGE_SLOWDOWN_BUTTON_PRESSED);
 		mSlowdownButton->Resize(mApp->mDDInterface->mWideScreenOffsetX, mApp->mDDInterface->mWideScreenOffsetY, Sexy::IMAGE_SLOWDOWN_BUTTON->GetWidth(), Sexy::IMAGE_SLOWDOWN_BUTTON->GetHeight());
@@ -6886,6 +6887,8 @@ void Board::Update()
 	if (mQECounter > 0)
 		mQECounter--;
 
+	mTicks++;
+
 	if (mAllowSpeedMod && !mLevelAwardSpawned && mApp->mGameScene == GameScenes::SCENE_PLAYING)
 	{
 		switch (mSpeedMod)
@@ -6911,19 +6914,25 @@ void Board::Update()
 			break;
 
 		case SpeedMod::SPEED_FAST:
-			aUpdateCount = 2;
+			aUpdateCount = 1; // 1.5x
 			break;
 
 		case SpeedMod::SPEED_VERY_FAST:
-			aUpdateCount = 4;
+			aUpdateCount = 2; // 2.0x
 			break;
 
 		case SpeedMod::SPEED_SONIC:
-			aUpdateCount = 8;
+			aUpdateCount = 2; // 2.5x
 			break;
+		}
+
+		if ((mTicks & 1) == 0 && (mSpeedMod == SpeedMod::SPEED_FAST || mSpeedMod == SpeedMod::SPEED_SONIC))
+		{
+			aUpdateCount++;
 		}
 	}
 #endif
+
 	for (int i = 0; i < aUpdateCount; i++)
 	{
 		mApp->mEffectSystem->Update();
@@ -7983,9 +7992,9 @@ float Board::GetSpeedValue(SpeedMod theMod)
 	{
 	case SpeedMod::SPEED_SLOWMO:    return 0.25f;
 	case SpeedMod::SPEED_SLOW:      return 0.5f;
-	case SpeedMod::SPEED_FAST:      return 2.0f;
-	case SpeedMod::SPEED_VERY_FAST: return 4.0f;
-	case SpeedMod::SPEED_SONIC:     return 8.0f;
+	case SpeedMod::SPEED_FAST:      return 1.5f;
+	case SpeedMod::SPEED_VERY_FAST: return 2.0f;
+	case SpeedMod::SPEED_SONIC:     return 2.5f;
 	default:              return 1.0f;
 	}
 }
@@ -8057,7 +8066,11 @@ void Board::DrawSpeed(Graphics* g)
 	gSpeedupButton.mTransX += TodAnimateCurve(12, 0, mShakeCounter, 0, mShakeAmountX, TodCurves::CURVE_BOUNCE);
 	gSpeedupButton.mTransY += TodAnimateCurve(12, 0, mShakeCounter, 0, mShakeAmountY, TodCurves::CURVE_BOUNCE);
 
-	mSlowdownButton->SetDisabled(mSpeedMod == SpeedMod::SPEED_SLOWMO);
+	mSlowdownButton->SetDisabled(mSpeedMod == SpeedMod::SPEED_SLOWMO
+#ifndef _DEBUG
+		|| mSpeedMod <= SpeedMod::SPEED_NORMAL
+#endif
+	);
 	mSpeedupButton->SetDisabled(mSpeedMod == SpeedMod::SPEED_SONIC);
 
 	if (!mSlowdownButton->mDisabled)

@@ -5337,7 +5337,7 @@ void Plant::DrawSeedType(Graphics* g, SeedType theSeedType, SeedType theImitater
             g->mScaleY /= scale;
 
             int offsetX, offsetY, aWidth, aHeight;
-            gLawnApp->mReanimatorCache->GetPlantImageSize(theSeedType, offsetX, offsetY, aWidth, aHeight);
+            gLawnApp->mReanimatorCache->GetPlantImageSize(aSeedType, offsetX, offsetY, aWidth, aHeight);
 
             aOffsetX += ((offsetX * (scale - 1)) / 2.0f) * g->mScaleX * scale;
             aOffsetY += ((offsetY * (scale - 1)) / 2.0f) * g->mScaleY * scale;

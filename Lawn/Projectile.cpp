@@ -110,12 +110,12 @@ void Projectile::ProjectileInitialize(int theX, int theY, int theRenderOrder, in
 	{
 		mRotation = -2 * PI / 5;  // DEG_TO_RAD(-72.0f);
 		mRotationSpeed = RandRangeFloat(-0.08f, -0.02f);
-		Trail* aTrail = mApp->mEffectSystem->mTrailHolder->AllocTrail(305000, TrailType::TRAIL_ICE);
+		/*Trail* aTrail = mApp->mEffectSystem->mTrailHolder->AllocTrail(305000, TrailType::TRAIL_ICE);
 		if (aTrail) 
 		{
 			aTrail->mFilterEffect = mFilterEffect;
 			AttachTrail(mAttachmentID, aTrail, 20.0f, 20.0f);
-		}
+		}*/
 		TodParticleSystem* aParticle = mApp->AddTodParticle(mPosX + 8.0f, mPosY + 13.0f, 400000, ParticleEffect::PARTICLE_SNOWPEA_TRAIL);
 		AttachParticle(mAttachmentID, aParticle, 18.0f, 23.0f);
 		if (aParticle)
@@ -128,12 +128,12 @@ void Projectile::ProjectileInitialize(int theX, int theY, int theRenderOrder, in
 	}
 	else if (mProjectileType == ProjectileType::PROJECTILE_SNOWPEA)
 	{
-		Trail* aTrail = mApp->mEffectSystem->mTrailHolder->AllocTrail(305000, TrailType::TRAIL_ICE);
+		/*Trail* aTrail = mApp->mEffectSystem->mTrailHolder->AllocTrail(305000, TrailType::TRAIL_ICE);
 		if (aTrail) 
 		{
 			aTrail->mFilterEffect = mFilterEffect;
 			AttachTrail(mAttachmentID, aTrail, 8.0f, 13.0f);
-		}
+		}*/
 		TodParticleSystem* aParticle = mApp->AddTodParticle(mPosX + 8.0f, mPosY + 13.0f, 400000, ParticleEffect::PARTICLE_SNOWPEA_TRAIL);
 		AttachParticle(mAttachmentID, aParticle, 8.0f, 13.0f);
 		if (aParticle)
@@ -212,12 +212,12 @@ void Projectile::ProjectileInitialize(int theX, int theY, int theRenderOrder, in
 		mHasImpactAnimation = true;
 		mNumFrames = 8;
 		mAnimTicksPerFrame = 12;
-		Trail* aTrail = mApp->mEffectSystem->mTrailHolder->AllocTrail(305000, TrailType::TRAIL_ICE);
+		/*Trail* aTrail = mApp->mEffectSystem->mTrailHolder->AllocTrail(305000, TrailType::TRAIL_ICE);
 		if (aTrail) 
 		{
 			aTrail->mFilterEffect = mFilterEffect;
 			AttachTrail(mAttachmentID, aTrail, 10.0f, 10.0f);
-		}
+		}*/
 		TodParticleSystem* aParticle = mApp->AddTodParticle(mPosX + 8.0f, mPosY + 13.0f, 400000, ParticleEffect::PARTICLE_SNOWPEA_TRAIL);
 		AttachParticle(mAttachmentID, aParticle, 8.0f, 13.0f);
 		if (aParticle)

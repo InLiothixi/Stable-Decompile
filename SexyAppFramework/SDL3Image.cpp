@@ -31,6 +31,7 @@ SDL_Texture* Sexy::SDL3Image::GetTexture(Image* image)
             auto bits = memoryImage->GetBits();
             auto surface = SDL_CreateSurfaceFrom(memoryImage->mWidth, memoryImage->mHeight, SDL_PIXELFORMAT_ARGB8888, bits, memoryImage->mWidth * 4);
             memoryImage->mD3DData = (void*)SDL_CreateTextureFromSurface(mRenderer, surface);
+            SDL_SetTextureBlendMode((SDL_Texture*)memoryImage->mD3DData, SDL_BLENDMODE_BLEND);
             SDL_DestroySurface(surface);
         }
         return (SDL_Texture*)memoryImage->mD3DData;

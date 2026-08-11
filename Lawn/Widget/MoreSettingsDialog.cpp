@@ -159,12 +159,12 @@ void MoreSettingsDialog::Resize(int theX, int theY, int theWidth, int theHeight)
 	mHDRExposureSlider->Resize(280, aTop + 105, 210, 36);
 	mHDRAdaptiveToneMappingCheckbox->Resize(72, aTop + 157, 46, 45);
 
-	mExclusiveFullscreenCheckbox->Resize(72, aTop + 52, 46, 45);
-	mRefreshPreviousButton->Resize(245, aTop + 105, 71, 42);
-	mRefreshNextButton->Resize(456, aTop + 105, 71, 42);
-	mIntegerScalingCheckbox->Resize(72, aTop + 165, 46, 45);
-	mShowFPSCheckbox->Resize(327, aTop + 165, 46, 45);
-	mRestoreDefaultsButton->Resize(195, aTop + 280, 209, 42);
+	mExclusiveFullscreenCheckbox->Resize(72, aTop + 50, 46, 45);
+	mRefreshPreviousButton->Resize(245, aTop + 101, 71, 42);
+	mRefreshNextButton->Resize(456, aTop + 101, 71, 42);
+	mIntegerScalingCheckbox->Resize(72, aTop + 158, 46, 45);
+	mShowFPSCheckbox->Resize(72, aTop + 210, 46, 45);
+	mRestoreDefaultsButton->Resize(195, aTop + 300, 209, 42);
 }
 
 void MoreSettingsDialog::SetPage(SettingsPage thePage)
@@ -260,18 +260,23 @@ void MoreSettingsDialog::Draw(Graphics* g)
 			anHDRStatus = TodStringTranslate(_S("[ADVANCED_WINDOWS_HDR_OFF]"));
 		else
 			anHDRStatus = TodStringTranslate(_S("[ADVANCED_HDR_RESTART]"));
-		TodDrawStringWrapped(
+		const Rect anHDRStatusRect(56, aTop + 207, 487, 0);
+		const int anHDRStatusHeight = TodDrawStringWrappedHelper(
 			g,
 			anHDRStatus,
-			Rect(72, aTop + 204, 455, 30),
-			FONT_DWARVENTODCRAFT15,
+			anHDRStatusRect,
+			FONT_DWARVENTODCRAFT12,
 			aSubtleColor,
-			DS_ALIGN_LEFT
+			DS_ALIGN_LEFT,
+			false
 		);
+		TodDrawStringWrapped(g, anHDRStatus, anHDRStatusRect, FONT_DWARVENTODCRAFT12, aSubtleColor, DS_ALIGN_LEFT);
+
+		const SexyString anAdaptiveNote = TodStringTranslate(_S("[ADVANCED_HDR_ADAPTIVE_NOTE]"));
 		TodDrawStringWrapped(
 			g,
-			TodStringTranslate(_S("[ADVANCED_HDR_ADAPTIVE_NOTE]")),
-			Rect(72, aTop + 235, 455, 40),
+			anAdaptiveNote,
+			Rect(56, anHDRStatusRect.mY + anHDRStatusHeight + 4, 487, 0),
 			FONT_DWARVENTODCRAFT12,
 			aSubtleColor,
 			DS_ALIGN_RIGHT
@@ -283,7 +288,7 @@ void MoreSettingsDialog::Draw(Graphics* g)
 			g,
 			TodStringTranslate(_S("[ADVANCED_EXCLUSIVE_FULLSCREEN]")),
 			114,
-			aTop + 76,
+			aTop + 74,
 			FONT_DWARVENTODCRAFT18,
 			aTextColor,
 			DS_ALIGN_LEFT
@@ -292,17 +297,24 @@ void MoreSettingsDialog::Draw(Graphics* g)
 			g,
 			TodStringTranslate(_S("[ADVANCED_REFRESH_RATE]")),
 			72,
-			aTop + 130,
+			aTop + 126,
 			FONT_DWARVENTODCRAFT18,
 			aTextColor,
 			DS_ALIGN_LEFT
 		);
-		TodDrawString(g, GetRefreshRateLabel(), 386, aTop + 130, FONT_DWARVENTODCRAFT12, aTextColor, DS_ALIGN_CENTER);
+		TodDrawStringWrapped(
+			g,
+			GetRefreshRateLabel(),
+			Rect(321, aTop + 101, 129, 42),
+			FONT_DWARVENTODCRAFT12,
+			aTextColor,
+			DS_ALIGN_CENTER_VERTICAL_MIDDLE
+		);
 		TodDrawString(
 			g,
 			TodStringTranslate(_S("[ADVANCED_INTEGER_SCALING]")),
 			114,
-			aTop + 189,
+			aTop + 182,
 			FONT_DWARVENTODCRAFT18,
 			aTextColor,
 			DS_ALIGN_LEFT
@@ -310,8 +322,8 @@ void MoreSettingsDialog::Draw(Graphics* g)
 		TodDrawString(
 			g,
 			TodStringTranslate(_S("[ADVANCED_SHOW_FPS]")),
-			369,
-			aTop + 189,
+			114,
+			aTop + 234,
 			FONT_DWARVENTODCRAFT18,
 			aTextColor,
 			DS_ALIGN_LEFT
@@ -319,7 +331,7 @@ void MoreSettingsDialog::Draw(Graphics* g)
 		TodDrawStringWrapped(
 			g,
 			TodStringTranslate(_S("[ADVANCED_DISPLAY_RESTART_NOTE]")),
-			Rect(72, aTop + 228, 455, 42),
+			Rect(56, aTop + 260, 487, 32),
 			FONT_DWARVENTODCRAFT12,
 			aSubtleColor,
 			DS_ALIGN_RIGHT

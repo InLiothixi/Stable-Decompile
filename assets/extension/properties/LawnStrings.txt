@@ -8,3 +8,66 @@ Native HDR
 Restart the game to apply this change.
 
 Windows HDR must be enabled in Display settings.
+
+[ADVANCED_SETTINGS_BUTTON]
+Advanced...
+
+[OPTIONS_ALMANAC_BUTTON]
+Almanac
+
+[ADVANCED_SETTINGS_HEADER]
+Advanced Settings
+
+[ADVANCED_SETTINGS_DONE]
+Done
+
+[ADVANCED_HDR_SECTION]
+HDR Tone Mapping
+
+[ADVANCED_HDR_PAPER_WHITE]
+Paper White
+
+[ADVANCED_HDR_DISABLED]
+Native HDR is off. This value is saved for later.
+
+[ADVANCED_HDR_ACTIVE]
+Native HDR active - display headroom
+
+[ADVANCED_WINDOWS_HDR_OFF]
+Native HDR renderer ready, but Windows HDR is off.
+
+[ADVANCED_HDR_RESTART]
+Restart the game to activate Native HDR.
+
+[ADVANCED_DISPLAY_SECTION]
+Display
+
+[ADVANCED_EXCLUSIVE_FULLSCREEN]
+Exclusive Fullscreen
+
+[ADVANCED_REFRESH_RATE]
+Refresh Rate
+
+[ADVANCED_DESKTOP_CONTROLLED]
+Windows default
+
+[ADVANCED_DESKTOP_RATE]
+Desktop rate
+
+[ADVANCED_DISPLAY_RESTART_NOTE]
+Fullscreen mode and refresh-rate changes apply after restart.
+
+[ADVANCED_INTEGER_SCALING]
+Pixel-Perfect Scaling
+
+[ADVANCED_SHOW_FPS]
+Show FPS
+
+[ADVANCED_RESTORE_DEFAULTS]
+Restore Defaults
+
+[ADVANCED_DISPLAY_RESTART_HEADER]
+Display Settings
+
+[ADVANCED_DISPLAY_RESTART_BODY]
+Restart the game to apply fullscreen mode or refresh-rate changes.

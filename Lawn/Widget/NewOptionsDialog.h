@@ -30,7 +30,8 @@ protected:
 		NewOptionsDialog_VideoGraphics,
 		NewOptionsDialog_SoundSystem,
 		NewOptionsDialog_Language,
-		NewOptionsDialog_NativeHDR
+		NewOptionsDialog_NativeHDR,
+		NewOptionsDialog_AdvancedSettings
 	};
 
 public:
@@ -43,6 +44,7 @@ public:
 	LawnStoneButton*		mAlmanacButton;						//+0x16C
 	LawnStoneButton*		mBackToMainButton;					//+0x170
 	LawnStoneButton*		mRestartButton;						//+0x174
+	LawnStoneButton*		mAdvancedSettingsButton;
 	NewLawnButton*			mBackToGameButton;					//+0x178
 	LawnStoneButton*		mGameplayButton;
 	LawnStoneButton*		mControllerButton;

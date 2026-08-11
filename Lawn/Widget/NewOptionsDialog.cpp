@@ -22,9 +22,14 @@ NewOptionsDialog::NewOptionsDialog(LawnApp* theApp, bool theFromGameSelector) :
     mApp = theApp;
     mFromGameSelector = theFromGameSelector;
     SetColor(Dialog::COLOR_BUTTON_TEXT, Color(255, 255, 100));
-    mAlmanacButton = MakeButton(NewOptionsDialog::NewOptionsDialog_Almanac, this, _S("[VIEW_ALMANAC_BUTTON]"));
+    mAlmanacButton = MakeButton(NewOptionsDialog::NewOptionsDialog_Almanac, this, _S("[OPTIONS_ALMANAC_BUTTON]"));
     mRestartButton = MakeButton(NewOptionsDialog::NewOptionsDialog_Restart, this, _S("[RESTART_LEVEL]"));
     mBackToMainButton = MakeButton(NewOptionsDialog::NewOptionsDialog_MainMenu, this, _S("[MAIN_MENU_BUTTON]"));
+	mAdvancedSettingsButton = MakeButton(
+		NewOptionsDialog::NewOptionsDialog_AdvancedSettings,
+		this,
+		_S("[ADVANCED_SETTINGS_BUTTON]")
+	);
 
    /* mGameplayButton = MakeButton(NewOptionsDialog::NewOptionsDialog_VideoGraphics, this, _S("[GAMEPLAY_SETTINGS_BUTTON]"));
     mControllerButton = MakeButton(NewOptionsDialog::NewOptionsDialog_SoundSystem, this, _S("[CONTROLLER_BUTTON]"));
@@ -121,6 +126,7 @@ NewOptionsDialog::~NewOptionsDialog()
     delete mAlmanacButton;
     delete mRestartButton;
     delete mBackToMainButton;
+	delete mAdvancedSettingsButton;
     delete mBackToGameButton;
     /*delete mGameplayButton;
     delete mControllerButton;
@@ -143,6 +149,7 @@ void NewOptionsDialog::AddedToManager(Sexy::WidgetManager* theWidgetManager)
     AddWidget(mAlmanacButton);
     AddWidget(mRestartButton);
     AddWidget(mBackToMainButton);
+	AddWidget(mAdvancedSettingsButton);
     AddWidget(mMusicVolumeSlider);
     AddWidget(mSfxVolumeSlider);
     AddWidget(mHardwareAccelerationCheckbox);
@@ -161,6 +168,7 @@ void NewOptionsDialog::RemovedFromManager(Sexy::WidgetManager* theWidgetManager)
     RemoveWidget(mAlmanacButton);
     RemoveWidget(mRestartButton);
     RemoveWidget(mBackToMainButton);
+	RemoveWidget(mAdvancedSettingsButton);
     RemoveWidget(mMusicVolumeSlider);
     RemoveWidget(mSfxVolumeSlider);
     RemoveWidget(mHardwareAccelerationCheckbox);
@@ -178,9 +186,34 @@ void NewOptionsDialog::Resize(int theX, int theY, int theWidth, int theHeight)
     mHardwareAccelerationCheckbox->Resize(283, 175, 46, 45);
     mFullscreenCheckbox->Resize(284, 206, 46, 45);
     mNativeHDRCheckbox->Resize(284, 237, 46, 45);
-    mAlmanacButton->Resize(107, 276, 209, 46);
-    mRestartButton->Resize(mAlmanacButton->mX, mAlmanacButton->mY + 39, 209, 46);
-    mBackToMainButton->Resize(mRestartButton->mX, mRestartButton->mY + 39, 209, 46);
+    const int aTopButtonY = mFromGameSelector ? 315 : 276;
+    if (mAlmanacButton->mVisible)
+    {
+        mAdvancedSettingsButton->Resize(45, aTopButtonY, 165, 46);
+        mAlmanacButton->Resize(210, aTopButtonY, 165, 46);
+    }
+    else
+    {
+        mAdvancedSettingsButton->Resize(107, aTopButtonY, 209, 46);
+        mAlmanacButton->Resize(107, aTopButtonY, 209, 46);
+    }
+
+    const int aSecondButtonY = aTopButtonY + 39;
+    if (mRestartButton->mVisible && mBackToMainButton->mVisible)
+    {
+        mRestartButton->Resize(45, aSecondButtonY, 165, 46);
+        mBackToMainButton->Resize(210, aSecondButtonY, 165, 46);
+    }
+    else if (mRestartButton->mVisible)
+    {
+        mRestartButton->Resize(107, aSecondButtonY, 209, 46);
+        mBackToMainButton->Resize(107, aSecondButtonY, 209, 46);
+    }
+    else
+    {
+        mRestartButton->Resize(107, aSecondButtonY, 209, 46);
+        mBackToMainButton->Resize(107, aSecondButtonY, 209, 46);
+    }
     mBackToGameButton->Resize(30, 395, mBackToGameButton->mWidth, mBackToGameButton->mHeight);
 
     /*mGameplayButton->Resize(mAlmanacButton->mX, 116, 209, 46);
@@ -201,10 +234,6 @@ void NewOptionsDialog::Resize(int theX, int theY, int theWidth, int theHeight)
         mBackToMainButton->Resize(mAlmanacButton->mX, mLanguageButton->mY + 43, 209, 46);*/
     }
 
-    if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN || mApp->mGameMode == GameMode::GAMEMODE_TREE_OF_WISDOM || mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ICE)
-    {
-        mAlmanacButton->mY += 43;
-    }
 }
 
 //0x45CB50
@@ -458,6 +487,10 @@ void NewOptionsDialog::ButtonDepress(int theId)
     case NewOptionsDialog::NewOptionsDialog_Update:
         mApp->CheckForUpdates();
         break;
+
+	case NewOptionsDialog::NewOptionsDialog_AdvancedSettings:
+		mApp->DoMoreSettingsDialog();
+		break;
 
     case NewOptionsDialog::NewOptionsDialog_Language:
     {

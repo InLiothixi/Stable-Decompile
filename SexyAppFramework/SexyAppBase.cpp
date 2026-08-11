@@ -4366,22 +4366,12 @@ bool SexyAppBase::DebugKeyDown(int theKey)
 	{
 		if(mWidgetManager->mKeyDown[KEYCODE_SHIFT])
 		{
-			mShowFPS = true;
 			if (++mShowFPSMode >= Num_FPS_Types)
 				mShowFPSMode = 0;
+			SetShowFPS(true);
 		}
 		else
-			mShowFPS = !mShowFPS;
-
-		mWidgetManager->MarkAllDirty();
-
-		if (mShowFPS)
-		{
-			gFPSTimer.Start();
-			gFrameCount = 0;
-			gFPSDisplay = 0;
-			gForceDisplay = true;
-		}
+			SetShowFPS(!mShowFPS);
 	}
 	else if (theKey == KEYCODE_F8)
 	{
@@ -4445,6 +4435,21 @@ bool SexyAppBase::DebugKeyDown(int theKey)
 		return false;
 
 	return false;
+}
+
+void SexyAppBase::SetShowFPS(bool theShowFPS)
+{
+	mShowFPS = theShowFPS;
+	if (mWidgetManager != nullptr)
+		mWidgetManager->MarkAllDirty();
+
+	if (mShowFPS)
+	{
+		gFPSTimer.Start();
+		gFrameCount = 0;
+		gFPSDisplay = 0;
+		gForceDisplay = true;
+	}
 }
 
 bool SexyAppBase::DebugKeyDownAsync(int theKey, bool ctrlDown, bool altDown)

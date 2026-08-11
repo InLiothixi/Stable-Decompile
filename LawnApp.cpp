@@ -62,6 +62,8 @@
 
 #include <windows.h>
 #include <windowsx.h>
+#include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <vector>
 
@@ -278,6 +280,7 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 
 	bool willShutdown = false;
 	bool videoFailed = false;
+	bool toggleFullscreenAfterVideo = false;
 	Uint64 start_ns = 0;
 	const double timelineStartSeconds = format_context->start_time == AV_NOPTS_VALUE
 		? 0.0
@@ -382,9 +385,21 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 		dstrect.y = ((float)mHeight - dstrect.h) / 2;
 
 		if (!SDL_SetRenderDrawColor(mSDLRenderer, bgColor.mRed, bgColor.mGreen, bgColor.mBlue, bgColor.mAlpha) ||
-			!SDL_RenderClear(mSDLRenderer) ||
-			!SDL_RenderTexture(mSDLRenderer, texture, nullptr, &dstrect) ||
-			!SDL_RenderPresent(mSDLRenderer))
+			!SDL_RenderClear(mSDLRenderer))
+		{
+			TodTrace("Video frame presentation failed: %s\n", SDL_GetError());
+			return false;
+		}
+
+		const float anHDRScale = GetHDRPaperWhiteScale();
+		if (!SDL_SetRenderColorScale(mSDLRenderer, anHDRScale))
+		{
+			TodTrace("Video HDR paper-white setup failed: %s\n", SDL_GetError());
+			return false;
+		}
+		const bool aRenderedFrame = SDL_RenderTexture(mSDLRenderer, texture, nullptr, &dstrect);
+		const bool aRestoredColorScale = SDL_SetRenderColorScale(mSDLRenderer, 1.0f);
+		if (!aRenderedFrame || !aRestoredColorScale || !SDL_RenderPresent(mSDLRenderer))
 		{
 			TodTrace("Video frame presentation failed: %s\n", SDL_GetError());
 			return false;
@@ -410,6 +425,13 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 			{
 			case SDL_EVENT_QUIT:
 				willShutdown = true;
+				break;
+			case SDL_EVENT_RENDER_TARGETS_RESET:
+			case SDL_EVENT_RENDER_DEVICE_RESET:
+			case SDL_EVENT_RENDER_DEVICE_LOST:
+				TodTrace("Graphics reset occurred during video playback; shutting down safely.\n");
+				willShutdown = true;
+				mIsPlayingVideo = false;
 				break;
 			case SDL_EVENT_WINDOW_FOCUS_GAINED:
 				mActive = true;
@@ -438,7 +460,9 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 					}
 					else if (theKey == KeyCode::KEYCODE_F11)
 					{
-						gLawnApp->SwitchScreenMode(!gLawnApp->mIsWindowed, true);
+						// A fullscreen transition can invalidate the renderer while the
+						// video decoder owns the presentation loop. Defer it until cleanup.
+						toggleFullscreenAfterVideo = !toggleFullscreenAfterVideo;
 						break;
 					}
 				}
@@ -715,6 +739,8 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 	for (AVPacket*& aVideoPacket : videoPackets)
 		av_packet_free(&aVideoPacket);
 	
+	if (!SDL_SetRenderColorScale(mSDLRenderer, 1.0f))
+		TodTrace("Video HDR paper-white cleanup failed: %s\n", SDL_GetError());
 	if (!SDL_SetRenderVSync(mSDLRenderer, havePreviousVsync ? previousVsync : (mEnableVsync ? 1 : 0)))
 		TodTrace("Video VSync restore failed: %s\n", SDL_GetError());
 	SDL_DestroyTexture(texture);
@@ -727,6 +753,8 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 
 	mIsPlayingVideo = false;
 	mWidgetManager->MarkAllDirty();
+	if (toggleFullscreenAfterVideo && !willShutdown)
+		SwitchScreenMode(!mIsWindowed, true);
 
 	SDL_ShowCursor();
 
@@ -790,6 +818,9 @@ void LawnApp::MakeWindow()
 	SDL_RendererLogicalPresentation presentationMode;
 
 	mSDLWindow = SDL_CreateWindow(mTitle.c_str(), mWidth, mHeight, windowFlags);
+	ConfigureFullscreenDisplayMode();
+	if (mSDLWindow != nullptr && (windowFlags & SDL_WINDOW_FULLSCREEN) != 0 && !SDL_SyncWindow(mSDLWindow))
+		TodTrace("Initial fullscreen synchronization timed out: %s\n", SDL_GetError());
 	mNativeHDRRenderer = false;
 	mSDLRenderer = CreateLawnRenderer(mSDLWindow, mEnableNativeHDR, mEnableVsync);
 	if (mSDLRenderer == nullptr && mEnableNativeHDR)
@@ -822,7 +853,7 @@ void LawnApp::MakeWindow()
 		);
 	}
 	SDL_SetRenderVSync(mSDLRenderer, mEnableVsync);
-	SDL_SetRenderLogicalPresentation(mSDLRenderer, mWidth, mHeight, SDL_LOGICAL_PRESENTATION_LETTERBOX);
+	ApplyLogicalPresentationMode();
 	mHWnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(mSDLWindow), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
 
 	mWidgetManager->mWidth = mWidth;
@@ -876,6 +907,119 @@ bool LawnApp::IsNativeHDRActive() const
 	return SDL_GetBooleanProperty(aRendererProperties, SDL_PROP_RENDERER_HDR_ENABLED_BOOLEAN, false);
 }
 
+float LawnApp::GetHDRPaperWhiteScale() const
+{
+	if (!IsNativeHDRActive())
+		return 1.0f;
+
+	const float aRequestedScale = (float)std::clamp(mHDRPaperWhitePercent, 50, 200) / 100.0f;
+	const SDL_PropertiesID aRendererProperties = SDL_GetRendererProperties(mSDLRenderer);
+	const float aReportedHeadroom = SDL_GetFloatProperty(
+		aRendererProperties,
+		SDL_PROP_RENDERER_HDR_HEADROOM_FLOAT,
+		1.0f
+	);
+	const float aHeadroom = aReportedHeadroom < 1.0f ? 1.0f : aReportedHeadroom;
+	return aRequestedScale > aHeadroom ? aHeadroom : aRequestedScale;
+}
+
+void LawnApp::ApplyLogicalPresentationMode()
+{
+	if (mSDLRenderer == nullptr)
+		return;
+
+	const SDL_RendererLogicalPresentation aPresentationMode = mUseIntegerScaling
+		? SDL_LOGICAL_PRESENTATION_INTEGER_SCALE
+		: SDL_LOGICAL_PRESENTATION_LETTERBOX;
+	if (!SDL_SetRenderLogicalPresentation(mSDLRenderer, mWidth, mHeight, aPresentationMode))
+		TodTrace("Logical presentation setup failed: %s\n", SDL_GetError());
+
+	if (mWidgetManager != nullptr)
+	{
+		mWidgetManager->MarkAllDirty();
+		mHasPendingDraw = true;
+	}
+}
+
+bool LawnApp::ConfigureFullscreenDisplayMode()
+{
+	if (mSDLWindow == nullptr)
+		return false;
+
+	if (!mUseExclusiveFullscreen)
+	{
+		if (!SDL_SetWindowFullscreenMode(mSDLWindow, nullptr))
+		{
+			TodTrace("Borderless fullscreen setup failed: %s\n", SDL_GetError());
+			return false;
+		}
+		return true;
+	}
+
+	const SDL_DisplayID aDisplay = SDL_GetDisplayForWindow(mSDLWindow);
+	const SDL_DisplayMode* aDesktopMode = aDisplay == 0 ? nullptr : SDL_GetDesktopDisplayMode(aDisplay);
+	int aModeCount = 0;
+	SDL_DisplayMode** aModes = aDisplay == 0 ? nullptr : SDL_GetFullscreenDisplayModes(aDisplay, &aModeCount);
+	const SDL_DisplayMode* aBestMode = nullptr;
+	double aBestScore = 1.0e30;
+	const double aDesiredRefresh = mPreferredRefreshRateMilliHz > 0
+		? (double)mPreferredRefreshRateMilliHz / 1000.0
+		: (aDesktopMode == nullptr ? 0.0 : aDesktopMode->refresh_rate);
+
+	if (aDesktopMode != nullptr && aModes != nullptr)
+	{
+		for (int i = 0; i < aModeCount; i++)
+		{
+			const SDL_DisplayMode* aMode = aModes[i];
+			if (aMode == nullptr ||
+				aMode->w != aDesktopMode->w ||
+				aMode->h != aDesktopMode->h ||
+				aMode->format != aDesktopMode->format ||
+				std::abs(aMode->pixel_density - aDesktopMode->pixel_density) > 0.01f ||
+				aMode->refresh_rate <= 0.0f)
+				continue;
+
+			const double aRefreshDelta = std::abs((double)aMode->refresh_rate - aDesiredRefresh);
+			const double aFormatPenalty = aMode->format == aDesktopMode->format ? 0.0 : 10.0;
+			const double aDensityPenalty = std::abs((double)aMode->pixel_density - aDesktopMode->pixel_density);
+			const double aScore = aRefreshDelta * 1000.0 + aFormatPenalty + aDensityPenalty;
+			if (aScore < aBestScore)
+			{
+				aBestScore = aScore;
+				aBestMode = aMode;
+			}
+		}
+	}
+
+	const bool aRequestedRateIsAvailable = aBestMode != nullptr &&
+		(mPreferredRefreshRateMilliHz == 0 ||
+		 std::abs((double)aBestMode->refresh_rate * 1000.0 - mPreferredRefreshRateMilliHz) <= 100.0);
+	bool aConfigured = false;
+	if (aRequestedRateIsAvailable)
+	{
+		aConfigured = SDL_SetWindowFullscreenMode(mSDLWindow, aBestMode);
+		if (aConfigured)
+		{
+			TodTrace(
+				"Exclusive fullscreen mode configured: %dx%d at %.3f Hz.\n",
+				aBestMode->w,
+				aBestMode->h,
+				aBestMode->refresh_rate
+			);
+		}
+	}
+	SDL_free(aModes);
+
+	if (!aConfigured)
+	{
+		TodTrace("Requested exclusive fullscreen mode is unavailable: %s. Falling back to borderless desktop.\n", SDL_GetError());
+		if (!SDL_SetWindowFullscreenMode(mSDLWindow, nullptr))
+			TodTrace("Borderless fullscreen fallback failed: %s\n", SDL_GetError());
+		mUseExclusiveFullscreen = false;
+	}
+	return aConfigured;
+}
+
 bool LawnApp::DrawDirtyStuff()
 {
 	if (mIsPlayingVideo) return true;
@@ -896,9 +1040,12 @@ bool LawnApp::DrawDirtyStuff()
 		SDL_SetRenderTarget(mSDLRenderer, nullptr);
 		SDL_SetRenderDrawColor(mSDLRenderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
 		SDL_RenderClear(mSDLRenderer);
+		SDL_SetRenderColorScale(mSDLRenderer, GetHDRPaperWhiteScale());
 		mWidgetManager->MarkAllDirty();
 	}
 	bool drewStuff = SexyAppBase::DrawDirtyStuff();
+	if (aScreenTexture == nullptr)
+		SDL_SetRenderColorScale(mSDLRenderer, 1.0f);
 	SDL_SetRenderTarget(mSDLRenderer, anOldRenderTarget);
 	return drewStuff;
 }
@@ -916,7 +1063,14 @@ void LawnApp::Redraw(Rect* theClipRect)
 		SDL_SetTextureColorMod(aScreenTexture, 255, 255, 255);
 		SDL_SetTextureAlphaMod(aScreenTexture, 255);
 		SDL_SetTextureBlendMode(aScreenTexture, SDL_BLENDMODE_NONE);
-		if (!SDL_RenderTexture(mSDLRenderer, aScreenTexture, nullptr, nullptr))
+		const bool aScaleWasSet = SDL_SetRenderColorScale(mSDLRenderer, GetHDRPaperWhiteScale());
+		const bool aCompositeSucceeded = SDL_RenderTexture(mSDLRenderer, aScreenTexture, nullptr, nullptr);
+		const bool aScaleWasRestored = SDL_SetRenderColorScale(mSDLRenderer, 1.0f);
+		if (!aScaleWasSet)
+			TodTrace("HDR paper-white setup failed: %s\n", SDL_GetError());
+		if (!aScaleWasRestored)
+			TodTrace("HDR paper-white restore failed: %s\n", SDL_GetError());
+		if (!aCompositeSucceeded)
 		{
 			TodTrace("Screen composite failed: %s. Switching to full-frame direct rendering.\n", SDL_GetError());
 			SDL_DestroyTexture(aScreenTexture);
@@ -1140,6 +1294,7 @@ bool LawnApp::UpdateAppStep(bool* updated)
 					mHasPendingDraw = true;
 					break;
 				}
+				case SDL_EVENT_RENDER_TARGETS_RESET:
 				case SDL_EVENT_RENDER_DEVICE_RESET:
 				case SDL_EVENT_RENDER_DEVICE_LOST:
 				{
@@ -1407,6 +1562,10 @@ LawnApp::LawnApp()
 	mPlayerLevelRef = -1;
 	mEnableNativeHDR = false;
 	mNativeHDRRenderer = false;
+	mHDRPaperWhitePercent = 100;
+	mPreferredRefreshRateMilliHz = 0;
+	mUseExclusiveFullscreen = false;
+	mUseIntegerScaling = false;
 }
 
 //0x44EDD0、0x44EDF0
@@ -1686,6 +1845,11 @@ void LawnApp::WriteToRegistry()
 
 	SexyAppBase::WriteToRegistry();
 	RegistryWriteBoolean(_S("EnableNativeHDR"), mEnableNativeHDR);
+	RegistryWriteInteger(_S("HDRPaperWhitePercent"), mHDRPaperWhitePercent);
+	RegistryWriteInteger(_S("PreferredRefreshRateMilliHz"), mPreferredRefreshRateMilliHz);
+	RegistryWriteBoolean(_S("UseExclusiveFullscreen"), mUseExclusiveFullscreen);
+	RegistryWriteBoolean(_S("UseIntegerScaling"), mUseIntegerScaling);
+	RegistryWriteBoolean(_S("ShowFPS"), mShowFPS);
 }
 
 //0x44F530
@@ -1693,6 +1857,15 @@ void LawnApp::ReadFromRegistry()
 {
 	SexyApp::ReadFromRegistry();
 	RegistryReadBoolean(_S("EnableNativeHDR"), &mEnableNativeHDR);
+	RegistryReadInteger(_S("HDRPaperWhitePercent"), &mHDRPaperWhitePercent);
+	RegistryReadInteger(_S("PreferredRefreshRateMilliHz"), &mPreferredRefreshRateMilliHz);
+	RegistryReadBoolean(_S("UseExclusiveFullscreen"), &mUseExclusiveFullscreen);
+	RegistryReadBoolean(_S("UseIntegerScaling"), &mUseIntegerScaling);
+	bool aShowFPS = mShowFPS;
+	RegistryReadBoolean(_S("ShowFPS"), &aShowFPS);
+	mHDRPaperWhitePercent = std::clamp(mHDRPaperWhitePercent, 50, 200);
+	mPreferredRefreshRateMilliHz = std::clamp(mPreferredRefreshRateMilliHz, 0, 1000000);
+	SetShowFPS(aShowFPS);
 }
 
 //0x44F540
@@ -3535,6 +3708,10 @@ void LawnApp::ButtonDepress(int theId)
 			KillNewOptionsDialog();
 			return;
 
+		case Dialogs::DIALOG_MORESETTINGS:
+			KillMoreSettingsDialog();
+			return;
+
 		case Dialogs::DIALOG_PREGAME_NAG:
 			DoRegister();
 			return;
@@ -5260,12 +5437,27 @@ void LawnApp::PlaySample(int theSoundNum)
 void LawnApp::SwitchScreenMode(bool wantWindowed, bool is3d, bool force)
 {
 	//SexyAppBase::SwitchScreenMode(wantWindowed, is3d, force);
-	if ((force || wantWindowed != mIsWindowed) && !SDL_SetWindowFullscreen(mSDLWindow, !wantWindowed))
+	bool anAppliedWindowedState = wantWindowed;
+	if (force || wantWindowed != mIsWindowed)
 	{
-		TodTrace("Fullscreen switch failed: %s\n", SDL_GetError());
-		return;
+		if (!wantWindowed)
+			ConfigureFullscreenDisplayMode();
+		if (!SDL_SetWindowFullscreen(mSDLWindow, !wantWindowed))
+		{
+			TodTrace("Fullscreen switch failed: %s\n", SDL_GetError());
+		}
+		else
+		{
+			if (!SDL_SyncWindow(mSDLWindow))
+				TodTrace("Fullscreen switch synchronization timed out: %s\n", SDL_GetError());
+		}
+
+		const bool isActuallyFullscreen = (SDL_GetWindowFlags(mSDLWindow) & SDL_WINDOW_FULLSCREEN) != 0;
+		anAppliedWindowedState = !isActuallyFullscreen;
+		if (isActuallyFullscreen == wantWindowed)
+			TodTrace("Fullscreen switch was not applied by the window system.\n");
 	}
-	mIsWindowed = wantWindowed;
+	mIsWindowed = anAppliedWindowedState;
 
 	NewOptionsDialog* aNewOptionsDialog = (NewOptionsDialog*)GetDialog(Dialogs::DIALOG_NEWOPTIONS);
 	if (aNewOptionsDialog)
@@ -5451,6 +5643,42 @@ void LawnApp::DoConfirmRIPMode()
 
 void LawnApp::DoMoreSettingsDialog()
 {
+	MoreSettingsDialog* anExistingDialog = (MoreSettingsDialog*)GetDialog(Dialogs::DIALOG_MORESETTINGS);
+	if (anExistingDialog != nullptr)
+	{
+		mWidgetManager->SetFocus(anExistingDialog);
+		return;
+	}
+
 	MoreSettingsDialog* aDialog = new MoreSettingsDialog(this);
 	AddDialog(Dialogs::DIALOG_MORESETTINGS, aDialog);
+	mWidgetManager->SetFocus(aDialog);
+}
+
+void LawnApp::KillMoreSettingsDialog()
+{
+	MoreSettingsDialog* aDialog = (MoreSettingsDialog*)GetDialog(Dialogs::DIALOG_MORESETTINGS);
+	if (aDialog == nullptr)
+		return;
+
+	const bool aDisplayRestartIsRequired = aDialog->RequiresDisplayRestart();
+	RegistryWriteInteger(_S("HDRPaperWhitePercent"), mHDRPaperWhitePercent);
+	RegistryWriteInteger(_S("PreferredRefreshRateMilliHz"), mPreferredRefreshRateMilliHz);
+	RegistryWriteBoolean(_S("UseExclusiveFullscreen"), mUseExclusiveFullscreen);
+	RegistryWriteBoolean(_S("UseIntegerScaling"), mUseIntegerScaling);
+	RegistryWriteBoolean(_S("ShowFPS"), mShowFPS);
+	KillDialog(Dialogs::DIALOG_MORESETTINGS);
+	ClearUpdateBacklog();
+
+	if (aDisplayRestartIsRequired)
+	{
+		DoDialog(
+			Dialogs::DIALOG_INFO,
+			true,
+			_S("[ADVANCED_DISPLAY_RESTART_HEADER]"),
+			_S("[ADVANCED_DISPLAY_RESTART_BODY]"),
+			_S("[OK_LABEL]"),
+			Dialog::BUTTONS_FOOTER
+		);
+	}
 }

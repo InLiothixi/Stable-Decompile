@@ -165,6 +165,10 @@ public:
 	bool                            mEnableFPS;
 	bool							mEnableNativeHDR;
 	bool							mNativeHDRRenderer;
+	int								mHDRPaperWhitePercent;
+	int								mPreferredRefreshRateMilliHz;
+	bool							mUseExclusiveFullscreen;
+	bool							mUseIntegerScaling;
 
 public:
 	LawnApp();
@@ -376,6 +380,9 @@ public:
 	void							KillMoreSettingsDialog();
 	void							MakeWindow();
 	bool							IsNativeHDRActive() const;
+	float							GetHDRPaperWhiteScale() const;
+	void							ApplyLogicalPresentationMode();
+	bool							ConfigureFullscreenDisplayMode();
 	bool							DrawDirtyStuff();
 	void							Redraw(Rect* theClipRect);
 	bool							UpdateAppStep(bool* updated);

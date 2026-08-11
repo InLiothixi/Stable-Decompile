@@ -1,60 +1,67 @@
 #ifndef __MORESETTINGSDIALOG_H__
 #define __MORESETTINGSDIALOG_H__
 
-#include "../../SexyAppFramework/Dialog.h"
-#include "../../SexyAppFramework/ButtonListener.h"
+#include <vector>
+
 #include "../../SexyAppFramework/CheckboxListener.h"
+#include "../../SexyAppFramework/SliderListener.h"
 #include "LawnDialog.h"
 
 class LawnApp;
 class LawnStoneButton;
+
 namespace Sexy
 {
-	class Slider;
 	class Checkbox;
-};
+	class Slider;
+}
 
-class MoreSettingsDialog : public LawnDialog, public Sexy::CheckboxListener 
+class MoreSettingsDialog : public LawnDialog, public Sexy::CheckboxListener, public Sexy::SliderListener
 {
 private:
-	enum {
-		MoreSettingsDialog_Page1 = 20000,
-		MoreSettingsDialog_Page2,
-        MoreSettingsDialog_HardwareAcceleration,
-		MoreSettingsDialog_FPS,
-		MoreSettingsDialog_CustomCursor,
-		MoreSettingsDialog_AutoPause,
-		MoreSettingsDialog_OptimizedGameplay,
-		MoreSettingsDialog_NoToolTip,
-	}; 
-
-	enum MoreSettingsPages {
-		MoreSettingsPage_1,
-		MoreSettingsPage_2,
-		NUM_OF_PAGES
+	enum
+	{
+		MoreSettingsDialog_RefreshPrevious = 20000,
+		MoreSettingsDialog_RefreshNext,
+		MoreSettingsDialog_ExclusiveFullscreen,
+		MoreSettingsDialog_IntegerScaling,
+		MoreSettingsDialog_ShowFPS,
+		MoreSettingsDialog_HDRPaperWhite,
+		MoreSettingsDialog_RestoreDefaults,
 	};
-public:
-	LawnApp*			mApp;
-    MoreSettingsPages	mCurPage;
-	LawnStoneButton*	mPage1;
-	LawnStoneButton*	mPage2;
-	// PP1
-	Checkbox*			mHardwareAcceleration;
-	Checkbox*			mCustomCursor;
-	Checkbox*			mFPSToggle;
-	Checkbox*			mAutoPause;
-	Checkbox*			mShowToolTip;
+
+	LawnApp*				mApp;
+	Sexy::Slider*			mHDRPaperWhiteSlider;
+	Sexy::Checkbox*		mExclusiveFullscreenCheckbox;
+	Sexy::Checkbox*		mIntegerScalingCheckbox;
+	Sexy::Checkbox*		mShowFPSCheckbox;
+	LawnStoneButton*		mRefreshPreviousButton;
+	LawnStoneButton*		mRefreshNextButton;
+	LawnStoneButton*		mRestoreDefaultsButton;
+	std::vector<int>		mAvailableRefreshRatesMilliHz;
+	int						mRefreshRateIndex;
+	int						mOriginalRefreshRateMilliHz;
+	bool					mOriginalExclusiveFullscreen;
+
+	int						GetContentTop() const;
+	void					BuildRefreshRateList();
+	void					UpdateRefreshControls();
+	SexyString				GetRefreshRateLabel() const;
+	void					RestoreDefaults();
 
 public:
 	MoreSettingsDialog(LawnApp* theApp);
 	~MoreSettingsDialog();
-	void				AddedToManager(Sexy::WidgetManager* theWidgetManager);
-	void				RemovedFromManager(Sexy::WidgetManager* theWidgetManager);
-	void				Resize(int theX, int theY, int theWidth, int theHeight);
-	void				Draw(Sexy::Graphics* g);
-	void				CheckboxChecked(int theId, bool checked);
-	void				ButtonDepress(int theId);
-	void				ChangePage(MoreSettingsPages thePage);
-	void				Update();
+
+	void					AddedToManager(Sexy::WidgetManager* theWidgetManager);
+	void					RemovedFromManager(Sexy::WidgetManager* theWidgetManager);
+	void					Resize(int theX, int theY, int theWidth, int theHeight);
+	void					Draw(Sexy::Graphics* g);
+	void					CheckboxChecked(int theId, bool checked);
+	void					SliderVal(int theId, double theVal);
+	void					ButtonDepress(int theId);
+	void					KeyDown(Sexy::KeyCode theKey);
+	bool					RequiresDisplayRestart() const;
 };
+
 #endif

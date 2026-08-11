@@ -729,7 +729,30 @@ void ChallengeScreen::DrawButton(Graphics* g, int theChallengeIndex)
 				{
 					SexyString aAchievement = TodReplaceNumberString(_S("[LONGEST_STREAK]"), _S("{STREAK}"), aRecord);
 					Rect aRect(aPosX, aPosY + 15, 96, 200);
-					TodDrawStringWrapped(g, aAchievement, aRect, Sexy::FONT_CONTINUUMBOLD14OUTLINE, Color::White, DS_ALIGN_CENTER);
+					// Keep the outline and fill on the same glyph atlas for this narrow wrapped label.
+					for (int anOffsetY = -1; anOffsetY <= 1; anOffsetY++)
+					{
+						for (int anOffsetX = -1; anOffsetX <= 1; anOffsetX++)
+						{
+							if (anOffsetX == 0 && anOffsetY == 0)
+								continue;
+
+							Rect anOutlineRect(
+								aRect.mX + anOffsetX,
+								aRect.mY + anOffsetY,
+								aRect.mWidth,
+								aRect.mHeight
+							);
+							TodDrawStringWrapped(
+								g,
+								aAchievement,
+								anOutlineRect,
+								Sexy::FONT_CONTINUUMBOLD14,
+								Color::White,
+								DS_ALIGN_CENTER
+							);
+						}
+					}
 					TodDrawStringWrapped(g, aAchievement, aRect, Sexy::FONT_CONTINUUMBOLD14, Color(255, 0, 0), DS_ALIGN_CENTER);
 				}
 			}

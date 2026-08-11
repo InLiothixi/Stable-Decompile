@@ -205,6 +205,184 @@ namespace
 		return aRenderer;
 	}
 
+	bool ShouldUseSDRVideoPresentation(SDL_Renderer* theRenderer)
+	{
+		if (theRenderer == nullptr)
+			return false;
+
+		const SDL_PropertiesID aRendererProperties = SDL_GetRendererProperties(theRenderer);
+		const SDL_Colorspace anOutputColorspace = (SDL_Colorspace)SDL_GetNumberProperty(
+			aRendererProperties,
+			SDL_PROP_RENDERER_OUTPUT_COLORSPACE_NUMBER,
+			SDL_COLORSPACE_UNKNOWN
+		);
+		return anOutputColorspace == SDL_COLORSPACE_SRGB_LINEAR;
+	}
+
+	bool SDLCALL KeepEventsForOtherWindows(void* theUserData, SDL_Event* theEvent)
+	{
+		SDL_Window* aWindow = static_cast<SDL_Window*>(theUserData);
+		return SDL_GetWindowFromEvent(theEvent) != aWindow;
+	}
+
+	struct SDRVideoPresentation
+	{
+		SDL_Window* mWindow = nullptr;
+		SDL_Renderer* mRenderer = nullptr;
+		SDL_WindowID mWindowId = 0;
+
+		~SDRVideoPresentation()
+		{
+			Destroy();
+		}
+
+		SDRVideoPresentation(const SDRVideoPresentation&) = delete;
+		SDRVideoPresentation& operator=(const SDRVideoPresentation&) = delete;
+		SDRVideoPresentation() = default;
+
+		bool Create(
+			SDL_Window* theParent,
+			int theLogicalWidth,
+			int theLogicalHeight,
+			Uint8 theRed,
+			Uint8 theGreen,
+			Uint8 theBlue,
+			Uint8 theAlpha)
+		{
+			int aParentWidth = 0;
+			int aParentHeight = 0;
+			if (theParent == nullptr ||
+				!SDL_GetWindowSize(theParent, &aParentWidth, &aParentHeight) ||
+				aParentWidth <= 0 || aParentHeight <= 0)
+			{
+				TodTrace("Video SDR popup could not query the parent window size: %s\n", SDL_GetError());
+				return false;
+			}
+
+			SDL_PropertiesID aWindowProperties = SDL_CreateProperties();
+			if (aWindowProperties == 0)
+			{
+				TodTrace("Video SDR popup property creation failed: %s\n", SDL_GetError());
+				return false;
+			}
+
+			const bool aWindowPropertiesConfigured =
+				SDL_SetPointerProperty(aWindowProperties, SDL_PROP_WINDOW_CREATE_PARENT_POINTER, theParent) &&
+				SDL_SetBooleanProperty(aWindowProperties, SDL_PROP_WINDOW_CREATE_TOOLTIP_BOOLEAN, true) &&
+				SDL_SetBooleanProperty(aWindowProperties, SDL_PROP_WINDOW_CREATE_FOCUSABLE_BOOLEAN, false) &&
+				SDL_SetBooleanProperty(aWindowProperties, SDL_PROP_WINDOW_CREATE_CONSTRAIN_POPUP_BOOLEAN, false) &&
+				SDL_SetBooleanProperty(aWindowProperties, SDL_PROP_WINDOW_CREATE_HIDDEN_BOOLEAN, true) &&
+				SDL_SetBooleanProperty(aWindowProperties, SDL_PROP_WINDOW_CREATE_HIGH_PIXEL_DENSITY_BOOLEAN, true) &&
+				SDL_SetNumberProperty(aWindowProperties, SDL_PROP_WINDOW_CREATE_X_NUMBER, 0) &&
+				SDL_SetNumberProperty(aWindowProperties, SDL_PROP_WINDOW_CREATE_Y_NUMBER, 0) &&
+				SDL_SetNumberProperty(aWindowProperties, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, aParentWidth) &&
+				SDL_SetNumberProperty(aWindowProperties, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, aParentHeight);
+			if (aWindowPropertiesConfigured)
+				mWindow = SDL_CreateWindowWithProperties(aWindowProperties);
+			SDL_DestroyProperties(aWindowProperties);
+
+			if (!aWindowPropertiesConfigured || mWindow == nullptr)
+			{
+				TodTrace("Video SDR popup creation failed: %s\n", SDL_GetError());
+				Destroy();
+				return false;
+			}
+
+			mWindowId = SDL_GetWindowID(mWindow);
+			SDL_PropertiesID aRendererProperties = SDL_CreateProperties();
+			if (aRendererProperties == 0)
+			{
+				TodTrace("Video SDR renderer property creation failed: %s\n", SDL_GetError());
+				Destroy();
+				return false;
+			}
+
+			const bool aRendererPropertiesConfigured =
+				SDL_SetPointerProperty(aRendererProperties, SDL_PROP_RENDERER_CREATE_WINDOW_POINTER, mWindow) &&
+				SDL_SetStringProperty(aRendererProperties, SDL_PROP_RENDERER_CREATE_NAME_STRING, "direct3d11") &&
+				SDL_SetNumberProperty(
+					aRendererProperties,
+					SDL_PROP_RENDERER_CREATE_OUTPUT_COLORSPACE_NUMBER,
+					SDL_COLORSPACE_SRGB
+				) &&
+				SDL_SetNumberProperty(aRendererProperties, SDL_PROP_RENDERER_CREATE_PRESENT_VSYNC_NUMBER, 1);
+			if (aRendererPropertiesConfigured)
+				mRenderer = SDL_CreateRendererWithProperties(aRendererProperties);
+			SDL_DestroyProperties(aRendererProperties);
+
+			if (!aRendererPropertiesConfigured || mRenderer == nullptr)
+			{
+				TodTrace("Video SDR renderer creation failed: %s\n", SDL_GetError());
+				Destroy();
+				return false;
+			}
+
+			const SDL_PropertiesID anActualRendererProperties = SDL_GetRendererProperties(mRenderer);
+			const SDL_Colorspace anActualColorspace = (SDL_Colorspace)SDL_GetNumberProperty(
+				anActualRendererProperties,
+				SDL_PROP_RENDERER_OUTPUT_COLORSPACE_NUMBER,
+				SDL_COLORSPACE_UNKNOWN
+			);
+			if (anActualColorspace != SDL_COLORSPACE_SRGB)
+			{
+				TodTrace(
+					"Video SDR renderer returned output colorspace 0x%X instead of sRGB.\n",
+					(unsigned int)anActualColorspace
+				);
+				Destroy();
+				return false;
+			}
+
+			if (!SDL_SetRenderLogicalPresentation(
+				mRenderer,
+				theLogicalWidth,
+				theLogicalHeight,
+				SDL_LOGICAL_PRESENTATION_LETTERBOX
+			) ||
+				!SDL_SetRenderDrawColor(mRenderer, theRed, theGreen, theBlue, theAlpha) ||
+				!SDL_RenderClear(mRenderer) ||
+				!SDL_RenderPresent(mRenderer) ||
+				!SDL_ShowWindow(mWindow) ||
+				!SDL_SyncWindow(mWindow))
+			{
+				TodTrace("Video SDR popup initialization failed: %s\n", SDL_GetError());
+				Destroy();
+				return false;
+			}
+
+			TodTrace(
+				"Video SDR compatibility renderer: %s, output colorspace: 0x%X, popup: %dx%d.\n",
+				SDL_GetRendererName(mRenderer),
+				(unsigned int)anActualColorspace,
+				aParentWidth,
+				aParentHeight
+			);
+			return true;
+		}
+
+		void Destroy()
+		{
+			if (mWindow != nullptr)
+				SDL_HideWindow(mWindow);
+			if (mRenderer != nullptr)
+			{
+				SDL_DestroyRenderer(mRenderer);
+				mRenderer = nullptr;
+			}
+			if (mWindow != nullptr)
+			{
+				// Remove auxiliary focus/window/render events while SDL can still
+				// resolve their window ID. The normal game loop must only see events
+				// that belong to the persistent main window.
+				SDL_PumpEvents();
+				SDL_FilterEvents(KeepEventsForOtherWindows, mWindow);
+				SDL_DestroyWindow(mWindow);
+				mWindow = nullptr;
+			}
+			mWindowId = 0;
+		}
+	};
+
 }
 
 // I wouldn't be able to make this without Codotaku. Huge W for them
@@ -249,8 +427,41 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 	if (audio_playback_stream == nullptr)
 		TodTrace("Video audio device creation failed: %s. Continuing without audio.\n", SDL_GetError());
 
+	SDRVideoPresentation anSDRPresentation;
+	SDL_Renderer* aVideoRenderer = mSDLRenderer;
+	if (ShouldUseSDRVideoPresentation(mSDLRenderer))
+	{
+		if (anSDRPresentation.Create(
+			mSDLWindow,
+			mWidth,
+			mHeight,
+			bgColor.mRed,
+			bgColor.mGreen,
+			bgColor.mBlue,
+			bgColor.mAlpha
+		))
+		{
+			aVideoRenderer = anSDRPresentation.mRenderer;
+		}
+		else
+		{
+			TodTrace("Video SDR compatibility presentation is unavailable; using the main renderer.\n");
+		}
+	}
+	const bool isUsingSDRPresentation = aVideoRenderer == anSDRPresentation.mRenderer &&
+		anSDRPresentation.mRenderer != nullptr;
+	// MakeWindow and popup synchronization can leave startup geometry events in
+	// the queue. Only a change made after the SDR surface is ready should end it.
+	const Uint64 anSDRPresentationReadyTimestamp = isUsingSDRPresentation
+		? SDL_GetTicksNS()
+		: 0;
+	const SDL_WindowID aMainWindowId = SDL_GetWindowID(mSDLWindow);
+	const SDL_WindowID aVideoWindowId = isUsingSDRPresentation
+		? anSDRPresentation.mWindowId
+		: aMainWindowId;
+
 	SDL_Texture* texture = CreateVideoTexture(
-		mSDLRenderer,
+		aVideoRenderer,
 		SDL_PIXELFORMAT_BGRA32,
 		video_decoder->width,
 		video_decoder->height,
@@ -311,8 +522,9 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 	}
 
 	int previousVsync = mEnableVsync ? 1 : 0;
-	const bool havePreviousVsync = SDL_GetRenderVSync(mSDLRenderer, &previousVsync);
-	if (!SDL_SetRenderVSync(mSDLRenderer, 1))
+	const bool havePreviousVsync = !isUsingSDRPresentation &&
+		SDL_GetRenderVSync(aVideoRenderer, &previousVsync);
+	if (!SDL_SetRenderVSync(aVideoRenderer, 1))
 		TodTrace("Video VSync setup failed: %s\n", SDL_GetError());
 
 	bool willShutdown = false;
@@ -431,22 +643,22 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 		dstrect.x = ((float)mWidth - dstrect.w) / 2;
 		dstrect.y = ((float)mHeight - dstrect.h) / 2;
 
-		if (!SDL_SetRenderDrawColor(mSDLRenderer, bgColor.mRed, bgColor.mGreen, bgColor.mBlue, bgColor.mAlpha) ||
-			!SDL_RenderClear(mSDLRenderer))
+		if (!SDL_SetRenderDrawColor(aVideoRenderer, bgColor.mRed, bgColor.mGreen, bgColor.mBlue, bgColor.mAlpha) ||
+			!SDL_RenderClear(aVideoRenderer))
 		{
 			TodTrace("Video frame presentation failed: %s\n", SDL_GetError());
 			return false;
 		}
 
-		const float anHDRScale = GetHDRPaperWhiteScale();
-		if (!SDL_SetRenderColorScale(mSDLRenderer, anHDRScale))
+		const float anHDRScale = isUsingSDRPresentation ? 1.0f : GetHDRPaperWhiteScale();
+		if (!SDL_SetRenderColorScale(aVideoRenderer, anHDRScale))
 		{
 			TodTrace("Video HDR paper-white setup failed: %s\n", SDL_GetError());
 			return false;
 		}
-		const bool aRenderedFrame = SDL_RenderTexture(mSDLRenderer, texture, nullptr, &dstrect);
-		const bool aRestoredColorScale = SDL_SetRenderColorScale(mSDLRenderer, 1.0f);
-		if (!aRenderedFrame || !aRestoredColorScale || !SDL_RenderPresent(mSDLRenderer))
+		const bool aRenderedFrame = SDL_RenderTexture(aVideoRenderer, texture, nullptr, &dstrect);
+		const bool aRestoredColorScale = SDL_SetRenderColorScale(aVideoRenderer, 1.0f);
+		if (!aRenderedFrame || !aRestoredColorScale || !SDL_RenderPresent(aVideoRenderer))
 		{
 			TodTrace("Video frame presentation failed: %s\n", SDL_GetError());
 			return false;
@@ -454,10 +666,10 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 		return true;
 	};
 
-	if (!SDL_SetRenderTarget(mSDLRenderer, nullptr) ||
-		!SDL_SetRenderDrawColor(mSDLRenderer, bgColor.mRed, bgColor.mGreen, bgColor.mBlue, bgColor.mAlpha) ||
-		!SDL_RenderClear(mSDLRenderer) ||
-		!SDL_RenderPresent(mSDLRenderer))
+	if (!SDL_SetRenderTarget(aVideoRenderer, nullptr) ||
+		!SDL_SetRenderDrawColor(aVideoRenderer, bgColor.mRed, bgColor.mGreen, bgColor.mBlue, bgColor.mAlpha) ||
+		!SDL_RenderClear(aVideoRenderer) ||
+		!SDL_RenderPresent(aVideoRenderer))
 	{
 		TodTrace("Initial video presentation failed: %s\n", SDL_GetError());
 		videoFailed = true;
@@ -476,21 +688,67 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 			case SDL_EVENT_RENDER_TARGETS_RESET:
 			case SDL_EVENT_RENDER_DEVICE_RESET:
 			case SDL_EVENT_RENDER_DEVICE_LOST:
-				TodTrace("Graphics reset occurred during video playback; shutting down safely.\n");
-				willShutdown = true;
-				mIsPlayingVideo = false;
+				if (isUsingSDRPresentation && event.render.windowID == aVideoWindowId)
+				{
+					TodTrace("The auxiliary video renderer was reset; ending video playback safely.\n");
+					videoFailed = true;
+					mIsPlayingVideo = false;
+				}
+				else if (event.render.windowID == aMainWindowId)
+				{
+					TodTrace("The main graphics renderer reset during video playback; shutting down safely.\n");
+					willShutdown = true;
+					mIsPlayingVideo = false;
+				}
+				else
+				{
+					TodTrace(
+						"Ignoring a graphics reset for unrelated window %u during video playback.\n",
+						(unsigned int)event.render.windowID
+					);
+				}
+				break;
+			case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+				if (event.window.windowID == aMainWindowId)
+				{
+					willShutdown = true;
+					mIsPlayingVideo = false;
+				}
 				break;
 			case SDL_EVENT_WINDOW_FOCUS_GAINED:
-				mActive = true;
-				RehupFocus();
-				EnforceCursor();
+				if (event.window.windowID == aMainWindowId)
+				{
+					mActive = true;
+					RehupFocus();
+					EnforceCursor();
+				}
 				break;
 			case SDL_EVENT_WINDOW_FOCUS_LOST:
-				mActive = false;
-				RehupFocus();
+				if (event.window.windowID == aMainWindowId)
+				{
+					mActive = false;
+					RehupFocus();
+				}
+				break;
+			case SDL_EVENT_WINDOW_MOVED:
+			case SDL_EVENT_WINDOW_RESIZED:
+			case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+			case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
+			case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
+			case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
+			case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
+				if (isUsingSDRPresentation &&
+					event.window.windowID == aMainWindowId &&
+					event.window.timestamp >= anSDRPresentationReadyTimestamp)
+				{
+					TodTrace("The main window changed while the SDR video surface was active; ending video playback safely.\n");
+					mIsPlayingVideo = false;
+				}
 				break;
 			case SDL_EVENT_KEY_DOWN:
 			{
+				if (event.key.windowID != aMainWindowId && event.key.windowID != aVideoWindowId)
+					break;
 				mLastUserInputTick = mLastTimerTime;
 				if (mDebugKeysEnabled)
 				{
@@ -576,6 +834,8 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 				break;
 			}
 			case SDL_EVENT_KEY_UP:
+				if (event.key.windowID != aMainWindowId && event.key.windowID != aVideoWindowId)
+					break;
 				mLastUserInputTick = mLastTimerTime;
 				mWidgetManager->KeyUp(GetKeyCodeFromCodeSDL(event.key.key));
 				break;
@@ -786,11 +1046,13 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 	for (AVPacket*& aVideoPacket : videoPackets)
 		av_packet_free(&aVideoPacket);
 	
-	if (!SDL_SetRenderColorScale(mSDLRenderer, 1.0f))
+	if (!SDL_SetRenderColorScale(aVideoRenderer, 1.0f))
 		TodTrace("Video HDR paper-white cleanup failed: %s\n", SDL_GetError());
-	if (!SDL_SetRenderVSync(mSDLRenderer, havePreviousVsync ? previousVsync : (mEnableVsync ? 1 : 0)))
+	if (!isUsingSDRPresentation &&
+		!SDL_SetRenderVSync(aVideoRenderer, havePreviousVsync ? previousVsync : (mEnableVsync ? 1 : 0)))
 		TodTrace("Video VSync restore failed: %s\n", SDL_GetError());
 	SDL_DestroyTexture(texture);
+	anSDRPresentation.Destroy();
 	sws_freeContext(videoScaler);
 	av_free(bgraPixels);
 	SDL_DestroyAudioStream(audio_playback_stream);
@@ -1347,6 +1609,15 @@ bool LawnApp::UpdateAppStep(bool* updated)
 				case SDL_EVENT_RENDER_DEVICE_RESET:
 				case SDL_EVENT_RENDER_DEVICE_LOST:
 				{
+					const SDL_WindowID aMainWindowId = SDL_GetWindowID(mSDLWindow);
+					if (event.render.windowID != aMainWindowId)
+					{
+						TodTrace(
+							"Ignoring a graphics reset for auxiliary window %u.\n",
+							(unsigned int)event.render.windowID
+						);
+						break;
+					}
 					const char* aReason = event.type == SDL_EVENT_RENDER_DEVICE_LOST ? "lost" : "reset";
 					TodTrace("Graphics device %s; an orderly restart is required.\n", aReason);
 					SDL_ShowSimpleMessageBox(

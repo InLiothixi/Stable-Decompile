@@ -93,6 +93,8 @@ SDL_Cursor* LawnApp::mSDLNoCursor = nullptr;
 extern "C" {
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
+#include <libavutil/imgutils.h>
+#include <libswscale/swscale.h>
 }
 
 #include <SDL3_ttf/SDL_ttf.h>
@@ -102,25 +104,39 @@ bool LawnApp::mIsPlayingVideo = false;
 
 namespace
 {
-	SDL_Colorspace GetVideoColorspace(const AVCodecContext* theDecoder)
+	int GetVideoSwsColorspace(const AVFrame* theFrame, const AVCodecContext* theDecoder)
 	{
-		const bool isFullRange = theDecoder->color_range == AVCOL_RANGE_JPEG;
-		switch (theDecoder->colorspace)
+		const AVColorSpace aColorspace = theFrame->colorspace != AVCOL_SPC_UNSPECIFIED
+			? theFrame->colorspace
+			: theDecoder->colorspace;
+		switch (aColorspace)
 		{
 		case AVCOL_SPC_BT709:
-			return isFullRange ? SDL_COLORSPACE_BT709_FULL : SDL_COLORSPACE_BT709_LIMITED;
+			return SWS_CS_ITU709;
+		case AVCOL_SPC_FCC:
+			return SWS_CS_FCC;
 		case AVCOL_SPC_BT470BG:
 		case AVCOL_SPC_SMPTE170M:
+			return SWS_CS_ITU601;
 		case AVCOL_SPC_SMPTE240M:
-			return isFullRange ? SDL_COLORSPACE_BT601_FULL : SDL_COLORSPACE_BT601_LIMITED;
+			return SWS_CS_SMPTE240M;
 		case AVCOL_SPC_BT2020_NCL:
-			return isFullRange ? SDL_COLORSPACE_BT2020_FULL : SDL_COLORSPACE_BT2020_LIMITED;
+		case AVCOL_SPC_BT2020_CL:
+			return SWS_CS_BT2020;
 		default:
 			// Unspecified HD video is conventionally BT.709; SD video is BT.601.
-			if (theDecoder->width >= 720 || theDecoder->height >= 576)
-				return isFullRange ? SDL_COLORSPACE_BT709_FULL : SDL_COLORSPACE_BT709_LIMITED;
-			return isFullRange ? SDL_COLORSPACE_BT601_FULL : SDL_COLORSPACE_BT601_LIMITED;
+			return theFrame->width >= 720 || theFrame->height >= 576
+				? SWS_CS_ITU709
+				: SWS_CS_ITU601;
 		}
+	}
+
+	bool IsVideoFullRange(const AVFrame* theFrame, const AVCodecContext* theDecoder)
+	{
+		const AVColorRange aRange = theFrame->color_range != AVCOL_RANGE_UNSPECIFIED
+			? theFrame->color_range
+			: theDecoder->color_range;
+		return aRange == AVCOL_RANGE_JPEG;
 	}
 
 	SDL_Texture* CreateVideoTexture(
@@ -233,27 +249,13 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 	if (audio_playback_stream == nullptr)
 		TodTrace("Video audio device creation failed: %s. Continuing without audio.\n", SDL_GetError());
 
-	const SDL_Colorspace aVideoColorspace = GetVideoColorspace(video_decoder);
-	bool useNV12 = true;
 	SDL_Texture* texture = CreateVideoTexture(
 		mSDLRenderer,
-		SDL_PIXELFORMAT_NV12,
+		SDL_PIXELFORMAT_BGRA32,
 		video_decoder->width,
 		video_decoder->height,
-		aVideoColorspace
+		SDL_COLORSPACE_SRGB
 	);
-	if (texture == nullptr)
-	{
-		TodTrace("NV12 video texture creation failed: %s. Falling back to IYUV.\n", SDL_GetError());
-		useNV12 = false;
-		texture = CreateVideoTexture(
-			mSDLRenderer,
-			SDL_PIXELFORMAT_IYUV,
-			video_decoder->width,
-			video_decoder->height,
-			aVideoColorspace
-		);
-	}
 	if (texture == nullptr)
 	{
 		TodTrace("Video texture creation failed: %s\n", SDL_GetError());
@@ -273,6 +275,41 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 	if (!SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_LINEAR))
 		TodTrace("Video texture scale-mode setup failed: %s\n", SDL_GetError());
 
+	Uint8* bgraPlanes[4] = { nullptr, nullptr, nullptr, nullptr };
+	int bgraStrides[4] = { 0, 0, 0, 0 };
+	const int aBgraBufferSize = av_image_get_buffer_size(
+		AV_PIX_FMT_BGRA,
+		video_decoder->width,
+		video_decoder->height,
+		1
+	);
+	Uint8* bgraPixels = aBgraBufferSize > 0
+		? (Uint8*)av_malloc((size_t)aBgraBufferSize)
+		: nullptr;
+	if (bgraPixels == nullptr || av_image_fill_arrays(
+		bgraPlanes,
+		bgraStrides,
+		bgraPixels,
+		AV_PIX_FMT_BGRA,
+		video_decoder->width,
+		video_decoder->height,
+		1
+	) < 0)
+	{
+		TodTrace("Unable to allocate the video conversion buffer.\n");
+		av_free(bgraPixels);
+		SDL_DestroyTexture(texture);
+		SDL_DestroyAudioStream(audio_playback_stream);
+		av_frame_free(&frame);
+		av_packet_free(&packet);
+		avcodec_free_context(&audio_decoder);
+		avcodec_free_context(&video_decoder);
+		avformat_close_input(&format_context);
+		mIsPlayingVideo = false;
+		SDL_ShowCursor();
+		return false;
+	}
+
 	int previousVsync = mEnableVsync ? 1 : 0;
 	const bool havePreviousVsync = SDL_GetRenderVSync(mSDLRenderer, &previousVsync);
 	if (!SDL_SetRenderVSync(mSDLRenderer, 1))
@@ -285,9 +322,7 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 	const double timelineStartSeconds = format_context->start_time == AV_NOPTS_VALUE
 		? 0.0
 		: (double)format_context->start_time / AV_TIME_BASE;
-	std::vector<Uint8> nv12Pixels(
-		(size_t)video_decoder->width * (size_t)video_decoder->height * 3U / 2U
-	);
+	SwsContext* videoScaler = nullptr;
 	std::vector<AVPacket*> videoPackets;
 	if (video_stream->nb_frames > 0)
 		videoPackets.reserve((size_t)video_stream->nb_frames);
@@ -310,7 +345,7 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 				return true;
 		}
 
-		if (theFrame->format != AV_PIX_FMT_YUV420P ||
+		if (theFrame->format < 0 ||
 			theFrame->width != video_decoder->width ||
 			theFrame->height != video_decoder->height)
 		{
@@ -323,51 +358,63 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 			return false;
 		}
 
-		bool uploaded = false;
-		if (useNV12)
+		videoScaler = sws_getCachedContext(
+			videoScaler,
+			theFrame->width,
+			theFrame->height,
+			(AVPixelFormat)theFrame->format,
+			video_decoder->width,
+			video_decoder->height,
+			AV_PIX_FMT_BGRA,
+			SWS_BILINEAR,
+			nullptr,
+			nullptr,
+			nullptr
+		);
+		if (videoScaler == nullptr)
 		{
-			Uint8* aYPlane = nv12Pixels.data();
-			Uint8* anUVPlane = aYPlane + (size_t)video_decoder->width * (size_t)video_decoder->height;
-			for (int y = 0; y < video_decoder->height; y++)
-			{
-				std::memcpy(
-					aYPlane + (size_t)y * (size_t)video_decoder->width,
-					theFrame->data[0] + (ptrdiff_t)y * theFrame->linesize[0],
-					(size_t)video_decoder->width
-				);
-			}
-			for (int y = 0; y < video_decoder->height / 2; y++)
-			{
-				const Uint8* aURow = theFrame->data[1] + (ptrdiff_t)y * theFrame->linesize[1];
-				const Uint8* aVRow = theFrame->data[2] + (ptrdiff_t)y * theFrame->linesize[2];
-				Uint8* anUVRow = anUVPlane + (size_t)y * (size_t)video_decoder->width;
-				for (int x = 0; x < video_decoder->width / 2; x++)
-				{
-					anUVRow[x * 2] = aURow[x];
-					anUVRow[x * 2 + 1] = aVRow[x];
-				}
-			}
+			TodTrace("Unable to create the video pixel converter.\n");
+			return false;
+		}
 
-			uploaded = SDL_UpdateNVTexture(
-				texture,
-				nullptr,
-				aYPlane,
-				video_decoder->width,
-				anUVPlane,
-				video_decoder->width
-			);
-		}
-		else
+		const int* aColorCoefficients = sws_getCoefficients(GetVideoSwsColorspace(theFrame, video_decoder));
+		if (aColorCoefficients == nullptr || sws_setColorspaceDetails(
+			videoScaler,
+			aColorCoefficients,
+			IsVideoFullRange(theFrame, video_decoder) ? 1 : 0,
+			aColorCoefficients,
+			1,
+			0,
+			1 << 16,
+			1 << 16
+		) < 0)
 		{
-			uploaded = SDL_UpdateYUVTexture(
-				texture,
-				nullptr,
-				theFrame->data[0], theFrame->linesize[0],
-				theFrame->data[1], theFrame->linesize[1],
-				theFrame->data[2], theFrame->linesize[2]
-			);
+			TodTrace("Unable to configure the video color conversion.\n");
+			return false;
 		}
-		if (!uploaded)
+
+		const Uint8* aSourcePlanes[4] = {
+			theFrame->data[0],
+			theFrame->data[1],
+			theFrame->data[2],
+			theFrame->data[3]
+		};
+		const int aConvertedRows = sws_scale(
+			videoScaler,
+			aSourcePlanes,
+			theFrame->linesize,
+			0,
+			theFrame->height,
+			bgraPlanes,
+			bgraStrides
+		);
+		if (aConvertedRows != video_decoder->height)
+		{
+			TodTrace("Video pixel conversion failed after %d rows.\n", aConvertedRows);
+			return false;
+		}
+
+		if (!SDL_UpdateTexture(texture, nullptr, bgraPixels, bgraStrides[0]))
 		{
 			TodTrace("Video texture upload failed: %s\n", SDL_GetError());
 			return false;
@@ -744,6 +791,8 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 	if (!SDL_SetRenderVSync(mSDLRenderer, havePreviousVsync ? previousVsync : (mEnableVsync ? 1 : 0)))
 		TodTrace("Video VSync restore failed: %s\n", SDL_GetError());
 	SDL_DestroyTexture(texture);
+	sws_freeContext(videoScaler);
+	av_free(bgraPixels);
 	SDL_DestroyAudioStream(audio_playback_stream);
 	av_frame_free(&frame);
 	av_packet_free(&packet);

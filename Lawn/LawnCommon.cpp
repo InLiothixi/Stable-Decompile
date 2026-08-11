@@ -137,17 +137,23 @@ SexyString GetSavedGameName(GameMode theGameMode, int theProfileId)
 #endif
 }
 
-SexyString GetSavedGameName(GameMode theGameMode, int theProfileId, int theLevel)
+SexyString GetSavedGameNameForArchitecture(GameMode theGameMode, int theProfileId, int theLevel, bool theUse64BitSuffix)
 {
     SexyString aName = GetAppDataFolder();
     if (theGameMode == GameMode::GAMEMODE_ADVENTURE && theLevel != 0 && gLawnApp->mPlayerInfo->mLevel != theLevel)
         aName += StrFormat(_S("userdata\\game%d_%d_replay_%d"), theProfileId, (int)theGameMode, theLevel);
     else
         aName += StrFormat(_S("userdata\\game%d_%d"), theProfileId, (int)theGameMode);
+
+    return FinishSavedGameName(aName, theUse64BitSuffix);
+}
+
+SexyString GetSavedGameName(GameMode theGameMode, int theProfileId, int theLevel)
+{
 #ifdef _WIN64
-    return FinishSavedGameName(aName, true);
+    return GetSavedGameNameForArchitecture(theGameMode, theProfileId, theLevel, true);
 #else
-    return FinishSavedGameName(aName, false);
+    return GetSavedGameNameForArchitecture(theGameMode, theProfileId, theLevel, false);
 #endif
 }
 

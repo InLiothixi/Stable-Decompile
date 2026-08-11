@@ -216,8 +216,9 @@ namespace
 			SDL_PROP_RENDERER_OUTPUT_COLORSPACE_NUMBER,
 			SDL_COLORSPACE_UNKNOWN
 		);
-		return anOutputColorspace == SDL_COLORSPACE_SRGB_LINEAR &&
-			SDL_GetBooleanProperty(aRendererProperties, SDL_PROP_RENDERER_HDR_ENABLED_BOOLEAN, false);
+		// The scRGB swapchain needs the SDR compatibility surface even while the
+		// display's HDR state is transitioning or Windows HDR is temporarily off.
+		return anOutputColorspace == SDL_COLORSPACE_SRGB_LINEAR;
 	}
 
 	bool SDLCALL KeepEventsForOtherWindows(void* theUserData, SDL_Event* theEvent)
@@ -245,6 +246,7 @@ namespace
 			SDL_Window* theParent,
 			int theLogicalWidth,
 			int theLogicalHeight,
+			SDL_RendererLogicalPresentation theLogicalPresentation,
 			Uint8 theRed,
 			Uint8 theGreen,
 			Uint8 theBlue,
@@ -338,7 +340,7 @@ namespace
 				mRenderer,
 				theLogicalWidth,
 				theLogicalHeight,
-				SDL_LOGICAL_PRESENTATION_LETTERBOX
+				theLogicalPresentation
 			) ||
 				!SDL_SetRenderDrawColor(mRenderer, theRed, theGreen, theBlue, theAlpha) ||
 				!SDL_RenderClear(mRenderer) ||
@@ -391,40 +393,82 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 {
 	mIsPlayingVideo = true;
 
-	AVFormatContext* format_context = NULL;
-	const int ret = avformat_open_input(&format_context, url.c_str(), NULL, NULL);
-	if (ret < 0) 
+	AVFormatContext* format_context = nullptr;
+	AVCodecContext* video_decoder = nullptr;
+	AVCodecContext* audio_decoder = nullptr;
+	AVPacket* packet = nullptr;
+	AVFrame* frame = nullptr;
+	SDL_AudioStream* audio_playback_stream = nullptr;
+
+	auto failVideoSetup = [&](const char* theStage, int theError) -> bool
 	{
-		TodTrace("Video: %s is missing or corrupted!\n", url.c_str());
+		TodTrace("Video setup failed at %s (%d): %s\n", theStage, theError, url.c_str());
+		SDL_DestroyAudioStream(audio_playback_stream);
+		av_frame_free(&frame);
+		av_packet_free(&packet);
+		avcodec_free_context(&audio_decoder);
+		avcodec_free_context(&video_decoder);
+		avformat_close_input(&format_context);
 		mIsPlayingVideo = false;
 		return false;
-	}
+	};
 
-	SDL_HideCursor();
+	int ret = avformat_open_input(&format_context, url.c_str(), nullptr, nullptr);
+	if (ret < 0)
+		return failVideoSetup("opening input", ret);
+	ret = avformat_find_stream_info(format_context, nullptr);
+	if (ret < 0)
+		return failVideoSetup("reading stream information", ret);
 
-	const AVCodec* video_codec = NULL;
+	const AVCodec* video_codec = nullptr;
 	const int video_stream_index = av_find_best_stream(format_context, AVMEDIA_TYPE_VIDEO, -1, -1, &video_codec, 0);
+	if (video_stream_index < 0 || video_codec == nullptr)
+		return failVideoSetup("finding a video stream", video_stream_index);
 	const AVStream* video_stream = format_context->streams[video_stream_index];
+	if (video_stream == nullptr || video_stream->codecpar == nullptr)
+		return failVideoSetup("reading video stream parameters", AVERROR_INVALIDDATA);
 
-	const AVCodec* audio_codec = NULL;
-	const int  audio_stream_index = av_find_best_stream(format_context, AVMEDIA_TYPE_AUDIO, -1, video_stream_index, &audio_codec, 0);
+	const AVCodec* audio_codec = nullptr;
+	const int audio_stream_index = av_find_best_stream(format_context, AVMEDIA_TYPE_AUDIO, -1, video_stream_index, &audio_codec, 0);
+	if (audio_stream_index < 0 || audio_codec == nullptr)
+		return failVideoSetup("finding an audio stream", audio_stream_index);
 	const AVStream* audio_stream = format_context->streams[audio_stream_index];
+	if (audio_stream == nullptr || audio_stream->codecpar == nullptr)
+		return failVideoSetup("reading audio stream parameters", AVERROR_INVALIDDATA);
 
-	AVCodecContext* video_decoder = avcodec_alloc_context3(video_codec);
+	video_decoder = avcodec_alloc_context3(video_codec);
+	if (video_decoder == nullptr)
+		return failVideoSetup("allocating the video decoder", AVERROR(ENOMEM));
 	video_decoder->thread_count = 0;
-	avcodec_parameters_to_context(video_decoder, video_stream->codecpar);
-	avcodec_open2(video_decoder, video_codec, NULL);
+	ret = avcodec_parameters_to_context(video_decoder, video_stream->codecpar);
+	if (ret < 0)
+		return failVideoSetup("copying video parameters", ret);
+	ret = avcodec_open2(video_decoder, video_codec, nullptr);
+	if (ret < 0)
+		return failVideoSetup("opening the video decoder", ret);
+	if (video_decoder->width <= 0 || video_decoder->height <= 0)
+		return failVideoSetup("validating video dimensions", AVERROR_INVALIDDATA);
 
-	AVCodecContext* audio_decoder = avcodec_alloc_context3(audio_codec);
+	audio_decoder = avcodec_alloc_context3(audio_codec);
+	if (audio_decoder == nullptr)
+		return failVideoSetup("allocating the audio decoder", AVERROR(ENOMEM));
 	audio_decoder->thread_count = 0;
-	avcodec_parameters_to_context(audio_decoder, audio_stream->codecpar);
-	avcodec_open2(audio_decoder, audio_codec, NULL);
+	ret = avcodec_parameters_to_context(audio_decoder, audio_stream->codecpar);
+	if (ret < 0)
+		return failVideoSetup("copying audio parameters", ret);
+	ret = avcodec_open2(audio_decoder, audio_codec, nullptr);
+	if (ret < 0)
+		return failVideoSetup("opening the audio decoder", ret);
+	if (audio_decoder->ch_layout.nb_channels <= 0 || audio_decoder->sample_rate <= 0)
+		return failVideoSetup("validating audio parameters", AVERROR_INVALIDDATA);
 
-	AVPacket* packet = av_packet_alloc();
-	AVFrame* frame = av_frame_alloc();
+	packet = av_packet_alloc();
+	frame = av_frame_alloc();
+	if (packet == nullptr || frame == nullptr)
+		return failVideoSetup("allocating decode buffers", AVERROR(ENOMEM));
 
 	SDL_AudioSpec audio_spec = { SDL_AUDIO_F32, audio_decoder->ch_layout.nb_channels, audio_decoder->sample_rate };
-	SDL_AudioStream* audio_playback_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &audio_spec, NULL, NULL);
+	audio_playback_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &audio_spec, nullptr, nullptr);
 	if (audio_playback_stream == nullptr)
 		TodTrace("Video audio device creation failed: %s. Continuing without audio.\n", SDL_GetError());
 
@@ -432,23 +476,27 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 	SDL_Renderer* aVideoRenderer = mSDLRenderer;
 	if (ShouldUseSDRVideoPresentation(mSDLRenderer))
 	{
-		if (anSDRPresentation.Create(
+		const SDL_RendererLogicalPresentation aPresentationMode = mUseIntegerScaling
+			? SDL_LOGICAL_PRESENTATION_INTEGER_SCALE
+			: SDL_LOGICAL_PRESENTATION_LETTERBOX;
+		if (!anSDRPresentation.Create(
 			mSDLWindow,
 			mWidth,
 			mHeight,
+			aPresentationMode,
 			bgColor.mRed,
 			bgColor.mGreen,
 			bgColor.mBlue,
 			bgColor.mAlpha
 		))
 		{
-			aVideoRenderer = anSDRPresentation.mRenderer;
+			TodTrace("Video SDR compatibility presentation is unavailable; skipping playback safely.\n");
+			return failVideoSetup("creating the SDR compatibility presentation", AVERROR_EXTERNAL);
 		}
-		else
-		{
-			TodTrace("Video SDR compatibility presentation is unavailable; using the main renderer.\n");
-		}
+		aVideoRenderer = anSDRPresentation.mRenderer;
 	}
+
+	SDL_HideCursor();
 	const bool isUsingSDRPresentation = aVideoRenderer == anSDRPresentation.mRenderer &&
 		anSDRPresentation.mRenderer != nullptr;
 	// MakeWindow and popup synchronization can leave startup geometry events in
@@ -727,6 +775,30 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 				{
 					mActive = false;
 					RehupFocus();
+				}
+				break;
+			case SDL_EVENT_WINDOW_MINIMIZED:
+				if (event.window.windowID == aMainWindowId)
+				{
+					mMinimized = true;
+					mPhysMinimized = true;
+				}
+				break;
+			case SDL_EVENT_WINDOW_RESTORED:
+				if (event.window.windowID == aMainWindowId)
+				{
+					mMinimized = false;
+					mPhysMinimized = false;
+					ClearUpdateBacklog();
+					mWidgetManager->MarkAllDirty();
+					mHasPendingDraw = true;
+				}
+				break;
+			case SDL_EVENT_WINDOW_EXPOSED:
+				if (event.window.windowID == aMainWindowId)
+				{
+					mWidgetManager->MarkAllDirty();
+					mHasPendingDraw = true;
 				}
 				break;
 			case SDL_EVENT_WINDOW_MOVED:
@@ -2398,7 +2470,7 @@ static bool ShouldAbortNewGameAfterLoad(LawnApp* theApp, SaveGameLoadStatus theL
 		return false;
 
 	theApp->DoDialog(Dialogs::DIALOG_INFO, true, _S("Unable to Load Save"),
-		_S("The existing in-progress save could not be loaded or moved to a safe backup. It has been left unchanged. Check the file permissions or move the save manually before trying again."),
+		_S("The existing in-progress save could not be loaded or moved safely. It has been left unchanged. Check the file permissions or move the save manually before trying again."),
 		_S("[OK_LABEL]"), Dialog::BUTTONS_FOOTER);
 	return true;
 }
@@ -2477,7 +2549,26 @@ void LawnApp::StartPlaying()
 bool LawnApp::SaveFileExists()
 {
 	SexyString aFileName = GetSavedGameName(GameMode::GAMEMODE_ADVENTURE, mPlayerInfo->mId);
-	return this->FileExists(aFileName);
+	bool aSaveExists = this->FileExists(aFileName);
+#ifdef _WIN64
+	if (!aSaveExists)
+	{
+		const SexyString aLegacyFileName = GetSavedGameNameForArchitecture(
+			GameMode::GAMEMODE_ADVENTURE, mPlayerInfo->mId, false);
+		const LegacySaveMigrationStatus aMigrationStatus = TryMigrateLegacyX64Save(aLegacyFileName, aFileName);
+		if (aMigrationStatus == LegacySaveMigrationStatus::MIGRATED)
+			aSaveExists = true;
+		else if (aMigrationStatus == LegacySaveMigrationStatus::TARGET_PRESENT)
+			aSaveExists = true; // Preserve an existing target even if it is temporarily unreadable.
+		else if (aMigrationStatus == LegacySaveMigrationStatus::USE_LEGACY_PATH)
+			aSaveExists = true; // The source passed the complete x64 discriminator probe.
+		else if (aMigrationStatus == LegacySaveMigrationStatus::PROBE_FAILED)
+			aSaveExists = true; // Keep Continue visible so TryLoadGame can explain the recoverable error.
+		else
+			aSaveExists = this->FileExists(aFileName); // Handle a target created during the probe.
+	}
+#endif
+	return aSaveExists;
 }
 
 //0x44F7A0
@@ -2489,9 +2580,46 @@ SaveGameLoadStatus LawnApp::TryLoadGame()
 SaveGameLoadStatus LawnApp::TryLoadGame(int theLevel)
 {
 	SexyString aSaveName = GetSavedGameName(mGameMode, mPlayerInfo->mId, theLevel);
+	bool aSaveExists = this->FileExists(aSaveName);
+#ifdef _WIN64
+	if (!aSaveExists)
+	{
+		const SexyString aLegacySaveName = GetSavedGameNameForArchitecture(
+			mGameMode, mPlayerInfo->mId, theLevel, false);
+		const LegacySaveMigrationStatus aMigrationStatus = TryMigrateLegacyX64Save(aLegacySaveName, aSaveName);
+		if (aMigrationStatus == LegacySaveMigrationStatus::MIGRATED)
+			aSaveExists = true;
+		else if (aMigrationStatus == LegacySaveMigrationStatus::TARGET_PRESENT)
+		{
+			aSaveExists = this->FileExists(aSaveName);
+			if (!aSaveExists)
+			{
+				mMusic->StopAllMusic();
+				return SaveGameLoadStatus::REJECTED_UNPRESERVED;
+			}
+		}
+		else if (aMigrationStatus == LegacySaveMigrationStatus::USE_LEGACY_PATH)
+		{
+			aSaveName = aLegacySaveName;
+			aSaveExists = this->FileExists(aSaveName);
+			if (!aSaveExists)
+			{
+				mMusic->StopAllMusic();
+				return SaveGameLoadStatus::REJECTED_UNPRESERVED;
+			}
+		}
+		else if (aMigrationStatus == LegacySaveMigrationStatus::PROBE_FAILED)
+		{
+			mMusic->StopAllMusic();
+			return SaveGameLoadStatus::REJECTED_UNPRESERVED;
+		}
+		else
+			aSaveExists = this->FileExists(aSaveName); // Handle a target created during the probe.
+	}
+#endif
 	mMusic->StopAllMusic();
 
-	if (this->FileExists(aSaveName))
+	if (aSaveExists)
 	{
 		MakeNewBoard();
 		SaveGameLoadStatus aLoadStatus = mBoard->LoadGame(aSaveName);

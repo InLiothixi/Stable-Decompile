@@ -1,5 +1,6 @@
 #include "DataSync.h"
 #include "PlayerInfo.h"
+#include "SaveGame.h"
 #include "../LawnCommon.h"
 #include "../Widget/ChallengeScreen.h"
 #include "../../Sexy.TodLib/TodDebug.h"
@@ -160,6 +161,11 @@ void PlayerInfo::DeleteUserFiles()
 		gSexyAppBase->EraseFile(GetSavedGameNameForArchitecture((GameMode)i, mId, false));
 		gSexyAppBase->EraseFile(GetSavedGameNameForArchitecture((GameMode)i, mId, true));
 	}
+
+	// Explicit deletion (including automatic oldest-profile pruning) removes all
+	// replay saves and numbered rejected backups for both architectures. The
+	// helper validates the complete filename grammar before deleting a match.
+	DeleteSaveGameArtifactsForProfile(mId);
 }
 
 //0x469940

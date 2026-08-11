@@ -35,6 +35,15 @@ enum class SaveGameLoadStatus
     REJECTED_UNPRESERVED
 };
 
+enum class LegacySaveMigrationStatus
+{
+    NOT_APPLICABLE,
+    TARGET_PRESENT,
+    MIGRATED,
+    USE_LEGACY_PATH,
+    PROBE_FAILED
+};
+
 class SaveGameContext
 {
 public:
@@ -62,5 +71,7 @@ void                SyncBoard(SaveGameContext& theContext, Board* theBoard);
 void				FixBoardAfterLoad(Board* theBoard);
 SaveGameLoadStatus  LawnLoadGame(Board* theBoard, const SexyString& theFilePath);
 bool				LawnSaveGame(Board* theBoard, const SexyString& theFilePath);
+LegacySaveMigrationStatus TryMigrateLegacyX64Save(const SexyString& theLegacyFilePath, const SexyString& theX64FilePath);
+void                DeleteSaveGameArtifactsForProfile(int theProfileId);
 
 #endif

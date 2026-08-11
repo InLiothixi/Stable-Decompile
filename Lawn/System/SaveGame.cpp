@@ -34,6 +34,198 @@ static unsigned int SAVE_FILE_DATE = crc32(0, (Bytef*)FILE_COMPILE_TIME_STRING, 
 static unsigned int SAVE_FILE_DATE2 = crc32(0, (Bytef*)FILE_COMPILE_TIME_STRING2, strlen(FILE_COMPILE_TIME_STRING2));
 #endif
 
+static bool IsSupportedSaveFileHeader(const SaveFileHeader& theHeader)
+{
+	if (theHeader.mMagicNumber != SAVE_FILE_MAGIC_NUMBER || theHeader.mBuildVersion != SAVE_FILE_VERSION)
+		return false;
+
+	if (theHeader.mBuildDate == SAVE_FILE_DATE)
+		return true;
+#ifdef _GOTY
+	if (theHeader.mBuildDate == SAVE_FILE_DATE2)
+		return true;
+#endif
+	return false;
+}
+
+// The original serializer writes raw class tails, so an x64 save cannot be
+// loaded by Win32. Earlier x64 fork builds nevertheless used the Win32 file
+// name. The first raw block has a stored byte count that is deterministic for
+// each ABI and can be checked without deserializing any pointers. The supported
+// upstream layouts record 22431 bytes on Win32 and 22435 bytes on x64.
+static const unsigned int LEGACY_X64_BOARD_BLOCK_SIZE = 22435U;
+
+LegacySaveMigrationStatus TryMigrateLegacyX64Save(const SexyString& theLegacyFilePath, const SexyString& theX64FilePath)
+{
+#ifndef _WIN64
+	(void)theLegacyFilePath;
+	(void)theX64FilePath;
+	return LegacySaveMigrationStatus::NOT_APPLICABLE;
+#else
+	// Feature-flagged/modded Board layouts are valid builds, but they must not
+	// claim compatibility with saves from this known x64 raw layout.
+	if (sizeof(Board) - offsetof(Board, mPaused) != LEGACY_X64_BOARD_BLOCK_SIZE)
+		return LegacySaveMigrationStatus::NOT_APPLICABLE;
+
+	// Never replace an x64-named save, even if another process creates it while
+	// this probe is running.
+#ifdef _USE_WIDE_STRING
+	const DWORD aTargetAttributes = GetFileAttributesW(theX64FilePath.c_str());
+#else
+	const DWORD aTargetAttributes = GetFileAttributesA(theX64FilePath.c_str());
+#endif
+	if (aTargetAttributes != INVALID_FILE_ATTRIBUTES)
+		return LegacySaveMigrationStatus::TARGET_PRESENT;
+
+	const DWORD aTargetError = GetLastError();
+	if (aTargetError != ERROR_FILE_NOT_FOUND && aTargetError != ERROR_PATH_NOT_FOUND)
+	{
+		TodTrace("Could not inspect architecture-specific save path: filesystem error %lu", aTargetError);
+		return LegacySaveMigrationStatus::PROBE_FAILED;
+	}
+
+#ifdef _USE_WIDE_STRING
+	HANDLE aFile = CreateFileW(theLegacyFilePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
+		OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+#else
+	HANDLE aFile = CreateFileA(theLegacyFilePath.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,
+		OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+#endif
+	if (aFile == INVALID_HANDLE_VALUE)
+	{
+		const DWORD anError = GetLastError();
+		if (anError == ERROR_FILE_NOT_FOUND || anError == ERROR_PATH_NOT_FOUND)
+			return LegacySaveMigrationStatus::NOT_APPLICABLE;
+
+		TodTrace("Could not inspect legacy unsuffixed save: filesystem error %lu", anError);
+		return LegacySaveMigrationStatus::PROBE_FAILED;
+	}
+
+	unsigned int aProbe[5] = {};
+	DWORD aBytesRead = 0;
+	const BOOL aReadSucceeded = ReadFile(aFile, aProbe, sizeof(aProbe), &aBytesRead, nullptr);
+	CloseHandle(aFile);
+
+	if (!aReadSucceeded || aBytesRead != sizeof(aProbe))
+	{
+		TodTrace("Could not inspect complete legacy unsuffixed save header");
+		return LegacySaveMigrationStatus::PROBE_FAILED;
+	}
+
+	SaveFileHeader aHeader = { aProbe[1], aProbe[2], aProbe[3] };
+	if (aProbe[0] != sizeof(SaveFileHeader) || !IsSupportedSaveFileHeader(aHeader) ||
+		aProbe[4] != LEGACY_X64_BOARD_BLOCK_SIZE)
+	{
+		return LegacySaveMigrationStatus::NOT_APPLICABLE;
+	}
+
+#ifdef _USE_WIDE_STRING
+	const BOOL aMoved = MoveFileW(theLegacyFilePath.c_str(), theX64FilePath.c_str());
+#else
+	const BOOL aMoved = MoveFileA(theLegacyFilePath.c_str(), theX64FilePath.c_str());
+#endif
+	if (aMoved)
+	{
+		TodTrace("Migrated legacy unsuffixed x64 save");
+		return LegacySaveMigrationStatus::MIGRATED;
+	}
+
+	const DWORD anError = GetLastError();
+	if (anError == ERROR_FILE_EXISTS || anError == ERROR_ALREADY_EXISTS)
+		return LegacySaveMigrationStatus::TARGET_PRESENT;
+	if (anError == ERROR_FILE_NOT_FOUND || anError == ERROR_PATH_NOT_FOUND)
+		return LegacySaveMigrationStatus::NOT_APPLICABLE;
+
+	// The name is not part of the serialized data. If renaming is denied, the
+	// caller can safely load this positively identified x64 save in place. The
+	// next normal save writes the architecture-specific path while this source
+	// remains untouched as a recovery copy.
+	TodTrace("Could not rename legacy unsuffixed x64 save; using it in place: filesystem error %lu", anError);
+	return LegacySaveMigrationStatus::USE_LEGACY_PATH;
+#endif
+}
+
+static bool ConsumeUnsignedNumber(const SexyString& theText, SexyString::size_type& thePosition)
+{
+	const SexyString::size_type aStart = thePosition;
+	while (thePosition < theText.length() && theText[thePosition] >= _S('0') && theText[thePosition] <= _S('9'))
+		thePosition++;
+	return thePosition > aStart;
+}
+
+static bool ConsumeLiteral(const SexyString& theText, SexyString::size_type& thePosition, const SexyString& theLiteral)
+{
+	if (theText.compare(thePosition, theLiteral.length(), theLiteral) != 0)
+		return false;
+	thePosition += theLiteral.length();
+	return true;
+}
+
+static bool IsProfileSaveGameArtifactName(const SexyString& theFileName, const SexyString& theProfilePrefix)
+{
+	if (theFileName.compare(0, theProfilePrefix.length(), theProfilePrefix) != 0)
+		return false;
+
+	SexyString::size_type aPosition = theProfilePrefix.length();
+	if (!ConsumeUnsignedNumber(theFileName, aPosition))
+		return false;
+
+	const SexyString aReplayMarker = _S("_replay_");
+	if (theFileName.compare(aPosition, aReplayMarker.length(), aReplayMarker) == 0)
+	{
+		aPosition += aReplayMarker.length();
+		if (!ConsumeUnsignedNumber(theFileName, aPosition))
+			return false;
+	}
+
+	const SexyString anX64Marker = _S("_x64");
+	if (theFileName.compare(aPosition, anX64Marker.length(), anX64Marker) == 0)
+		aPosition += anX64Marker.length();
+
+	if (!ConsumeLiteral(theFileName, aPosition, _S(".dat")))
+		return false;
+	if (aPosition == theFileName.length())
+		return true;
+
+	if (!ConsumeLiteral(theFileName, aPosition, _S(".rejected")))
+		return false;
+	if (aPosition == theFileName.length())
+		return true;
+	if (!ConsumeLiteral(theFileName, aPosition, _S(".")) || !ConsumeUnsignedNumber(theFileName, aPosition))
+		return false;
+	return aPosition == theFileName.length();
+}
+
+void DeleteSaveGameArtifactsForProfile(int theProfileId)
+{
+	const SexyString aUserDataFolder = GetAppDataFolder() + _S("userdata\\");
+	const SexyString aProfilePrefix = StrFormat(_S("game%d_"), theProfileId);
+	const SexyString aPattern = aUserDataFolder + aProfilePrefix + _S("*");
+
+#ifdef _USE_WIDE_STRING
+	WIN32_FIND_DATAW aFindData;
+	HANDLE aFindHandle = FindFirstFileW(aPattern.c_str(), &aFindData);
+#else
+	WIN32_FIND_DATAA aFindData;
+	HANDLE aFindHandle = FindFirstFileA(aPattern.c_str(), &aFindData);
+#endif
+	if (aFindHandle == INVALID_HANDLE_VALUE)
+		return;
+
+	do
+	{
+		const SexyString aFileName = aFindData.cFileName;
+		if (!(aFindData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) && IsProfileSaveGameArtifactName(aFileName, aProfilePrefix))
+			gSexyAppBase->EraseFile(aUserDataFolder + aFileName);
+#ifdef _USE_WIDE_STRING
+	} while (FindNextFileW(aFindHandle, &aFindData));
+#else
+	} while (FindNextFileA(aFindHandle, &aFindData));
+#endif
+
+	FindClose(aFindHandle);
+}
+
 static bool QuarantineRejectedSave(const SexyString& theFilePath, const char* theReason)
 {
 	// PreNewGame replaces a save after a failed load. Move rejected data out of that
@@ -557,11 +749,7 @@ SaveGameLoadStatus LawnLoadGame(Board* theBoard, const SexyString& theFilePath)
 
 	SaveFileHeader aHeader;
 	aContext.SyncBytes(&aHeader, sizeof(aHeader));
-	if (aHeader.mMagicNumber != SAVE_FILE_MAGIC_NUMBER || aHeader.mBuildVersion != SAVE_FILE_VERSION || aHeader.mBuildDate != SAVE_FILE_DATE
-#ifdef GOTY
-		&& aHeader.mBuildDate != SAVE_FILE_DATE2
-#endif
-		)
+	if (!IsSupportedSaveFileHeader(aHeader))
 	{
 		return QuarantineRejectedSave(theFilePath, "incompatible header")
 			? SaveGameLoadStatus::REJECTED_PRESERVED

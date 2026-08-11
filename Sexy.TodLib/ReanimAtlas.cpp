@@ -4,6 +4,7 @@
 #include "ReanimAtlas.h"
 #include "../SexyAppFramework/PerfTimer.h"
 #include "../SexyAppFramework/MemoryImage.h"
+#include <functional>
 
 //0x470250
 ReanimAtlas::ReanimAtlas()
@@ -68,7 +69,7 @@ bool sSortByNonIncreasingHeight(const ReanimAtlasImage& image1, const ReanimAtla
 	else if (image1.mWidth != image2.mWidth)
 		return image1.mWidth > image2.mWidth;
 	else
-		return (unsigned int)&image1 > (unsigned int)&image2;
+		return std::less<Image*>()(image2.mOriginalImage, image1.mOriginalImage);
 }
 
 static int GetClosestPowerOf2Above(int theNum)
@@ -247,7 +248,7 @@ void ReanimAtlas::ReanimAtlasCreate(ReanimatorDefinition* theReanimDef)
 			{
 				int aImageIndex = FindImage(aImage);
 				TOD_ASSERT(aImageIndex >= 0);
-				aImage = (Image*)(aImageIndex + 1);  // ★ 将图片在数组中的序号作为 Image* 修改动画定义
+				aImage = reinterpret_cast<Image*>(static_cast<intptr_t>(aImageIndex + 1));  // ★ 将图片在数组中的序号作为 Image* 修改动画定义
 			}
 		}
 	}

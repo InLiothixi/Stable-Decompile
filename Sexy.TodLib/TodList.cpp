@@ -65,9 +65,9 @@ bool TodAllocator::IsPointerFromAllocator(void* theItem)
 	size_t aBlockSize = mGrowCount * mItemSize;  // 每次“Grow”的内存大小，即每个区块的内存大小
 	for (void* aPtr = mBlockList; aPtr != nullptr; aPtr = *(void**)aPtr)
 	{
-		uint aItemPtr = (uint)theItem;
+		uintptr_t aItemPtr = reinterpret_cast<uintptr_t>(theItem);
 		// 区块的首个四字节为额外申请的、用于存储指向下一区块的指针的区域
-		uint aBlockPtr = (uint)aPtr + sizeof(void*);
+		uintptr_t aBlockPtr = reinterpret_cast<uintptr_t>(aPtr) + sizeof(void*);
 		// 判断 theItem 是否位于当前区块内且指向某一项的区域的起始地址
 		if (aItemPtr >= aBlockPtr && aItemPtr < aBlockPtr + aBlockSize && (aItemPtr - aBlockPtr) % mItemSize == 0)
 			return true;

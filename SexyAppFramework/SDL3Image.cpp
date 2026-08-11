@@ -22,6 +22,33 @@ Uint32  SDL3Image::GetBlendMode(SDL_BlendModes theDrawMode)
     }
 }
 
+SDL_Texture* SDL3Image::CreateRenderTarget(SDL_Renderer* theRenderer, int theWidth, int theHeight)
+{
+    SDL_Colorspace aTargetColorspace = SDL_COLORSPACE_SRGB;
+    SDL_PropertiesID aRendererProperties = SDL_GetRendererProperties(theRenderer);
+    SDL_Colorspace anOutputColorspace = (SDL_Colorspace)SDL_GetNumberProperty(
+        aRendererProperties,
+        SDL_PROP_RENDERER_OUTPUT_COLORSPACE_NUMBER,
+        SDL_COLORSPACE_UNKNOWN
+    );
+    if (anOutputColorspace == SDL_COLORSPACE_SRGB_LINEAR)
+        aTargetColorspace = SDL_COLORSPACE_SRGB_LINEAR;
+
+    SDL_PropertiesID aProperties = SDL_CreateProperties();
+    if (aProperties == 0)
+        return nullptr;
+
+    SDL_SetNumberProperty(aProperties, SDL_PROP_TEXTURE_CREATE_FORMAT_NUMBER, SDL_PIXELFORMAT_ARGB8888);
+    SDL_SetNumberProperty(aProperties, SDL_PROP_TEXTURE_CREATE_ACCESS_NUMBER, SDL_TEXTUREACCESS_TARGET);
+    SDL_SetNumberProperty(aProperties, SDL_PROP_TEXTURE_CREATE_WIDTH_NUMBER, theWidth);
+    SDL_SetNumberProperty(aProperties, SDL_PROP_TEXTURE_CREATE_HEIGHT_NUMBER, theHeight);
+    SDL_SetNumberProperty(aProperties, SDL_PROP_TEXTURE_CREATE_COLORSPACE_NUMBER, aTargetColorspace);
+
+    SDL_Texture* aTexture = SDL_CreateTextureWithProperties(theRenderer, aProperties);
+    SDL_DestroyProperties(aProperties);
+    return aTexture;
+}
+
 SDL_Texture* Sexy::SDL3Image::GetTexture(Image* image)
 {
     if (auto memoryImage = dynamic_cast<MemoryImage*>(image))
@@ -50,6 +77,7 @@ SDL3Image::~SDL3Image()
     if ((SDL_Texture*)mD3DData)
     {
         SDL_DestroyTexture((SDL_Texture*)mD3DData);
+        mD3DData = nullptr;
     }
 }
 

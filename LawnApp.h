@@ -163,6 +163,8 @@ public:
 
 	int								mPlayerLevelRef;
 	bool                            mEnableFPS;
+	bool							mEnableNativeHDR;
+	bool							mNativeHDRRenderer;
 
 public:
 	LawnApp();
@@ -373,6 +375,7 @@ public:
 	void							DoMoreSettingsDialog();
 	void							KillMoreSettingsDialog();
 	void							MakeWindow();
+	bool							IsNativeHDRActive() const;
 	bool							DrawDirtyStuff();
 	void							Redraw(Rect* theClipRect);
 	bool							UpdateAppStep(bool* updated);

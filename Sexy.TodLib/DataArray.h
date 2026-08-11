@@ -112,7 +112,7 @@ public:
 			aItem++;
 
 		DataArray<T>::DataArrayItem* aLast = &mBlock[mMaxUsedCount];
-		while ((unsigned int)aItem < (unsigned int)aLast)
+		while (aItem < aLast)
 		{
 			if (aItem->mID & DATA_ARRAY_KEY_MASK)
 			{

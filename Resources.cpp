@@ -1,4 +1,5 @@
 #include <map>
+#include <cstdint>
 #include "Resources.h"
 #include "SexyAppFramework/ResourceManager.h"
 #include "GameConstants.h"
@@ -3167,23 +3168,24 @@ Sexy::ResourceId Sexy::GetIdByFont(Font* theFont)
 
 Sexy::ResourceId Sexy::GetIdBySound(int theSound)
 {
-	return GetIdByVariable((void*)theSound);
+	return GetIdByVariable(reinterpret_cast<void*>(static_cast<intptr_t>(theSound)));
 }
 
 //0x47FBC0
 Sexy::ResourceId Sexy::GetIdByVariable(void* theVariable)
 {
-	static std::map<int, int> aMap;
+	using ResourceKey = uint32_t;
+	static std::map<ResourceKey, int> aMap;
 
 	if (gNeedRecalcVariableToIdMap)
 	{
 		gNeedRecalcVariableToIdMap = false;
 		aMap.clear();
 		for (int i = 0; i < (int)ResourceId::RESOURCE_ID_MAX; i++)
-			aMap[*(int*)gResources[i]] = i;
+			aMap[static_cast<ResourceKey>(*(int*)gResources[i])] = i;
 	}
 
-	auto anIter = aMap.find((int)theVariable);
+	auto anIter = aMap.find(static_cast<ResourceKey>(reinterpret_cast<uintptr_t>(theVariable)));
 	return anIter == aMap.end() ? ResourceId::RESOURCE_ID_MAX : (ResourceId)anIter->second;
 }
 /*

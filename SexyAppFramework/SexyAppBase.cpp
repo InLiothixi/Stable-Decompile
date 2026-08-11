@@ -477,11 +477,7 @@ SexyAppBase::~SexyAppBase()
 	{
 		HWND aWindow = mInvisHWnd;
 		mInvisHWnd = NULL;
-#ifdef _WIN64
-		SetWindowLong(aWindow, GWLP_USERDATA, NULL);
-#else
-		SetWindowLong(aWindow, GWL_USERDATA, NULL);
-#endif
+		SetWindowLongPtr(aWindow, GWLP_USERDATA, 0);
 		DestroyWindow(aWindow);
 	}	
 	
@@ -507,13 +503,9 @@ SexyAppBase::~SexyAppBase()
 	{
 		HWND aWindow = mHWnd;
 		mHWnd = NULL;
-#ifdef _WIN64
-		SetWindowLong(aWindow, GWLP_USERDATA, NULL);
-#else 
-		SetWindowLong(aWindow, GWL_USERDATA, NULL);
-#endif
+		SetWindowLongPtr(aWindow, GWLP_USERDATA, 0);
 		char aStr[256];
-		sprintf(aStr, "HWND: %d\r\n", aWindow);
+		sprintf(aStr, "HWND: %p\r\n", static_cast<void*>(aWindow));
 		TodTrace(aStr);
 				
 		DestroyWindow(aWindow);
@@ -1108,7 +1100,7 @@ bool SexyAppBase::OpenURL(const SexyString& theURL, bool shutdownOnOpen)
 		mOpeningURL = theURL;
 		mOpeningURLTime = GetTickCount();		
 
-		if ((int) ShellExecute(NULL, _S("open"), theURL.c_str(), NULL, NULL, SW_SHOWNORMAL) > 32)
+		if (reinterpret_cast<INT_PTR>(ShellExecute(NULL, _S("open"), theURL.c_str(), NULL, NULL, SW_SHOWNORMAL)) > 32)
 		{
 			return true;
 		}
@@ -1234,7 +1226,12 @@ void SexyAppBase::TakeScreenshot()
 
 	SexyString anImageName = anImageDir + anImagePrefix + StrFormat("%d.png",aMaxId+1).c_str();
 
+	SDL_Texture* anOldRenderTarget = SDL_GetRenderTarget(LawnApp::mSDLRenderer);
+	SDL_Texture* aScreenTexture = (SDL_Texture*)mWidgetManager->mImage->mD3DData;
+	if (aScreenTexture != nullptr && !SDL_SetRenderTarget(LawnApp::mSDLRenderer, aScreenTexture))
+		return;
 	SDL_Surface* surface = SDL_RenderReadPixels(LawnApp::mSDLRenderer, NULL);
+	SDL_SetRenderTarget(LawnApp::mSDLRenderer, anOldRenderTarget);
 	if (!surface) return;
 	std::thread([surface, anImageName]() {
 		SDL_SavePNG(surface, anImageName.c_str());
@@ -2472,10 +2469,16 @@ static void CalculateFPS()
 		gFPSImage = new SDL3Image(LawnApp::mSDLRenderer);
 		gFPSImage->mWidth = 55;
 		gFPSImage->mHeight = gFPSFont->GetHeight() + 4;
-		gFPSImage->mD3DData = SDL_CreateTexture(LawnApp::mSDLRenderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, gFPSImage->mWidth, gFPSImage->mHeight);
+		gFPSImage->mD3DData = SDL3Image::CreateRenderTarget(LawnApp::mSDLRenderer, gFPSImage->mWidth, gFPSImage->mHeight);
 		SDL_SetTextureBlendMode((SDL_Texture*)gFPSImage->mD3DData, SDL_BLENDMODE_BLEND);
+		SDL_Texture* anInitialRenderTarget = SDL_GetRenderTarget(LawnApp::mSDLRenderer);
+		SDL_SetRenderTarget(LawnApp::mSDLRenderer, (SDL_Texture*)gFPSImage->mD3DData);
+		SDL_SetRenderDrawColor(LawnApp::mSDLRenderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+		SDL_RenderClear(LawnApp::mSDLRenderer);
+		SDL_SetRenderTarget(LawnApp::mSDLRenderer, anInitialRenderTarget);
 	}
 
+	SDL_Texture* anOldRenderTarget = SDL_GetRenderTarget(LawnApp::mSDLRenderer);
 	SDL_SetRenderTarget(LawnApp::mSDLRenderer, (SDL_Texture*)gFPSImage->mD3DData);
 
 	if (gFPSTimer.GetDuration() >= 1000 || gForceDisplay)
@@ -2509,7 +2512,7 @@ static void CalculateFPS()
 	aDrawG.SetColor(gFrameCount % 2 == 1 ? Color(0xff00) : Color(0xff0000));
 	aDrawG.FillRect(0, gFPSImage->GetHeight() - 2, gSexyAppBase->mLoadingThreadCompleted ? gFPSImage->GetWidth() : gFPSImage->GetWidth() / 2, 2);
 
-	SDL_SetRenderTarget(LawnApp::mSDLRenderer, nullptr);
+	SDL_SetRenderTarget(LawnApp::mSDLRenderer, anOldRenderTarget);
 }
 
 ///////////////////////////// FPS Stuff to draw mouse coords
@@ -2522,10 +2525,16 @@ static void FPSDrawCoords(int theX, int theY)
 		gFPSImage = new SDL3Image(LawnApp::mSDLRenderer);
 		gFPSImage->mWidth = 55;
 		gFPSImage->mHeight = gFPSFont->GetHeight() + 4;
-		gFPSImage->mD3DData = SDL_CreateTexture(LawnApp::mSDLRenderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, gFPSImage->mWidth, gFPSImage->mHeight);
+		gFPSImage->mD3DData = SDL3Image::CreateRenderTarget(LawnApp::mSDLRenderer, gFPSImage->mWidth, gFPSImage->mHeight);
 		SDL_SetTextureBlendMode((SDL_Texture*)gFPSImage->mD3DData, SDL_BLENDMODE_BLEND);
+		SDL_Texture* anInitialRenderTarget = SDL_GetRenderTarget(LawnApp::mSDLRenderer);
+		SDL_SetRenderTarget(LawnApp::mSDLRenderer, (SDL_Texture*)gFPSImage->mD3DData);
+		SDL_SetRenderDrawColor(LawnApp::mSDLRenderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+		SDL_RenderClear(LawnApp::mSDLRenderer);
+		SDL_SetRenderTarget(LawnApp::mSDLRenderer, anInitialRenderTarget);
 	}
 
+	SDL_Texture* anOldRenderTarget = SDL_GetRenderTarget(LawnApp::mSDLRenderer);
 	SDL_SetRenderTarget(LawnApp::mSDLRenderer, (SDL_Texture*)gFPSImage->mD3DData);
 
 	Graphics aDrawG(gFPSImage);
@@ -2537,7 +2546,7 @@ static void FPSDrawCoords(int theX, int theY)
 	aDrawG.SetColor(0xFFFFFF);
 	aDrawG.DrawString(aFPS,2, gFPSFont->GetAscent());
 
-	SDL_SetRenderTarget(LawnApp::mSDLRenderer, nullptr);
+	SDL_SetRenderTarget(LawnApp::mSDLRenderer, anOldRenderTarget);
 }
 
 ///////////////////////////// Demo TimeLeft Stuff
@@ -3049,13 +3058,13 @@ static INT_PTR CALLBACK MarkerListDialogProc(HWND hwnd, UINT msg, WPARAM wParam,
 
 static LPWORD lpdwAlign ( LPWORD lpIn)
 {
-    ULONG ul;
+    uintptr_t ul;
 
-    ul = (ULONG) lpIn;
+	ul = reinterpret_cast<uintptr_t>(lpIn);
     ul +=3;
     ul >>=2;
     ul <<=2;
-    return (LPWORD) ul;
+	return reinterpret_cast<LPWORD>(ul);
 }
 
 static int ListDemoMarkers()
@@ -3519,11 +3528,7 @@ LRESULT CALLBACK SexyAppBase::WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LP
 			return aResult;
 	}
 
-#ifdef _WIN64
-	SexyAppBase* aSexyApp = (SexyAppBase*)GetWindowLongPtr(hWnd, GWLP_USERDATA);
-#else
-	SexyAppBase* aSexyApp = (SexyAppBase*)GetWindowLong(hWnd, GWL_USERDATA);
-#endif
+	SexyAppBase* aSexyApp = reinterpret_cast<SexyAppBase*>(GetWindowLongPtr(hWnd, GWLP_USERDATA));
 	switch (uMsg)
 	{		
 //  TODO: switch to killfocus/setfocus? [NOT NEEDED]
@@ -3809,7 +3814,7 @@ LRESULT CALLBACK SexyAppBase::WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LP
 				else if (uMsg == WM_CLOSE)
 				{
 					char aStr[256];
-					sprintf(aStr, "CLOSED HWND: %d\r\n", hWnd);
+					sprintf(aStr, "CLOSED HWND: %p\r\n", static_cast<void*>(hWnd));
 					TodTrace(aStr);
 					
 					aSexyApp->CloseRequestAsync();
@@ -3964,7 +3969,7 @@ LRESULT CALLBACK SexyAppBase::WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LP
 	case WM_DESTROY:
 		{
 			char aStr[256];
-			sprintf(aStr, "DESTROYED HWND: %d\r\n", hWnd);
+			sprintf(aStr, "DESTROYED HWND: %p\r\n", static_cast<void*>(hWnd));
 			TodTrace(aStr);
 		}
 		break;	
@@ -4935,11 +4940,7 @@ void SexyAppBase::MakeWindow()
 
 	if (mHWnd != NULL)
 	{
-#ifdef _WIN64
-		SetWindowLongPtr(mHWnd, GWLP_USERDATA, (LONG_PTR)NULL);
-#else
-		SetWindowLong(mHWnd, GWL_USERDATA, NULL);
-#endif
+		SetWindowLongPtr(mHWnd, GWLP_USERDATA, 0);
 		HWND anOldWindow = mHWnd;
 		mHWnd = NULL;		
 		DestroyWindow(anOldWindow);	
@@ -5123,13 +5124,9 @@ void SexyAppBase::MakeWindow()
 	}
 	
 	char aStr[256];
-	sprintf(aStr, "HWND: %d\r\n", mHWnd);
+	sprintf(aStr, "HWND: %p\r\n", static_cast<void*>(mHWnd));
 	TodTrace(aStr);
-#ifdef _WIN64
-	SetWindowLongPtr(mHWnd, GWLP_USERDATA, (LONG_PTR)this);
-#else
-	SetWindowLongW(mHWnd, GWL_USERDATA, (LONG)this);
-#endif
+	SetWindowLongPtr(mHWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 
 	if (IsPreviewSaver()) {
 		SetParent(mHWnd, (HWND)mPreviewHWnd);
@@ -6701,11 +6698,7 @@ void SexyAppBase::Init()
 				NULL,
 				gHInstance,
 				0);	
-#if defined(_WIN32)
-		SetWindowLongPtr(mInvisHWnd, GWLP_USERDATA, (LONG_PTR)this);
-#elif defined(_WIN64)
-		SetWindowLong(mInvisHWnd, GWL_USERDATA, (LONG) this);
-#endif
+		SetWindowLongPtr(mInvisHWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 	}
 	else
 	{
@@ -6755,11 +6748,7 @@ void SexyAppBase::Init()
 				NULL,
 				gHInstance,
 				0);	
-#if defined(WIN32)
-		SetWindowLongPtr(mInvisHWnd, GWLP_USERDATA, (LONG_PTR)this);
-#elif defined(WIN64)
-		SetWindowLong(mInvisHWnd, GWL_USERDATA, (LONG) this);
-#endif
+		SetWindowLongPtr(mInvisHWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
 	}
 		
 	//mHandCursor = CreateCursor(gHInstance, 11, 4, 32, 32, gFingerCursorData, gFingerCursorData+sizeof(gFingerCursorData)/2); 

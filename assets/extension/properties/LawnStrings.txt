@@ -1,0 +1,10 @@
+[NATIVE_HDR_LABEL]
+Native HDR
+
+[NATIVE_HDR_RESTART_HEADER]
+Native HDR
+
+[NATIVE_HDR_RESTART_BODY]
+Restart the game to apply this change.
+
+Windows HDR must be enabled in Display settings.

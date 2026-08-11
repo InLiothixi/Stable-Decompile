@@ -1286,8 +1286,9 @@ void Projectile::DoImpact(Zombie* theZombie)
 		}
 	}
 
-	else if (mProjectileType == ProjectileType::PROJECTILE_SPIKE 
-	#ifdef _PIERCING_CACTUS || mProjectileType == ProjectileType::PROJECTILE_PIERCE_SPIKE
+	else if (mProjectileType == ProjectileType::PROJECTILE_SPIKE
+	#ifdef _PIERCING_CACTUS
+		|| mProjectileType == ProjectileType::PROJECTILE_PIERCE_SPIKE
 	#endif
 	)
 	{

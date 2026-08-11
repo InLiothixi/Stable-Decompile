@@ -60,6 +60,7 @@ NewOptionsDialog::NewOptionsDialog(LawnApp* theApp, bool theFromGameSelector) :
 
     mFullscreenCheckbox = MakeNewCheckbox(NewOptionsDialog::NewOptionsDialog_Fullscreen, this, !theApp->mIsWindowed);
     mHardwareAccelerationCheckbox = MakeNewCheckbox(NewOptionsDialog::NewOptionsDialog_HardwareAcceleration, this, theApp->mEnableVsync);
+    mNativeHDRCheckbox = MakeNewCheckbox(NewOptionsDialog::NewOptionsDialog_NativeHDR, this, theApp->mEnableNativeHDR);
 
     if (mFromGameSelector)
     {
@@ -109,13 +110,14 @@ NewOptionsDialog::NewOptionsDialog(LawnApp* theApp, bool theFromGameSelector) :
     //}
 }
 
-//0x45C760¡¢0x45C780
+//0x45C760, 0x45C780
 NewOptionsDialog::~NewOptionsDialog()
 {
     delete mMusicVolumeSlider;
     delete mSfxVolumeSlider;
     delete mFullscreenCheckbox;
     delete mHardwareAccelerationCheckbox;
+    delete mNativeHDRCheckbox;
     delete mAlmanacButton;
     delete mRestartButton;
     delete mBackToMainButton;
@@ -145,6 +147,7 @@ void NewOptionsDialog::AddedToManager(Sexy::WidgetManager* theWidgetManager)
     AddWidget(mSfxVolumeSlider);
     AddWidget(mHardwareAccelerationCheckbox);
     AddWidget(mFullscreenCheckbox);
+    AddWidget(mNativeHDRCheckbox);
     AddWidget(mBackToGameButton);
 }
 
@@ -162,6 +165,7 @@ void NewOptionsDialog::RemovedFromManager(Sexy::WidgetManager* theWidgetManager)
     RemoveWidget(mSfxVolumeSlider);
     RemoveWidget(mHardwareAccelerationCheckbox);
     RemoveWidget(mFullscreenCheckbox);
+    RemoveWidget(mNativeHDRCheckbox);
     RemoveWidget(mBackToGameButton);
 }
 
@@ -173,10 +177,11 @@ void NewOptionsDialog::Resize(int theX, int theY, int theWidth, int theHeight)
     mSfxVolumeSlider->Resize(199, 143, 135, 40);
     mHardwareAccelerationCheckbox->Resize(283, 175, 46, 45);
     mFullscreenCheckbox->Resize(284, 206, 46, 45);
-    mAlmanacButton->Resize(107, 241, 209, 46);
-    mRestartButton->Resize(mAlmanacButton->mX, mAlmanacButton->mY + 43, 209, 46);
-    mBackToMainButton->Resize(mRestartButton->mX, mRestartButton->mY + 43, 209, 46);
-    mBackToGameButton->Resize(30, 381, mBackToGameButton->mWidth, mBackToGameButton->mHeight);
+    mNativeHDRCheckbox->Resize(284, 237, 46, 45);
+    mAlmanacButton->Resize(107, 276, 209, 46);
+    mRestartButton->Resize(mAlmanacButton->mX, mAlmanacButton->mY + 39, 209, 46);
+    mBackToMainButton->Resize(mRestartButton->mX, mRestartButton->mY + 39, 209, 46);
+    mBackToGameButton->Resize(30, 395, mBackToGameButton->mWidth, mBackToGameButton->mHeight);
 
     /*mGameplayButton->Resize(mAlmanacButton->mX, 116, 209, 46);
     mControllerButton->Resize(mAlmanacButton->mX, mGameplayButton->mY + 43, 209, 46);
@@ -188,6 +193,7 @@ void NewOptionsDialog::Resize(int theX, int theY, int theWidth, int theHeight)
         mSfxVolumeSlider->mY += 10;
         mHardwareAccelerationCheckbox->mY += 15;
         mFullscreenCheckbox->mY += 20;
+        mNativeHDRCheckbox->mY += 20;
 
         /*mGameplayButton->mY += 69;
         mControllerButton->mY += 69;
@@ -210,12 +216,14 @@ void NewOptionsDialog::Draw(Sexy::Graphics* g)
     int aSfxOffset = 0;
     int a3DAccelOffset = 0;
     int aFullScreenOffset = 0;
+    int aNativeHDROffset = 0;
     if (mFromGameSelector)
     {
         aMusicOffset = 5;
         aSfxOffset = 10;
         a3DAccelOffset = 15;
         aFullScreenOffset = 20;
+        aNativeHDROffset = 20;
     }
     Sexy::Color aTextColor(107, 109, 145);
 
@@ -234,6 +242,7 @@ void NewOptionsDialog::Draw(Sexy::Graphics* g)
         TodDrawString(g, TodStringTranslate(_S("[SOUND_LABEL]")), 186, 167 + aSfxOffset, FONT_DWARVENTODCRAFT18, aTextColor, DrawStringJustification::DS_ALIGN_RIGHT);
         TodDrawString(g, TodStringTranslate(_S("Vertical-Sync")), 274, 197 + a3DAccelOffset, FONT_DWARVENTODCRAFT18, aTextColor, DrawStringJustification::DS_ALIGN_RIGHT);
         TodDrawString(g, TodStringTranslate(_S("[FULLSCREEN_LABEL]")), 274, 229 + aFullScreenOffset, FONT_DWARVENTODCRAFT18, aTextColor, DrawStringJustification::DS_ALIGN_RIGHT);
+        TodDrawString(g, TodStringTranslate(_S("[NATIVE_HDR_LABEL]")), 274, 260 + aNativeHDROffset, FONT_DWARVENTODCRAFT18, aTextColor, DrawStringJustification::DS_ALIGN_RIGHT);
     }
 }
 
@@ -266,6 +275,24 @@ void NewOptionsDialog::SliderVal(int theId, double theVal)
 void NewOptionsDialog::CheckboxChecked(int theId, bool checked)
 {
     mApp->PlaySample(SOUND_BUTTONCLICK);
+
+    if (theId == NewOptionsDialog::NewOptionsDialog_NativeHDR)
+    {
+        mApp->mEnableNativeHDR = checked;
+        mApp->RegistryWriteBoolean(_S("EnableNativeHDR"), checked);
+
+        if (checked != mApp->mNativeHDRRenderer)
+        {
+            mApp->DoDialog(
+                Dialogs::DIALOG_INFO,
+                true,
+                _S("[NATIVE_HDR_RESTART_HEADER]"),
+                _S("[NATIVE_HDR_RESTART_BODY]"),
+                _S("[OK_LABEL]"),
+                Dialog::BUTTONS_FOOTER
+            );
+        }
+    }
 
     /*switch (theId)
     {

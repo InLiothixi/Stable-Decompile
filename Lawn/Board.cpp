@@ -2791,7 +2791,7 @@ Plant* Board::GetTopPlantAt(int theGridX, int theGridY, PlantPriority thePriorit
 	case PlantPriority::TOPPLANT_ONLY_UNDER_PLANT:				return aPlantOnLawn.mUnderPlant;
 	default:													TOD_ASSERT();
 	}
-	//unreachable();
+	return nullptr;
 }
 
 //0x40D3A0
@@ -8427,9 +8427,9 @@ void Board::DrawDebugText(Graphics* g)
 				float bpm1;
 				gBass->BASS_ChannelGetAttribute(aMusicHandle1, BASS_ATTRIB_MUSIC_BPM, &bpm1);
 				float bpm2;
-				gBass->BASS_ChannelGetAttribute(aMusicHandle2, BASS_ATTRIB_MUSIC_BPM, &bpm1);
+				gBass->BASS_ChannelGetAttribute(aMusicHandle2, BASS_ATTRIB_MUSIC_BPM, &bpm2);
 				float bpm3;
-				gBass->BASS_ChannelGetAttribute(aMusicHandle3, BASS_ATTRIB_MUSIC_BPM, &bpm1);
+				gBass->BASS_ChannelGetAttribute(aMusicHandle3, BASS_ATTRIB_MUSIC_BPM, &bpm3);
 				aText += StrFormat(_S("bpm1 %d bmp2 %d bpm3 %d\n"), (int)bpm1, (int)bpm2, (int)bpm3);
 			}
 			else if (mApp->mMusic->mCurMusicTune == MusicTune::MUSIC_TUNE_NIGHT_MOONGRAINS)
@@ -10954,7 +10954,7 @@ int Board::LeftFogColumn()
 	if (mLevel >= 37 && mLevel <= 40)									return 4;
 	TOD_ASSERT();
 
-	//unreachable();
+	return 5;
 }
 
 //0x41C210
@@ -11876,7 +11876,7 @@ int Board::GetNumWavesPerSurvivalStage()
 
 	TOD_ASSERT();
 
-	//unreachable();
+	return 10;
 }
 
 //0x41DA50
@@ -11968,7 +11968,7 @@ bool Board::CanUseGameObject(GameObjectType theGameObject)
 
 	TOD_ASSERT();
 
-	//unreachable();
+	return false;
 }
 
 void Board::ShakeBoard(int theShakeAmountX, int theShakeAmountY)

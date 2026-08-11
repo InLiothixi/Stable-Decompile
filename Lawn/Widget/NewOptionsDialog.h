@@ -29,7 +29,8 @@ protected:
 		NewOptionsDialog_HardwareAcceleration,
 		NewOptionsDialog_VideoGraphics,
 		NewOptionsDialog_SoundSystem,
-		NewOptionsDialog_Language
+		NewOptionsDialog_Language,
+		NewOptionsDialog_NativeHDR
 	};
 
 public:
@@ -38,6 +39,7 @@ public:
 	Sexy::Slider*			mSfxVolumeSlider;					//+0x160
 	Sexy::Checkbox*			mFullscreenCheckbox;				//+0x164
 	Sexy::Checkbox*			mHardwareAccelerationCheckbox;		//+0x168
+	Sexy::Checkbox*			mNativeHDRCheckbox;
 	LawnStoneButton*		mAlmanacButton;						//+0x16C
 	LawnStoneButton*		mBackToMainButton;					//+0x170
 	LawnStoneButton*		mRestartButton;						//+0x174

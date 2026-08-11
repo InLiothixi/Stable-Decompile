@@ -1,5 +1,6 @@
 #include "SEHCatcher.h"
 #include "SexyAppBase.h"
+#include <cstdint>
 #include <fstream>
 #include <process.h>
 
@@ -128,19 +129,19 @@ bool SEHCatcher::LoadImageHelp()
     if (!mUnDecorateSymbolName)
         return false;
 
-    mStackWalk = (STACKWALKPROC) GetProcAddress(mImageHelpLib, "StackWalk");
+    mStackWalk = (STACKWALKPROC) GetProcAddress(mImageHelpLib, "StackWalk64");
     if (!mStackWalk)
         return false;
 
-    mSymFunctionTableAccess = (SYMFUNCTIONTABLEACCESSPROC) GetProcAddress(mImageHelpLib, "SymFunctionTableAccess");
+	mSymFunctionTableAccess = (SYMFUNCTIONTABLEACCESSPROC) GetProcAddress(mImageHelpLib, "SymFunctionTableAccess64");
     if (!mSymFunctionTableAccess)
         return false;
 
-    mSymGetModuleBase = (SYMGETMODULEBASEPROC) GetProcAddress(mImageHelpLib, "SymGetModuleBase");
+	mSymGetModuleBase = (SYMGETMODULEBASEPROC) GetProcAddress(mImageHelpLib, "SymGetModuleBase64");
     if (!mSymGetModuleBase)
         return false;
 
-    mSymGetSymFromAddr = (SYMGETSYMFROMADDRPROC) GetProcAddress(mImageHelpLib, "SymGetSymFromAddr" );
+	mSymGetSymFromAddr = (SYMGETSYMFROMADDRPROC) GetProcAddress(mImageHelpLib, "SymGetSymFromAddr64" );
     if (!mSymGetSymFromAddr)
         return false;    
 
@@ -366,13 +367,13 @@ void SEHCatcher::DoHandleDebugEvent(LPEXCEPTION_POINTERS lpEP)
 
     if (szName != NULL)
 	{		
-		sprintf(aBuffer,"Exception: %s (code 0x%x) at address %08X in thread %X\r\n",
+		sprintf(aBuffer,"Exception: %s (code 0x%lX) at address %p in thread %lX\r\n",
 				szName, lpEP->ExceptionRecord->ExceptionCode, 
 				lpEP->ExceptionRecord->ExceptionAddress, GetCurrentThreadId());
 	}
 	else
 	{
-		sprintf(aBuffer,"Unknown exception: (code 0x%x) at address %08X in thread %X\r\n",
+		sprintf(aBuffer,"Unknown exception: (code 0x%lX) at address %p in thread %lX\r\n",
 				lpEP->ExceptionRecord->ExceptionCode, 
 				lpEP->ExceptionRecord->ExceptionAddress, GetCurrentThreadId());
 	}
@@ -381,23 +382,40 @@ void SEHCatcher::DoHandleDebugEvent(LPEXCEPTION_POINTERS lpEP)
 
 	///////////////////////////////////////////////////////////
 	// Get logical address of the module where exception occurs
-	DWORD section, offset;
-	GetLogicalAddress(lpEP->ExceptionRecord->ExceptionAddress, aBuffer, sizeof(aBuffer), section, offset);
-	aDebugDump += "Module: " + GetFilename(aBuffer) + "\r\n";		
-	sprintf(aBuffer, "Logical Address: %04X:%08X\r\n", section, offset);
-	aDebugDump += aBuffer;	
+	DWORD section = 0, offset = 0;
+	aBuffer[0] = '\0';
+	const bool hasLogicalAddress = GetLogicalAddress(
+		lpEP->ExceptionRecord->ExceptionAddress, aBuffer, sizeof(aBuffer), section, offset);
+	if (hasLogicalAddress)
+	{
+		aDebugDump += "Module: " + GetFilename(aBuffer) + "\r\n";
+		sprintf(aBuffer, "Logical Address: %04lX:%08lX\r\n", section, offset);
+		aDebugDump += aBuffer;
+	}
+	else
+	{
+		aDebugDump += "Module: <unknown>\r\n";
+		aDebugDump += "Logical Address: <unavailable>\r\n";
+	}
 	
 	aDebugDump += "\r\n";	
 
-	anErrorTitle = StrFormat("Exception at %04X:%08X", section, offset);
+	anErrorTitle = hasLogicalAddress ?
+		StrFormat("Exception at %04X:%08X", section, offset) :
+		"Exception at an unknown address";
 
 	std::string aWalkString;	
 
 	if (hasImageHelp)
 		aWalkString = ImageHelpWalk(lpEP->ContextRecord, 0);
 
+	#ifndef _WIN64
 	if (aWalkString.length() == 0)
 		aWalkString = IntelWalk(lpEP->ContextRecord, 0);
+	#endif
+
+	if (aWalkString.empty())
+		aWalkString = "Stack trace unavailable\r\n";
 
 	aDebugDump += aWalkString;
 
@@ -516,8 +534,9 @@ std::string SEHCatcher::IntelWalk(PCONTEXT theContext, int theSkipCount)
 
         GetLogicalAddress((PVOID)pc, szModule, sizeof(szModule), section, offset);
 
-        sprintf(aBuffer, "%08X  %08X  %04X:%08X %s\r\n",
-                  pc, pFrame, section, offset, GetFilename(szModule).c_str());
+        sprintf(aBuffer, "%p  %p  %04lX:%08lX %s\r\n",
+                  reinterpret_cast<void*>(static_cast<std::uintptr_t>(pc)), static_cast<void*>(pFrame),
+                  section, offset, GetFilename(szModule).c_str());
 		aDebugDump += aBuffer;
 
 #ifdef _WIN64
@@ -553,25 +572,25 @@ std::string SEHCatcher::ImageHelpWalk(PCONTEXT theContext, int theSkipCount)
 	char aBuffer[2048];
 	std::string aDebugDump;
 
-	STACKFRAME sf;
-	memset( &sf, 0, sizeof(sf) );	
+	STACKFRAME64 sf{};
+	CONTEXT context = *theContext;
 
 	// Initialize the STACKFRAME structure for the first call.  This is only
 	// necessary for Intel CPUs, and isn't mentioned in the documentation.
 
 #ifdef _WIN64
-	sf.AddrPC.Offset = theContext->Rip; 
+	sf.AddrPC.Offset = context.Rip;
 	sf.AddrPC.Mode = AddrModeFlat;
-	sf.AddrStack.Offset = theContext->Rsp;   
+	sf.AddrStack.Offset = context.Rsp;
 	sf.AddrStack.Mode = AddrModeFlat;
-	sf.AddrFrame.Offset = theContext->Rbp;  
+	sf.AddrFrame.Offset = context.Rsp;
 	sf.AddrFrame.Mode = AddrModeFlat;
 #else
-	sf.AddrPC.Offset = theContext->Eip;
+	sf.AddrPC.Offset = context.Eip;
 	sf.AddrPC.Mode = AddrModeFlat;
-	sf.AddrStack.Offset = theContext->Esp;
+	sf.AddrStack.Offset = context.Esp;
 	sf.AddrStack.Mode = AddrModeFlat;
-	sf.AddrFrame.Offset = theContext->Ebp;
+	sf.AddrFrame.Offset = context.Ebp;
 	sf.AddrFrame.Mode = AddrModeFlat;
 #endif
 	
@@ -581,12 +600,10 @@ std::string SEHCatcher::ImageHelpWalk(PCONTEXT theContext, int theSkipCount)
 	{
 #ifdef _WIN64
 		if (!mStackWalk(IMAGE_FILE_MACHINE_AMD64, GetCurrentProcess(), GetCurrentThread(),
-			&sf, NULL /*theContext*/, NULL,
-			(PFUNCTION_TABLE_ACCESS_ROUTINE64)mSymFunctionTableAccess,
-			(PGET_MODULE_BASE_ROUTINE64)mSymGetModuleBase, 0))
+			&sf, &context, NULL, mSymFunctionTableAccess, mSymGetModuleBase, NULL))
 #else
 		if (!mStackWalk(IMAGE_FILE_MACHINE_I386, GetCurrentProcess(), GetCurrentThread(),
-			&sf, NULL  /*theContext*/, NULL, mSymFunctionTableAccess, mSymGetModuleBase, 0))
+			&sf, &context, NULL, mSymFunctionTableAccess, mSymGetModuleBase, NULL))
 #endif
 		{
 			DWORD lastErr = GetLastError();
@@ -604,26 +621,31 @@ std::string SEHCatcher::ImageHelpWalk(PCONTEXT theContext, int theSkipCount)
 			continue;
 		}
 
-		BYTE symbolBuffer[sizeof(IMAGEHLP_SYMBOL) + 512];
-		PIMAGEHLP_SYMBOL pSymbol = (PIMAGEHLP_SYMBOL)symbolBuffer;
-		pSymbol->SizeOfStruct = sizeof(symbolBuffer);
-		pSymbol->MaxNameLength = 512;
+		IMAGEHLP_SYMBOL64_PACKAGE symbolPackage{};
+		PIMAGEHLP_SYMBOL64 pSymbol = &symbolPackage.sym;
+		pSymbol->SizeOfStruct = sizeof(IMAGEHLP_SYMBOL64);
+		pSymbol->MaxNameLength = MAX_SYM_NAME;
 			
-		DWORD symDisplacement = 0;  // Displacement of the input address,
+		DWORD64 symDisplacement = 0;  // Displacement of the input address,
 									// relative to the start of the symbol
 			
 		if (mSymGetSymFromAddr(GetCurrentProcess(), sf.AddrPC.Offset, &symDisplacement, pSymbol))
 		{
-			char aUDName[256];
-			mUnDecorateSymbolName(pSymbol->Name, aUDName, 256, 
+			char aUDName[MAX_SYM_NAME] = {};
+			if (mUnDecorateSymbolName(pSymbol->Name, aUDName, MAX_SYM_NAME,
 								 UNDNAME_NO_ALLOCATION_MODEL | UNDNAME_NO_ALLOCATION_LANGUAGE | 
 								 UNDNAME_NO_MS_THISTYPE | UNDNAME_NO_ACCESS_SPECIFIERS | 
 								 UNDNAME_NO_THISTYPE | UNDNAME_NO_MEMBER_TYPE | 
 								 UNDNAME_NO_RETURN_UDT_MODEL | UNDNAME_NO_THROW_SIGNATURES |
-								 UNDNAME_NO_SPECIAL_SYMS);
+								 UNDNAME_NO_SPECIAL_SYMS) == 0)
+			{
+				strcpy_s(aUDName, pSymbol->Name);
+			}
 				
-			sprintf(aBuffer, "%08X %08X %hs+%X\r\n", 
-					sf.AddrFrame.Offset, sf.AddrPC.Offset, aUDName, symDisplacement);
+			sprintf(aBuffer, "%016llX %016llX %hs+%llX\r\n",
+					static_cast<unsigned long long>(sf.AddrFrame.Offset),
+					static_cast<unsigned long long>(sf.AddrPC.Offset), aUDName,
+					static_cast<unsigned long long>(symDisplacement));
 		}
 		else // No symbol found.  Print out the logical address instead.
 		{
@@ -631,11 +653,16 @@ std::string SEHCatcher::ImageHelpWalk(PCONTEXT theContext, int theSkipCount)
 			DWORD section = 0, offset = 0;
 
 			GetLogicalAddress((PVOID)sf.AddrPC.Offset, szModule, sizeof(szModule), section, offset);				
-			sprintf(aBuffer, "%08X %08X %04X:%08X %s\r\n", sf.AddrFrame.Offset, sf.AddrPC.Offset, section, offset, GetFilename(szModule).c_str());
+			sprintf(aBuffer, "%016llX %016llX %04lX:%08lX %s\r\n",
+				static_cast<unsigned long long>(sf.AddrFrame.Offset),
+				static_cast<unsigned long long>(sf.AddrPC.Offset), section, offset,
+				GetFilename(szModule).c_str());
 		}
 		aDebugDump += aBuffer;
 		
-		sprintf(aBuffer, "Params: %08X %08X %08X %08X\r\n", sf.Params[0], sf.Params[1], sf.Params[2], sf.Params[3]);
+		sprintf(aBuffer, "Params: %016llX %016llX %016llX %016llX\r\n",
+			static_cast<unsigned long long>(sf.Params[0]), static_cast<unsigned long long>(sf.Params[1]),
+			static_cast<unsigned long long>(sf.Params[2]), static_cast<unsigned long long>(sf.Params[3]));
 		aDebugDump += aBuffer;		
 		aDebugDump += "\r\n";
 
@@ -652,20 +679,30 @@ bool SEHCatcher::GetLogicalAddress(void* addr, char* szModule, DWORD len, DWORD&
     if (!VirtualQuery(addr, &mbi, sizeof(mbi)))
         return false;
 
-    DWORD hMod = (DWORD)mbi.AllocationBase;
+    HMODULE hMod = reinterpret_cast<HMODULE>(mbi.AllocationBase);
 
-    if (!GetModuleFileNameA((HMODULE) hMod, szModule, len))
+    if (!GetModuleFileNameA(hMod, szModule, len))
         return false;
 
     // Point to the DOS header in memory
-    PIMAGE_DOS_HEADER pDosHdr = (PIMAGE_DOS_HEADER) hMod;
+    BYTE* moduleBase = static_cast<BYTE*>(mbi.AllocationBase);
+    PIMAGE_DOS_HEADER pDosHdr = reinterpret_cast<PIMAGE_DOS_HEADER>(moduleBase);
+	if (pDosHdr->e_magic != IMAGE_DOS_SIGNATURE || pDosHdr->e_lfanew <= 0)
+		return false;
 
     // From the DOS header, find the NT (PE) header
-    PIMAGE_NT_HEADERS pNtHdr = (PIMAGE_NT_HEADERS) (hMod + pDosHdr->e_lfanew);
+    PIMAGE_NT_HEADERS pNtHdr = reinterpret_cast<PIMAGE_NT_HEADERS>(moduleBase + pDosHdr->e_lfanew);
+	if (pNtHdr->Signature != IMAGE_NT_SIGNATURE)
+		return false;
 
     PIMAGE_SECTION_HEADER pSection = IMAGE_FIRST_SECTION(pNtHdr);
 
-    DWORD rva = (DWORD) addr - hMod; // RVA is offset from module load address
+    const std::uintptr_t address = reinterpret_cast<std::uintptr_t>(addr);
+    const std::uintptr_t moduleAddress = reinterpret_cast<std::uintptr_t>(moduleBase);
+    if (address < moduleAddress || address - moduleAddress > MAXDWORD)
+        return false;
+
+    DWORD rva = static_cast<DWORD>(address - moduleAddress); // RVA is offset from module load address
 
     // Iterate through the section table, looking for the one that encompasses
     // the linear address.

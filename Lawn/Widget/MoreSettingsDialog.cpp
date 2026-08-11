@@ -31,6 +31,8 @@ MoreSettingsDialog::MoreSettingsDialog(LawnApp* theApp) :
 	mOriginalRefreshRateMilliHz = mApp->mPreferredRefreshRateMilliHz;
 	mOriginalExclusiveFullscreen = mApp->mUseExclusiveFullscreen;
 	mRefreshRateIndex = 0;
+	mUnavailableRefreshRateMilliHz = 0;
+	mCurrentPage = SETTINGS_PAGE_TONE_MAPPING;
 
 	mHDRPaperWhiteSlider = new Slider(
 		IMAGE_OPTIONS_SLIDERSLOT,
@@ -39,6 +41,18 @@ MoreSettingsDialog::MoreSettingsDialog(LawnApp* theApp) :
 		this
 	);
 	mHDRPaperWhiteSlider->SetValue((std::clamp(mApp->mHDRPaperWhitePercent, 50, 200) - 50) / 150.0);
+	mHDRExposureSlider = new Slider(
+		IMAGE_OPTIONS_SLIDERSLOT,
+		IMAGE_OPTIONS_SLIDERKNOB2,
+		MoreSettingsDialog_HDRExposure,
+		this
+	);
+	mHDRExposureSlider->SetValue((std::clamp(mApp->mHDRExposureTenthsEV, -20, 20) + 20) / 40.0);
+	mHDRAdaptiveToneMappingCheckbox = MakeNewCheckbox(
+		MoreSettingsDialog_HDRAdaptiveToneMapping,
+		this,
+		mApp->mHDRAdaptiveToneMapping
+	);
 	mExclusiveFullscreenCheckbox = MakeNewCheckbox(
 		MoreSettingsDialog_ExclusiveFullscreen,
 		this,
@@ -50,6 +64,16 @@ MoreSettingsDialog::MoreSettingsDialog(LawnApp* theApp) :
 		mApp->mUseIntegerScaling
 	);
 	mShowFPSCheckbox = MakeNewCheckbox(MoreSettingsDialog_ShowFPS, this, mApp->mShowFPS);
+	mToneMappingPageButton = MakeButton(
+		MoreSettingsDialog_ToneMappingPage,
+		this,
+		_S("[ADVANCED_TONE_MAPPING_TAB]")
+	);
+	mDisplayPageButton = MakeButton(
+		MoreSettingsDialog_DisplayPage,
+		this,
+		_S("[ADVANCED_DISPLAY_TAB]")
+	);
 	mRefreshPreviousButton = MakeButton(MoreSettingsDialog_RefreshPrevious, this, _S("<"));
 	mRefreshNextButton = MakeButton(MoreSettingsDialog_RefreshNext, this, _S(">"));
 	mRestoreDefaultsButton = MakeButton(
@@ -62,16 +86,21 @@ MoreSettingsDialog::MoreSettingsDialog(LawnApp* theApp) :
 	UpdateRefreshControls();
 	Resize(0, 0, 599, 578);
 	LawnApp::CenterDialog(this, mWidth, mHeight);
+	SetPage(SETTINGS_PAGE_TONE_MAPPING);
 }
 
 MoreSettingsDialog::~MoreSettingsDialog()
 {
 	delete mHDRPaperWhiteSlider;
+	delete mHDRExposureSlider;
+	delete mHDRAdaptiveToneMappingCheckbox;
 	delete mExclusiveFullscreenCheckbox;
 	delete mIntegerScalingCheckbox;
 	delete mShowFPSCheckbox;
 	delete mRefreshPreviousButton;
 	delete mRefreshNextButton;
+	delete mToneMappingPageButton;
+	delete mDisplayPageButton;
 	delete mRestoreDefaultsButton;
 }
 
@@ -79,11 +108,15 @@ void MoreSettingsDialog::AddedToManager(WidgetManager* theWidgetManager)
 {
 	LawnDialog::AddedToManager(theWidgetManager);
 	AddWidget(mHDRPaperWhiteSlider);
+	AddWidget(mHDRExposureSlider);
+	AddWidget(mHDRAdaptiveToneMappingCheckbox);
 	AddWidget(mExclusiveFullscreenCheckbox);
 	AddWidget(mIntegerScalingCheckbox);
 	AddWidget(mShowFPSCheckbox);
 	AddWidget(mRefreshPreviousButton);
 	AddWidget(mRefreshNextButton);
+	AddWidget(mToneMappingPageButton);
+	AddWidget(mDisplayPageButton);
 	AddWidget(mRestoreDefaultsButton);
 }
 
@@ -91,11 +124,15 @@ void MoreSettingsDialog::RemovedFromManager(WidgetManager* theWidgetManager)
 {
 	LawnDialog::RemovedFromManager(theWidgetManager);
 	RemoveWidget(mHDRPaperWhiteSlider);
+	RemoveWidget(mHDRExposureSlider);
+	RemoveWidget(mHDRAdaptiveToneMappingCheckbox);
 	RemoveWidget(mExclusiveFullscreenCheckbox);
 	RemoveWidget(mIntegerScalingCheckbox);
 	RemoveWidget(mShowFPSCheckbox);
 	RemoveWidget(mRefreshPreviousButton);
 	RemoveWidget(mRefreshNextButton);
+	RemoveWidget(mToneMappingPageButton);
+	RemoveWidget(mDisplayPageButton);
 	RemoveWidget(mRestoreDefaultsButton);
 }
 
@@ -115,13 +152,40 @@ void MoreSettingsDialog::Resize(int theX, int theY, int theWidth, int theHeight)
 	LawnDialog::Resize(theX, theY, theWidth, theHeight);
 	const int aTop = GetContentTop();
 
-	mHDRPaperWhiteSlider->Resize(280, aTop + 24, 210, 40);
-	mExclusiveFullscreenCheckbox->Resize(72, aTop + 125, 46, 45);
-	mRefreshPreviousButton->Resize(245, aTop + 166, 71, 42);
-	mRefreshNextButton->Resize(472, aTop + 166, 71, 42);
-	mIntegerScalingCheckbox->Resize(72, aTop + 225, 46, 45);
-	mShowFPSCheckbox->Resize(390, aTop + 225, 46, 45);
+	mToneMappingPageButton->Resize(72, aTop + 2, 218, 42);
+	mDisplayPageButton->Resize(309, aTop + 2, 218, 42);
+
+	mHDRPaperWhiteSlider->Resize(280, aTop + 48, 210, 36);
+	mHDRExposureSlider->Resize(280, aTop + 105, 210, 36);
+	mHDRAdaptiveToneMappingCheckbox->Resize(72, aTop + 157, 46, 45);
+
+	mExclusiveFullscreenCheckbox->Resize(72, aTop + 52, 46, 45);
+	mRefreshPreviousButton->Resize(245, aTop + 105, 71, 42);
+	mRefreshNextButton->Resize(456, aTop + 105, 71, 42);
+	mIntegerScalingCheckbox->Resize(72, aTop + 165, 46, 45);
+	mShowFPSCheckbox->Resize(327, aTop + 165, 46, 45);
 	mRestoreDefaultsButton->Resize(195, aTop + 280, 209, 42);
+}
+
+void MoreSettingsDialog::SetPage(SettingsPage thePage)
+{
+	mCurrentPage = thePage;
+	const bool isToneMappingPage = mCurrentPage == SETTINGS_PAGE_TONE_MAPPING;
+
+	mToneMappingPageButton->mInverted = isToneMappingPage;
+	mToneMappingPageButton->SetDisabled(isToneMappingPage);
+	mDisplayPageButton->mInverted = !isToneMappingPage;
+	mDisplayPageButton->SetDisabled(!isToneMappingPage);
+
+	mHDRPaperWhiteSlider->SetVisible(isToneMappingPage);
+	mHDRExposureSlider->SetVisible(isToneMappingPage);
+	mHDRAdaptiveToneMappingCheckbox->SetVisible(isToneMappingPage);
+	mExclusiveFullscreenCheckbox->SetVisible(!isToneMappingPage);
+	mRefreshPreviousButton->SetVisible(!isToneMappingPage);
+	mRefreshNextButton->SetVisible(!isToneMappingPage);
+	mIntegerScalingCheckbox->SetVisible(!isToneMappingPage);
+	mShowFPSCheckbox->SetVisible(!isToneMappingPage);
+	MarkDirty();
 }
 
 void MoreSettingsDialog::Draw(Graphics* g)
@@ -131,118 +195,143 @@ void MoreSettingsDialog::Draw(Graphics* g)
 	const Color aTextColor(107, 109, 145);
 	const Color aSubtleColor(126, 128, 160);
 
-	TodDrawString(
-		g,
-		TodStringTranslate(_S("[ADVANCED_HDR_SECTION]")),
-		72,
-		aTop + 10,
-		FONT_DWARVENTODCRAFT18YELLOW,
-		aTextColor,
-		DS_ALIGN_LEFT
-	);
-	g->SetColor(aTextColor);
-	g->DrawLine(72, aTop + 17, 527, aTop + 17);
-	TodDrawString(
-		g,
-		TodStringTranslate(_S("[ADVANCED_HDR_PAPER_WHITE]")),
-		72,
-		aTop + 50,
-		FONT_DWARVENTODCRAFT18,
-		aTextColor,
-		DS_ALIGN_LEFT
-	);
-	TodDrawString(
-		g,
-		StrFormat("%d%%", mApp->mHDRPaperWhitePercent),
-		550,
-		aTop + 50,
-		FONT_DWARVENTODCRAFT18,
-		aTextColor,
-		DS_ALIGN_RIGHT
-	);
-
-	SexyString anHDRStatus;
-	if (!mApp->mEnableNativeHDR)
-		anHDRStatus = TodStringTranslate(_S("[ADVANCED_HDR_DISABLED]"));
-	else if (mApp->IsNativeHDRActive())
+	if (mCurrentPage == SETTINGS_PAGE_TONE_MAPPING)
 	{
-		const SDL_PropertiesID aProperties = SDL_GetRendererProperties(LawnApp::mSDLRenderer);
-		const float aHeadroom = SDL_GetFloatProperty(aProperties, SDL_PROP_RENDERER_HDR_HEADROOM_FLOAT, 1.0f);
-		anHDRStatus = StrFormat(
-			"%s  %.1fx",
-			TodStringTranslate(_S("[ADVANCED_HDR_ACTIVE]")).c_str(),
-			aHeadroom
+		TodDrawString(
+			g,
+			TodStringTranslate(_S("[ADVANCED_HDR_PAPER_WHITE]")),
+			72,
+			aTop + 72,
+			FONT_DWARVENTODCRAFT15,
+			aTextColor,
+			DS_ALIGN_LEFT
+		);
+		TodDrawString(
+			g,
+			StrFormat("%d%%", mApp->mHDRPaperWhitePercent),
+			550,
+			aTop + 72,
+			FONT_DWARVENTODCRAFT15,
+			aTextColor,
+			DS_ALIGN_RIGHT
+		);
+		TodDrawString(
+			g,
+			TodStringTranslate(_S("[ADVANCED_HDR_EXPOSURE]")),
+			72,
+			aTop + 129,
+			FONT_DWARVENTODCRAFT15,
+			aTextColor,
+			DS_ALIGN_LEFT
+		);
+		TodDrawString(
+			g,
+			StrFormat("%+.1f EV", mApp->mHDRExposureTenthsEV / 10.0),
+			550,
+			aTop + 129,
+			FONT_DWARVENTODCRAFT15,
+			aTextColor,
+			DS_ALIGN_RIGHT
+		);
+		TodDrawString(
+			g,
+			TodStringTranslate(_S("[ADVANCED_HDR_ADAPTIVE]")),
+			114,
+			aTop + 181,
+			FONT_DWARVENTODCRAFT18,
+			aTextColor,
+			DS_ALIGN_LEFT
+		);
+
+		SexyString anHDRStatus;
+		if (!mApp->mEnableNativeHDR)
+			anHDRStatus = TodStringTranslate(_S("[ADVANCED_HDR_DISABLED]"));
+		else if (mApp->IsNativeHDRActive())
+		{
+			const SDL_PropertiesID aProperties = SDL_GetRendererProperties(LawnApp::mSDLRenderer);
+			const float aHeadroom = SDL_GetFloatProperty(aProperties, SDL_PROP_RENDERER_HDR_HEADROOM_FLOAT, 1.0f);
+			anHDRStatus = StrFormat(
+				"%s  %.1fx",
+				TodStringTranslate(_S("[ADVANCED_HDR_ACTIVE]")).c_str(),
+				aHeadroom
+			);
+		}
+		else if (mApp->mNativeHDRRenderer)
+			anHDRStatus = TodStringTranslate(_S("[ADVANCED_WINDOWS_HDR_OFF]"));
+		else
+			anHDRStatus = TodStringTranslate(_S("[ADVANCED_HDR_RESTART]"));
+		TodDrawStringWrapped(
+			g,
+			anHDRStatus,
+			Rect(72, aTop + 204, 455, 30),
+			FONT_DWARVENTODCRAFT15,
+			aSubtleColor,
+			DS_ALIGN_LEFT
+		);
+		TodDrawStringWrapped(
+			g,
+			TodStringTranslate(_S("[ADVANCED_HDR_ADAPTIVE_NOTE]")),
+			Rect(72, aTop + 235, 455, 40),
+			FONT_DWARVENTODCRAFT12,
+			aSubtleColor,
+			DS_ALIGN_RIGHT
 		);
 	}
-	else if (mApp->mNativeHDRRenderer)
-		anHDRStatus = TodStringTranslate(_S("[ADVANCED_WINDOWS_HDR_OFF]"));
 	else
-		anHDRStatus = TodStringTranslate(_S("[ADVANCED_HDR_RESTART]"));
-	TodDrawString(g, anHDRStatus, 72, aTop + 83, FONT_DWARVENTODCRAFT15, aSubtleColor, DS_ALIGN_LEFT);
-
-	TodDrawString(
-		g,
-		TodStringTranslate(_S("[ADVANCED_DISPLAY_SECTION]")),
-		72,
-		aTop + 112,
-		FONT_DWARVENTODCRAFT18YELLOW,
-		aTextColor,
-		DS_ALIGN_LEFT
-	);
-	g->SetColor(aTextColor);
-	g->DrawLine(72, aTop + 119, 527, aTop + 119);
-	TodDrawString(
-		g,
-		TodStringTranslate(_S("[ADVANCED_EXCLUSIVE_FULLSCREEN]")),
-		114,
-		aTop + 149,
-		FONT_DWARVENTODCRAFT18,
-		aTextColor,
-		DS_ALIGN_LEFT
-	);
-	TodDrawString(
-		g,
-		TodStringTranslate(_S("[ADVANCED_REFRESH_RATE]")),
-		72,
-		aTop + 191,
-		FONT_DWARVENTODCRAFT18,
-		aTextColor,
-		DS_ALIGN_LEFT
-	);
-	TodDrawString(g, GetRefreshRateLabel(), 394, aTop + 191, FONT_DWARVENTODCRAFT15, aTextColor, DS_ALIGN_CENTER);
-	TodDrawString(
-		g,
-		TodStringTranslate(_S("[ADVANCED_DISPLAY_RESTART_NOTE]")),
-		527,
-		aTop + 342,
-		FONT_DWARVENTODCRAFT12,
-		aSubtleColor,
-		DS_ALIGN_RIGHT
-	);
-	TodDrawString(
-		g,
-		TodStringTranslate(_S("[ADVANCED_INTEGER_SCALING]")),
-		114,
-		aTop + 249,
-		FONT_DWARVENTODCRAFT18,
-		aTextColor,
-		DS_ALIGN_LEFT
-	);
-	TodDrawString(
-		g,
-		TodStringTranslate(_S("[ADVANCED_SHOW_FPS]")),
-		432,
-		aTop + 249,
-		FONT_DWARVENTODCRAFT18,
-		aTextColor,
-		DS_ALIGN_LEFT
-	);
+	{
+		TodDrawString(
+			g,
+			TodStringTranslate(_S("[ADVANCED_EXCLUSIVE_FULLSCREEN]")),
+			114,
+			aTop + 76,
+			FONT_DWARVENTODCRAFT18,
+			aTextColor,
+			DS_ALIGN_LEFT
+		);
+		TodDrawString(
+			g,
+			TodStringTranslate(_S("[ADVANCED_REFRESH_RATE]")),
+			72,
+			aTop + 130,
+			FONT_DWARVENTODCRAFT18,
+			aTextColor,
+			DS_ALIGN_LEFT
+		);
+		TodDrawString(g, GetRefreshRateLabel(), 386, aTop + 130, FONT_DWARVENTODCRAFT12, aTextColor, DS_ALIGN_CENTER);
+		TodDrawString(
+			g,
+			TodStringTranslate(_S("[ADVANCED_INTEGER_SCALING]")),
+			114,
+			aTop + 189,
+			FONT_DWARVENTODCRAFT18,
+			aTextColor,
+			DS_ALIGN_LEFT
+		);
+		TodDrawString(
+			g,
+			TodStringTranslate(_S("[ADVANCED_SHOW_FPS]")),
+			369,
+			aTop + 189,
+			FONT_DWARVENTODCRAFT18,
+			aTextColor,
+			DS_ALIGN_LEFT
+		);
+		TodDrawStringWrapped(
+			g,
+			TodStringTranslate(_S("[ADVANCED_DISPLAY_RESTART_NOTE]")),
+			Rect(72, aTop + 228, 455, 42),
+			FONT_DWARVENTODCRAFT12,
+			aSubtleColor,
+			DS_ALIGN_RIGHT
+		);
+	}
 }
 
 void MoreSettingsDialog::BuildRefreshRateList()
 {
 	mAvailableRefreshRatesMilliHz.clear();
 	mAvailableRefreshRatesMilliHz.push_back(0);
+	mUnavailableRefreshRateMilliHz = 0;
 
 	const SDL_DisplayID aDisplay = LawnApp::mSDLWindow == nullptr
 		? 0
@@ -273,14 +362,17 @@ void MoreSettingsDialog::BuildRefreshRateList()
 		mAvailableRefreshRatesMilliHz.end()
 	);
 
-	auto aCurrentRate = std::find(
+	auto aCurrentRate = std::find_if(
 		mAvailableRefreshRatesMilliHz.begin(),
 		mAvailableRefreshRatesMilliHz.end(),
-		mApp->mPreferredRefreshRateMilliHz
+		[this](int theRateMilliHz)
+		{
+			return std::abs(theRateMilliHz - mApp->mPreferredRefreshRateMilliHz) <= 100;
+		}
 	);
 	if (aCurrentRate == mAvailableRefreshRatesMilliHz.end())
 	{
-		mApp->mPreferredRefreshRateMilliHz = 0;
+		mUnavailableRefreshRateMilliHz = mApp->mPreferredRefreshRateMilliHz;
 		aCurrentRate = mAvailableRefreshRatesMilliHz.begin();
 	}
 	mRefreshRateIndex = aCurrentRate == mAvailableRefreshRatesMilliHz.end()
@@ -302,6 +394,14 @@ SexyString MoreSettingsDialog::GetRefreshRateLabel() const
 {
 	if (!mApp->mUseExclusiveFullscreen)
 		return TodStringTranslate(_S("[ADVANCED_DESKTOP_CONTROLLED]"));
+	if (mUnavailableRefreshRateMilliHz > 0)
+	{
+		return StrFormat(
+			"%.2f Hz - %s",
+			mUnavailableRefreshRateMilliHz / 1000.0,
+			TodStringTranslate(_S("[ADVANCED_REFRESH_UNAVAILABLE]")).c_str()
+		);
+	}
 	if (mAvailableRefreshRatesMilliHz.empty() || mRefreshRateIndex < 0 ||
 		mRefreshRateIndex >= (int)mAvailableRefreshRatesMilliHz.size() ||
 		mAvailableRefreshRatesMilliHz[mRefreshRateIndex] == 0)
@@ -320,6 +420,13 @@ void MoreSettingsDialog::CheckboxChecked(int theId, bool checked)
 	mApp->PlaySample(SOUND_BUTTONCLICK);
 	switch (theId)
 	{
+	case MoreSettingsDialog_HDRAdaptiveToneMapping:
+		mApp->mHDRAdaptiveToneMapping = checked;
+		mApp->mHDRToneMapUnavailable = false;
+		if (!checked)
+			mApp->DestroyHDRToneMapTexture();
+		MarkDirty();
+		break;
 	case MoreSettingsDialog_ExclusiveFullscreen:
 		mApp->mUseExclusiveFullscreen = checked;
 		UpdateRefreshControls();
@@ -337,18 +444,37 @@ void MoreSettingsDialog::CheckboxChecked(int theId, bool checked)
 
 void MoreSettingsDialog::SliderVal(int theId, double theVal)
 {
-	if (theId != MoreSettingsDialog_HDRPaperWhite)
+	switch (theId)
+	{
+	case MoreSettingsDialog_HDRPaperWhite:
+	{
+		const int aPercent = std::clamp(50 + (int)std::lround(theVal * 30.0) * 5, 50, 200);
+		mApp->mHDRPaperWhitePercent = aPercent;
+		mApp->mHDRToneMapUnavailable = false;
+		mHDRPaperWhiteSlider->SetValue((aPercent - 50) / 150.0);
+		break;
+	}
+	case MoreSettingsDialog_HDRExposure:
+	{
+		const int anExposureTenthsEV = std::clamp(-20 + (int)std::lround(theVal * 40.0), -20, 20);
+		mApp->mHDRExposureTenthsEV = anExposureTenthsEV;
+		mApp->mHDRToneMapUnavailable = false;
+		mHDRExposureSlider->SetValue((anExposureTenthsEV + 20) / 40.0);
+		break;
+	}
+	default:
 		return;
-
-	const int aPercent = std::clamp(50 + (int)std::lround(theVal * 30.0) * 5, 50, 200);
-	mApp->mHDRPaperWhitePercent = aPercent;
-	mHDRPaperWhiteSlider->SetValue((aPercent - 50) / 150.0);
+	}
 	MarkDirty();
 }
 
 void MoreSettingsDialog::RestoreDefaults()
 {
 	mApp->mHDRPaperWhitePercent = 100;
+	mApp->mHDRExposureTenthsEV = 0;
+	mApp->mHDRAdaptiveToneMapping = false;
+	mApp->mHDRToneMapUnavailable = false;
+	mApp->DestroyHDRToneMapTexture();
 	mApp->mPreferredRefreshRateMilliHz = 0;
 	mApp->mUseExclusiveFullscreen = false;
 	mApp->mUseIntegerScaling = false;
@@ -356,6 +482,8 @@ void MoreSettingsDialog::RestoreDefaults()
 	mApp->SetShowFPS(false);
 
 	mHDRPaperWhiteSlider->SetValue(1.0 / 3.0);
+	mHDRExposureSlider->SetValue(0.5);
+	mHDRAdaptiveToneMappingCheckbox->SetChecked(false, false);
 	mExclusiveFullscreenCheckbox->SetChecked(false, false);
 	mIntegerScalingCheckbox->SetChecked(false, false);
 	mShowFPSCheckbox->SetChecked(false, false);
@@ -369,10 +497,17 @@ void MoreSettingsDialog::ButtonDepress(int theId)
 	LawnDialog::ButtonDepress(theId);
 	switch (theId)
 	{
+	case MoreSettingsDialog_ToneMappingPage:
+		SetPage(SETTINGS_PAGE_TONE_MAPPING);
+		break;
+	case MoreSettingsDialog_DisplayPage:
+		SetPage(SETTINGS_PAGE_DISPLAY);
+		break;
 	case MoreSettingsDialog_RefreshPrevious:
 		if (mRefreshRateIndex > 0)
 		{
 			mRefreshRateIndex--;
+			mUnavailableRefreshRateMilliHz = 0;
 			mApp->mPreferredRefreshRateMilliHz = mAvailableRefreshRatesMilliHz[mRefreshRateIndex];
 			UpdateRefreshControls();
 		}
@@ -381,6 +516,7 @@ void MoreSettingsDialog::ButtonDepress(int theId)
 		if (mRefreshRateIndex + 1 < (int)mAvailableRefreshRatesMilliHz.size())
 		{
 			mRefreshRateIndex++;
+			mUnavailableRefreshRateMilliHz = 0;
 			mApp->mPreferredRefreshRateMilliHz = mAvailableRefreshRatesMilliHz[mRefreshRateIndex];
 			UpdateRefreshControls();
 		}
@@ -393,7 +529,17 @@ void MoreSettingsDialog::ButtonDepress(int theId)
 
 void MoreSettingsDialog::KeyDown(KeyCode theKey)
 {
-	if (theKey == KEYCODE_ESCAPE)
+	if (theKey == KEYCODE_LEFT && mCurrentPage != SETTINGS_PAGE_TONE_MAPPING)
+	{
+		mApp->PlaySample(SOUND_GRAVEBUTTON);
+		SetPage(SETTINGS_PAGE_TONE_MAPPING);
+	}
+	else if (theKey == KEYCODE_RIGHT && mCurrentPage != SETTINGS_PAGE_DISPLAY)
+	{
+		mApp->PlaySample(SOUND_GRAVEBUTTON);
+		SetPage(SETTINGS_PAGE_DISPLAY);
+	}
+	else if (theKey == KEYCODE_ESCAPE)
 		Dialog::ButtonDepress(Dialog::ID_OK);
 	else
 		LawnDialog::KeyDown(theKey);

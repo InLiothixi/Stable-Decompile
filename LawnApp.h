@@ -166,6 +166,11 @@ public:
 	bool							mEnableNativeHDR;
 	bool							mNativeHDRRenderer;
 	int								mHDRPaperWhitePercent;
+	int								mHDRExposureTenthsEV;
+	bool							mHDRAdaptiveToneMapping;
+	SDL_Texture*					mHDRToneMapTexture;
+	int								mHDRToneMapTextureScaleMilli;
+	bool							mHDRToneMapUnavailable;
 	int								mPreferredRefreshRateMilliHz;
 	bool							mUseExclusiveFullscreen;
 	bool							mUseIntegerScaling;
@@ -381,6 +386,8 @@ public:
 	void							MakeWindow();
 	bool							IsNativeHDRActive() const;
 	float							GetHDRPaperWhiteScale() const;
+	float							GetHDRCompositeScale() const;
+	void							DestroyHDRToneMapTexture();
 	void							ApplyLogicalPresentationMode();
 	bool							ConfigureFullscreenDisplayMode();
 	bool							DrawDirtyStuff();

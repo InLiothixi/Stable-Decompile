@@ -21,29 +21,45 @@ class MoreSettingsDialog : public LawnDialog, public Sexy::CheckboxListener, pub
 private:
 	enum
 	{
-		MoreSettingsDialog_RefreshPrevious = 20000,
+		MoreSettingsDialog_ToneMappingPage = 20000,
+		MoreSettingsDialog_DisplayPage,
+		MoreSettingsDialog_HDRPaperWhite,
+		MoreSettingsDialog_HDRExposure,
+		MoreSettingsDialog_HDRAdaptiveToneMapping,
+		MoreSettingsDialog_RefreshPrevious,
 		MoreSettingsDialog_RefreshNext,
 		MoreSettingsDialog_ExclusiveFullscreen,
 		MoreSettingsDialog_IntegerScaling,
 		MoreSettingsDialog_ShowFPS,
-		MoreSettingsDialog_HDRPaperWhite,
 		MoreSettingsDialog_RestoreDefaults,
+	};
+	enum SettingsPage
+	{
+		SETTINGS_PAGE_TONE_MAPPING,
+		SETTINGS_PAGE_DISPLAY,
 	};
 
 	LawnApp*				mApp;
 	Sexy::Slider*			mHDRPaperWhiteSlider;
+	Sexy::Slider*			mHDRExposureSlider;
+	Sexy::Checkbox*		mHDRAdaptiveToneMappingCheckbox;
 	Sexy::Checkbox*		mExclusiveFullscreenCheckbox;
 	Sexy::Checkbox*		mIntegerScalingCheckbox;
 	Sexy::Checkbox*		mShowFPSCheckbox;
 	LawnStoneButton*		mRefreshPreviousButton;
 	LawnStoneButton*		mRefreshNextButton;
+	LawnStoneButton*		mToneMappingPageButton;
+	LawnStoneButton*		mDisplayPageButton;
 	LawnStoneButton*		mRestoreDefaultsButton;
 	std::vector<int>		mAvailableRefreshRatesMilliHz;
 	int						mRefreshRateIndex;
+	int						mUnavailableRefreshRateMilliHz;
 	int						mOriginalRefreshRateMilliHz;
 	bool					mOriginalExclusiveFullscreen;
+	SettingsPage			mCurrentPage;
 
 	int						GetContentTop() const;
+	void					SetPage(SettingsPage thePage);
 	void					BuildRefreshRateList();
 	void					UpdateRefreshControls();
 	SexyString				GetRefreshRateLabel() const;

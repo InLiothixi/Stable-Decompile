@@ -216,7 +216,8 @@ namespace
 			SDL_PROP_RENDERER_OUTPUT_COLORSPACE_NUMBER,
 			SDL_COLORSPACE_UNKNOWN
 		);
-		return anOutputColorspace == SDL_COLORSPACE_SRGB_LINEAR;
+		return anOutputColorspace == SDL_COLORSPACE_SRGB_LINEAR &&
+			SDL_GetBooleanProperty(aRendererProperties, SDL_PROP_RENDERER_HDR_ENABLED_BOOLEAN, false);
 	}
 
 	bool SDLCALL KeepEventsForOtherWindows(void* theUserData, SDL_Event* theEvent)
@@ -452,9 +453,7 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 		anSDRPresentation.mRenderer != nullptr;
 	// MakeWindow and popup synchronization can leave startup geometry events in
 	// the queue. Only a change made after the SDR surface is ready should end it.
-	const Uint64 anSDRPresentationReadyTimestamp = isUsingSDRPresentation
-		? SDL_GetTicksNS()
-		: 0;
+	const Uint64 aVideoPresentationReadyTimestamp = SDL_GetTicksNS();
 	const SDL_WindowID aMainWindowId = SDL_GetWindowID(mSDLWindow);
 	const SDL_WindowID aVideoWindowId = isUsingSDRPresentation
 		? anSDRPresentation.mWindowId
@@ -739,9 +738,19 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 			case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
 				if (isUsingSDRPresentation &&
 					event.window.windowID == aMainWindowId &&
-					event.window.timestamp >= anSDRPresentationReadyTimestamp)
+					event.window.timestamp >= aVideoPresentationReadyTimestamp)
 				{
 					TodTrace("The main window changed while the SDR video surface was active; ending video playback safely.\n");
+					mIsPlayingVideo = false;
+				}
+				break;
+			case SDL_EVENT_WINDOW_HDR_STATE_CHANGED:
+				if (!isUsingSDRPresentation &&
+					event.window.windowID == aMainWindowId &&
+					event.window.timestamp >= aVideoPresentationReadyTimestamp &&
+					ShouldUseSDRVideoPresentation(mSDLRenderer))
+				{
+					TodTrace("HDR became active during direct video playback; ending the video before switching presentation paths.\n");
 					mIsPlayingVideo = false;
 				}
 				break;
@@ -1078,6 +1087,7 @@ void LawnApp::MakeWindow()
 {
 	//SexyAppBase::MakeWindow();
 	if (mSDLWindow != nullptr) {
+		DestroyHDRToneMapTexture();
 		SDL_DestroyRenderer(mSDLRenderer);
 		SDL_DestroyWindow(mSDLWindow);
 	}
@@ -1133,6 +1143,7 @@ void LawnApp::MakeWindow()
 	if (mSDLWindow != nullptr && (windowFlags & SDL_WINDOW_FULLSCREEN) != 0 && !SDL_SyncWindow(mSDLWindow))
 		TodTrace("Initial fullscreen synchronization timed out: %s\n", SDL_GetError());
 	mNativeHDRRenderer = false;
+	mHDRToneMapUnavailable = false;
 	mSDLRenderer = CreateLawnRenderer(mSDLWindow, mEnableNativeHDR, mEnableVsync);
 	if (mSDLRenderer == nullptr && mEnableNativeHDR)
 	{
@@ -1232,6 +1243,28 @@ float LawnApp::GetHDRPaperWhiteScale() const
 	);
 	const float aHeadroom = aReportedHeadroom < 1.0f ? 1.0f : aReportedHeadroom;
 	return aRequestedScale > aHeadroom ? aHeadroom : aRequestedScale;
+}
+
+float LawnApp::GetHDRCompositeScale() const
+{
+	if (!IsNativeHDRActive())
+		return 1.0f;
+
+	const float anExposureScale = std::exp2((float)std::clamp(mHDRExposureTenthsEV, -20, 20) / 10.0f);
+	const float aPaperWhiteScale = mHDRAdaptiveToneMapping
+		? (float)std::clamp(mHDRPaperWhitePercent, 50, 200) / 100.0f
+		: GetHDRPaperWhiteScale();
+	return std::clamp(aPaperWhiteScale * anExposureScale, 0.125f, 8.0f);
+}
+
+void LawnApp::DestroyHDRToneMapTexture()
+{
+	if (mHDRToneMapTexture != nullptr)
+	{
+		SDL_DestroyTexture(mHDRToneMapTexture);
+		mHDRToneMapTexture = nullptr;
+	}
+	mHDRToneMapTextureScaleMilli = 0;
 }
 
 void LawnApp::ApplyLogicalPresentationMode()
@@ -1344,6 +1377,7 @@ bool LawnApp::DrawDirtyStuff()
 			anOldRenderTarget = nullptr;
 		SDL_DestroyTexture(aScreenTexture);
 		mWidgetManager->mImage->mD3DData = nullptr;
+		DestroyHDRToneMapTexture();
 		aScreenTexture = nullptr;
 	}
 	if (aScreenTexture == nullptr)
@@ -1351,7 +1385,7 @@ bool LawnApp::DrawDirtyStuff()
 		SDL_SetRenderTarget(mSDLRenderer, nullptr);
 		SDL_SetRenderDrawColor(mSDLRenderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
 		SDL_RenderClear(mSDLRenderer);
-		SDL_SetRenderColorScale(mSDLRenderer, GetHDRPaperWhiteScale());
+		SDL_SetRenderColorScale(mSDLRenderer, GetHDRCompositeScale());
 		mWidgetManager->MarkAllDirty();
 	}
 	bool drewStuff = SexyAppBase::DrawDirtyStuff();
@@ -1369,21 +1403,165 @@ void LawnApp::Redraw(Rect* theClipRect)
 	SDL_SetRenderTarget(mSDLRenderer, nullptr);
 	if (aScreenTexture != nullptr)
 	{
+		float aCompositeScale = GetHDRCompositeScale();
+		SDL_Texture* aCompositeTexture = aScreenTexture;
+		bool isUsingAdaptiveToneMapping = false;
+
+		if (mHDRAdaptiveToneMapping && !mHDRToneMapUnavailable && IsNativeHDRActive())
+		{
+			const SDL_PropertiesID aRendererProperties = SDL_GetRendererProperties(mSDLRenderer);
+			float aDisplayHeadroom = SDL_GetFloatProperty(
+				aRendererProperties,
+				SDL_PROP_RENDERER_HDR_HEADROOM_FLOAT,
+				1.0f
+			);
+			if (!std::isfinite(aDisplayHeadroom) || aDisplayHeadroom < 1.0f)
+				aDisplayHeadroom = 1.0f;
+
+			if (aCompositeScale > aDisplayHeadroom + 0.001f)
+			{
+				const int aScaleMilli = (int)std::lround(aCompositeScale * 1000.0f);
+				if (mHDRToneMapTexture == nullptr || mHDRToneMapTextureScaleMilli != aScaleMilli)
+				{
+					SDL_PropertiesID aProperties = SDL_CreateProperties();
+					SDL_Texture* aNewToneMapTexture = nullptr;
+					bool aToneMapTargetMetadataWasRejected = false;
+					if (aProperties != 0)
+					{
+						const bool aPropertiesWereConfigured =
+							SDL_SetNumberProperty(aProperties, SDL_PROP_TEXTURE_CREATE_FORMAT_NUMBER, SDL_PIXELFORMAT_RGBA64_FLOAT) &&
+							SDL_SetNumberProperty(aProperties, SDL_PROP_TEXTURE_CREATE_ACCESS_NUMBER, SDL_TEXTUREACCESS_TARGET) &&
+							SDL_SetNumberProperty(aProperties, SDL_PROP_TEXTURE_CREATE_WIDTH_NUMBER, mWidth) &&
+							SDL_SetNumberProperty(aProperties, SDL_PROP_TEXTURE_CREATE_HEIGHT_NUMBER, mHeight) &&
+							SDL_SetNumberProperty(aProperties, SDL_PROP_TEXTURE_CREATE_COLORSPACE_NUMBER, SDL_COLORSPACE_SRGB_LINEAR) &&
+							SDL_SetFloatProperty(aProperties, SDL_PROP_TEXTURE_CREATE_SDR_WHITE_POINT_FLOAT, 1.0f) &&
+							SDL_SetFloatProperty(aProperties, SDL_PROP_TEXTURE_CREATE_HDR_HEADROOM_FLOAT, aCompositeScale);
+						if (aPropertiesWereConfigured)
+							aNewToneMapTexture = SDL_CreateTextureWithProperties(mSDLRenderer, aProperties);
+						SDL_DestroyProperties(aProperties);
+					}
+
+					if (aNewToneMapTexture != nullptr)
+					{
+						const SDL_PropertiesID aTextureProperties = SDL_GetTextureProperties(aNewToneMapTexture);
+						const SDL_Colorspace aTextureColorspace = (SDL_Colorspace)SDL_GetNumberProperty(
+							aTextureProperties,
+							SDL_PROP_TEXTURE_COLORSPACE_NUMBER,
+							SDL_COLORSPACE_UNKNOWN
+						);
+						const SDL_PixelFormat aTextureFormat = (SDL_PixelFormat)SDL_GetNumberProperty(
+							aTextureProperties,
+							SDL_PROP_TEXTURE_FORMAT_NUMBER,
+							SDL_PIXELFORMAT_UNKNOWN
+						);
+						const float aTextureWhitePoint = SDL_GetFloatProperty(
+							aTextureProperties,
+							SDL_PROP_TEXTURE_SDR_WHITE_POINT_FLOAT,
+							0.0f
+						);
+						const float aTextureHeadroom = SDL_GetFloatProperty(
+							aTextureProperties,
+							SDL_PROP_TEXTURE_HDR_HEADROOM_FLOAT,
+							0.0f
+						);
+						const bool aTextureIsValid =
+							aTextureColorspace == SDL_COLORSPACE_SRGB_LINEAR &&
+							aTextureFormat == SDL_PIXELFORMAT_RGBA64_FLOAT &&
+							std::abs(aTextureWhitePoint - 1.0f) <= 0.001f &&
+							std::abs(aTextureHeadroom - aCompositeScale) <= 0.01f &&
+							SDL_SetTextureBlendMode(aNewToneMapTexture, SDL_BLENDMODE_NONE);
+
+						if (aTextureIsValid)
+						{
+							SDL_ScaleMode aScaleMode = SDL_SCALEMODE_LINEAR;
+							if (SDL_GetTextureScaleMode(aScreenTexture, &aScaleMode))
+								SDL_SetTextureScaleMode(aNewToneMapTexture, aScaleMode);
+							DestroyHDRToneMapTexture();
+							mHDRToneMapTexture = aNewToneMapTexture;
+							mHDRToneMapTextureScaleMilli = aScaleMilli;
+						}
+						else
+						{
+							TodTrace("HDR tone-map target metadata is unsupported. Using clipped HDR output.\n");
+							SDL_DestroyTexture(aNewToneMapTexture);
+							aNewToneMapTexture = nullptr;
+							aToneMapTargetMetadataWasRejected = true;
+						}
+					}
+					if (aNewToneMapTexture == nullptr)
+					{
+						if (!aToneMapTargetMetadataWasRejected)
+							TodTrace("HDR tone-map target creation failed: %s. Using clipped HDR output.\n", SDL_GetError());
+						DestroyHDRToneMapTexture();
+						mHDRToneMapUnavailable = true;
+					}
+				}
+
+				if (mHDRToneMapTexture != nullptr)
+				{
+					SDL_SetTextureColorMod(aScreenTexture, 255, 255, 255);
+					SDL_SetTextureAlphaMod(aScreenTexture, 255);
+					SDL_SetTextureBlendMode(aScreenTexture, SDL_BLENDMODE_NONE);
+					const bool aTargetWasSet = SDL_SetRenderTarget(mSDLRenderer, mHDRToneMapTexture);
+					const bool aScaleWasSet = aTargetWasSet && SDL_SetRenderColorScale(mSDLRenderer, aCompositeScale);
+					SDL_SetRenderDrawColor(mSDLRenderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+					const bool aTargetWasCleared = aScaleWasSet && SDL_RenderClear(mSDLRenderer);
+					const bool aToneMapSourceWasDrawn = aTargetWasCleared && SDL_RenderTexture(mSDLRenderer, aScreenTexture, nullptr, nullptr);
+					const bool aScaleWasRestored = SDL_SetRenderColorScale(mSDLRenderer, 1.0f);
+					const bool aWindowTargetWasRestored = SDL_SetRenderTarget(mSDLRenderer, nullptr);
+
+					if (aTargetWasSet && aScaleWasSet && aTargetWasCleared && aToneMapSourceWasDrawn &&
+						aScaleWasRestored && aWindowTargetWasRestored)
+					{
+						aCompositeTexture = mHDRToneMapTexture;
+						aCompositeScale = 1.0f;
+						isUsingAdaptiveToneMapping = true;
+					}
+					else
+					{
+						TodTrace("HDR tone-map pass failed: %s. Using clipped HDR output.\n", SDL_GetError());
+						SDL_SetRenderColorScale(mSDLRenderer, 1.0f);
+						SDL_SetRenderTarget(mSDLRenderer, nullptr);
+						DestroyHDRToneMapTexture();
+						mHDRToneMapUnavailable = true;
+					}
+				}
+			}
+		}
+
 		SDL_SetRenderDrawColor(mSDLRenderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
 		SDL_RenderClear(mSDLRenderer);
-		SDL_SetTextureColorMod(aScreenTexture, 255, 255, 255);
-		SDL_SetTextureAlphaMod(aScreenTexture, 255);
-		SDL_SetTextureBlendMode(aScreenTexture, SDL_BLENDMODE_NONE);
-		const bool aScaleWasSet = SDL_SetRenderColorScale(mSDLRenderer, GetHDRPaperWhiteScale());
-		const bool aCompositeSucceeded = SDL_RenderTexture(mSDLRenderer, aScreenTexture, nullptr, nullptr);
+		SDL_SetTextureColorMod(aCompositeTexture, 255, 255, 255);
+		SDL_SetTextureAlphaMod(aCompositeTexture, 255);
+		SDL_SetTextureBlendMode(aCompositeTexture, SDL_BLENDMODE_NONE);
+		const bool aScaleWasSet = SDL_SetRenderColorScale(mSDLRenderer, aCompositeScale);
+		bool aCompositeSucceeded = aScaleWasSet && SDL_RenderTexture(mSDLRenderer, aCompositeTexture, nullptr, nullptr);
 		const bool aScaleWasRestored = SDL_SetRenderColorScale(mSDLRenderer, 1.0f);
 		if (!aScaleWasSet)
-			TodTrace("HDR paper-white setup failed: %s\n", SDL_GetError());
+			TodTrace("HDR composite scale setup failed: %s\n", SDL_GetError());
 		if (!aScaleWasRestored)
-			TodTrace("HDR paper-white restore failed: %s\n", SDL_GetError());
+			TodTrace("HDR composite scale restore failed: %s\n", SDL_GetError());
+
+		if (!aCompositeSucceeded && isUsingAdaptiveToneMapping)
+		{
+			TodTrace("Adaptive HDR composite failed: %s. Retrying clipped HDR output.\n", SDL_GetError());
+			DestroyHDRToneMapTexture();
+			mHDRToneMapUnavailable = true;
+			SDL_SetRenderTarget(mSDLRenderer, nullptr);
+			SDL_SetRenderDrawColor(mSDLRenderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+			SDL_RenderClear(mSDLRenderer);
+			SDL_SetTextureColorMod(aScreenTexture, 255, 255, 255);
+			SDL_SetTextureAlphaMod(aScreenTexture, 255);
+			SDL_SetTextureBlendMode(aScreenTexture, SDL_BLENDMODE_NONE);
+			const bool aFallbackScaleWasSet = SDL_SetRenderColorScale(mSDLRenderer, GetHDRCompositeScale());
+			aCompositeSucceeded = aFallbackScaleWasSet && SDL_RenderTexture(mSDLRenderer, aScreenTexture, nullptr, nullptr);
+			SDL_SetRenderColorScale(mSDLRenderer, 1.0f);
+		}
+
 		if (!aCompositeSucceeded)
 		{
 			TodTrace("Screen composite failed: %s. Switching to full-frame direct rendering.\n", SDL_GetError());
+			DestroyHDRToneMapTexture();
 			SDL_DestroyTexture(aScreenTexture);
 			mWidgetManager->mImage->mD3DData = nullptr;
 			mWidgetManager->MarkAllDirty();
@@ -1601,6 +1779,7 @@ bool LawnApp::UpdateAppStep(bool* updated)
 						SDL_GetFloatProperty(aRendererProperties, SDL_PROP_RENDERER_SDR_WHITE_POINT_FLOAT, 1.0f),
 						SDL_GetFloatProperty(aRendererProperties, SDL_PROP_RENDERER_HDR_HEADROOM_FLOAT, 1.0f)
 					);
+					mHDRToneMapUnavailable = false;
 					mWidgetManager->MarkAllDirty();
 					mHasPendingDraw = true;
 					break;
@@ -1883,6 +2062,11 @@ LawnApp::LawnApp()
 	mEnableNativeHDR = false;
 	mNativeHDRRenderer = false;
 	mHDRPaperWhitePercent = 100;
+	mHDRExposureTenthsEV = 0;
+	mHDRAdaptiveToneMapping = false;
+	mHDRToneMapTexture = nullptr;
+	mHDRToneMapTextureScaleMilli = 0;
+	mHDRToneMapUnavailable = false;
 	mPreferredRefreshRateMilliHz = 0;
 	mUseExclusiveFullscreen = false;
 	mUseIntegerScaling = false;
@@ -1891,6 +2075,8 @@ LawnApp::LawnApp()
 //0x44EDD0、0x44EDF0
 LawnApp::~LawnApp()
 {
+	DestroyHDRToneMapTexture();
+
 	if (mBoard)
 	{
 		WriteCurrentUserConfig();
@@ -2166,6 +2352,8 @@ void LawnApp::WriteToRegistry()
 	SexyAppBase::WriteToRegistry();
 	RegistryWriteBoolean(_S("EnableNativeHDR"), mEnableNativeHDR);
 	RegistryWriteInteger(_S("HDRPaperWhitePercent"), mHDRPaperWhitePercent);
+	RegistryWriteInteger(_S("HDRExposureTenthsEV"), mHDRExposureTenthsEV);
+	RegistryWriteBoolean(_S("HDRAdaptiveToneMapping"), mHDRAdaptiveToneMapping);
 	RegistryWriteInteger(_S("PreferredRefreshRateMilliHz"), mPreferredRefreshRateMilliHz);
 	RegistryWriteBoolean(_S("UseExclusiveFullscreen"), mUseExclusiveFullscreen);
 	RegistryWriteBoolean(_S("UseIntegerScaling"), mUseIntegerScaling);
@@ -2178,12 +2366,15 @@ void LawnApp::ReadFromRegistry()
 	SexyApp::ReadFromRegistry();
 	RegistryReadBoolean(_S("EnableNativeHDR"), &mEnableNativeHDR);
 	RegistryReadInteger(_S("HDRPaperWhitePercent"), &mHDRPaperWhitePercent);
+	RegistryReadInteger(_S("HDRExposureTenthsEV"), &mHDRExposureTenthsEV);
+	RegistryReadBoolean(_S("HDRAdaptiveToneMapping"), &mHDRAdaptiveToneMapping);
 	RegistryReadInteger(_S("PreferredRefreshRateMilliHz"), &mPreferredRefreshRateMilliHz);
 	RegistryReadBoolean(_S("UseExclusiveFullscreen"), &mUseExclusiveFullscreen);
 	RegistryReadBoolean(_S("UseIntegerScaling"), &mUseIntegerScaling);
 	bool aShowFPS = mShowFPS;
 	RegistryReadBoolean(_S("ShowFPS"), &aShowFPS);
 	mHDRPaperWhitePercent = std::clamp(mHDRPaperWhitePercent, 50, 200);
+	mHDRExposureTenthsEV = std::clamp(mHDRExposureTenthsEV, -20, 20);
 	mPreferredRefreshRateMilliHz = std::clamp(mPreferredRefreshRateMilliHz, 0, 1000000);
 	SetShowFPS(aShowFPS);
 }
@@ -5983,6 +6174,8 @@ void LawnApp::KillMoreSettingsDialog()
 
 	const bool aDisplayRestartIsRequired = aDialog->RequiresDisplayRestart();
 	RegistryWriteInteger(_S("HDRPaperWhitePercent"), mHDRPaperWhitePercent);
+	RegistryWriteInteger(_S("HDRExposureTenthsEV"), mHDRExposureTenthsEV);
+	RegistryWriteBoolean(_S("HDRAdaptiveToneMapping"), mHDRAdaptiveToneMapping);
 	RegistryWriteInteger(_S("PreferredRefreshRateMilliHz"), mPreferredRefreshRateMilliHz);
 	RegistryWriteBoolean(_S("UseExclusiveFullscreen"), mUseExclusiveFullscreen);
 	RegistryWriteBoolean(_S("UseIntegerScaling"), mUseIntegerScaling);

@@ -21,14 +21,29 @@ Advanced Settings
 [ADVANCED_SETTINGS_DONE]
 Done
 
+[ADVANCED_TONE_MAPPING_TAB]
+Tone Mapping
+
+[ADVANCED_DISPLAY_TAB]
+Display
+
 [ADVANCED_HDR_SECTION]
 HDR Tone Mapping
 
 [ADVANCED_HDR_PAPER_WHITE]
 Paper White
 
+[ADVANCED_HDR_EXPOSURE]
+HDR Exposure
+
+[ADVANCED_HDR_ADAPTIVE]
+Adaptive Tone Mapping
+
+[ADVANCED_HDR_ADAPTIVE_NOTE]
+Game image only. Adaptive mapping protects highlights above display headroom.
+
 [ADVANCED_HDR_DISABLED]
-Native HDR is off. This value is saved for later.
+Native HDR is off. These settings are saved for later.
 
 [ADVANCED_HDR_ACTIVE]
 Native HDR active - display headroom
@@ -54,6 +69,9 @@ Windows default
 [ADVANCED_DESKTOP_RATE]
 Desktop rate
 
+[ADVANCED_REFRESH_UNAVAILABLE]
+Unavailable
+
 [ADVANCED_DISPLAY_RESTART_NOTE]
 Fullscreen mode and refresh-rate changes apply after restart.
 
@@ -64,7 +82,7 @@ Pixel-Perfect Scaling
 Show FPS
 
 [ADVANCED_RESTORE_DEFAULTS]
-Restore Defaults
+Reset All
 
 [ADVANCED_DISPLAY_RESTART_HEADER]
 Display Settings

@@ -49,3 +49,5 @@
 bin/x64/*.dll filter=lfs diff=lfs merge=lfs -text
 bin/x86/*.dll filter=lfs diff=lfs merge=lfs -text
 bin/**/*.dll filter=lfs diff=lfs merge=lfs -text
+# Preserve the byte-identical upstream zlib source, including its final blank line.
+third_party/zlib/trees.h whitespace=-blank-at-eof

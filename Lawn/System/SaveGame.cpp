@@ -34,6 +34,39 @@ static unsigned int SAVE_FILE_DATE = crc32(0, (Bytef*)FILE_COMPILE_TIME_STRING, 
 static unsigned int SAVE_FILE_DATE2 = crc32(0, (Bytef*)FILE_COMPILE_TIME_STRING2, strlen(FILE_COMPILE_TIME_STRING2));
 #endif
 
+static bool QuarantineRejectedSave(const SexyString& theFilePath, const char* theReason)
+{
+	// PreNewGame replaces a save after a failed load. Move rejected data out of that
+	// path first so an incompatible build or corrupt payload cannot destroy it.
+	for (int aCopyIndex = 0; aCopyIndex < 1000; aCopyIndex++)
+	{
+		SexyString aRejectedPath = theFilePath + _S(".rejected");
+		if (aCopyIndex > 0)
+			aRejectedPath += StrFormat(_S(".%d"), aCopyIndex);
+
+#ifdef _USE_WIDE_STRING
+		const BOOL aMoved = MoveFileW(theFilePath.c_str(), aRejectedPath.c_str());
+#else
+		const BOOL aMoved = MoveFileA(theFilePath.c_str(), aRejectedPath.c_str());
+#endif
+		if (aMoved)
+		{
+			TodTrace("Preserved rejected save (%s)", theReason);
+			return true;
+		}
+
+		const DWORD anError = GetLastError();
+		if (anError == ERROR_FILE_EXISTS || anError == ERROR_ALREADY_EXISTS)
+			continue;
+
+		TodTrace("Could not preserve rejected save (%s): filesystem error %lu", theReason, anError);
+		return false;
+	}
+
+	TodTrace("Could not preserve rejected save (%s): too many rejected copies", theReason);
+	return false;
+}
+
 //0x4813D0
 void SaveGameContext::SyncBytes(void* theDest, int theReadSize)
 {
@@ -510,14 +543,16 @@ void FixBoardAfterLoad(Board* theBoard)
 }
 
 //0x481FE0
-bool LawnLoadGame(Board* theBoard, const SexyString& theFilePath)
+SaveGameLoadStatus LawnLoadGame(Board* theBoard, const SexyString& theFilePath)
 {
 	SaveGameContext aContext;
 	aContext.mFailed = false;
 	aContext.mReading = true;
 	if (!gSexyAppBase->ReadBufferFromFile(theFilePath, &aContext.mBuffer, false))
 	{
-		return false;
+		return QuarantineRejectedSave(theFilePath, "read failure")
+			? SaveGameLoadStatus::REJECTED_PRESERVED
+			: SaveGameLoadStatus::REJECTED_UNPRESERVED;
 	}
 
 	SaveFileHeader aHeader;
@@ -528,19 +563,23 @@ bool LawnLoadGame(Board* theBoard, const SexyString& theFilePath)
 #endif
 		)
 	{
-		return false;
+		return QuarantineRejectedSave(theFilePath, "incompatible header")
+			? SaveGameLoadStatus::REJECTED_PRESERVED
+			: SaveGameLoadStatus::REJECTED_UNPRESERVED;
 	}
 
 	SyncBoard(aContext, theBoard);
 	if (aContext.mFailed)
 	{
-		return false;
+		return QuarantineRejectedSave(theFilePath, "corrupt or incompatible payload")
+			? SaveGameLoadStatus::REJECTED_PRESERVED
+			: SaveGameLoadStatus::REJECTED_UNPRESERVED;
 	}
 
 	TodTrace("Loaded save game");
 	FixBoardAfterLoad(theBoard);
 	theBoard->mApp->mGameScene = GameScenes::SCENE_PLAYING;
-	return true;
+	return SaveGameLoadStatus::LOADED;
 }
 
 //0x4820D0

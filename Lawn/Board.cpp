@@ -461,16 +461,17 @@ void Board::ResetFPSStats()
 }
 
 //0x408DE0
-bool Board::LoadGame(const SexyString& theFileName)
+SaveGameLoadStatus Board::LoadGame(const SexyString& theFileName)
 {
-	if (!LawnLoadGame(this, theFileName))
-		return false;
+	SaveGameLoadStatus aLoadStatus = LawnLoadGame(this, theFileName);
+	if (aLoadStatus != SaveGameLoadStatus::LOADED)
+		return aLoadStatus;
 
 	LoadBackgroundImages();
 	mApp->ClearUpdateBacklog();
 	ResetFPSStats();
 	UpdateLayers();
-	return true;
+	return SaveGameLoadStatus::LOADED;
 }
 
 //0x408E40

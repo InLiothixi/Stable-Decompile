@@ -819,6 +819,7 @@ void GameSelector::Draw(Graphics* g)
 		TodDrawStringMatrix(g, Sexy::FONT_BRIANNETOD16, aOverlayMatrix * aOffsetMatrix, aWelcomeStr, Color(255, 245, 200));
 	}
 
+#ifdef _HAS_ACHIEVEMENTS
 	Graphics gAchievementButton(*g);
 	if (mAdventureButton->mVisible)
 	{
@@ -826,6 +827,7 @@ void GameSelector::Draw(Graphics* g)
 		gAchievementButton.mTransY = mAchievementsButton->mY;
 		mAchievementsButton->Render(&gAchievementButton);
 	}
+#endif
 
 	Graphics gAdventureButton(*g);
 	if (mAdventureButton->mVisible)
@@ -1179,11 +1181,13 @@ void GameSelector::UpdateTooltip()
 	{
 		int aMouseX = mX + mApp->mWidgetManager->mLastMouseX;
 		int aMouseY = mY + mApp->mWidgetManager->mLastMouseY;
-		if (/*aMouseX >= mX + 50 && aMouseX < mX + 135 && aMouseY >= mY + 280 && aMouseY <= mY + 505*/
-#ifdef _HAS_ACHIEVEMENTS 
-			/*||*/ mTrophyButton && mTrophyButton->mIsOver
-#endif 
-		)
+#ifdef _HAS_ACHIEVEMENTS
+		const bool aTrophyIsOver = mTrophyButton && mTrophyButton->mIsOver;
+#else
+		const bool aTrophyIsOver = aMouseX >= mX + 50 && aMouseX < mX + 135 &&
+			aMouseY >= mY + 280 && aMouseY <= mY + 505;
+#endif
+		if (aTrophyIsOver)
 		{
 			if (mApp->EarnedGoldTrophy())
 			{

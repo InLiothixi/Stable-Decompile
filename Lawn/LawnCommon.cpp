@@ -116,19 +116,39 @@ Checkbox* MakeNewCheckbox(int theId, CheckboxListener* theListener, bool theDefa
 }
 
 //0x4568D0
+static SexyString FinishSavedGameName(const SexyString& theNameWithoutExtension, bool theUse64BitSuffix)
+{
+    return theNameWithoutExtension + (theUse64BitSuffix ? _S("_x64.dat") : _S(".dat"));
+}
+
+SexyString GetSavedGameNameForArchitecture(GameMode theGameMode, int theProfileId, bool theUse64BitSuffix)
+{
+    SexyString aName = GetAppDataFolder() + StrFormat(_S("userdata\\game%d_%d"), theProfileId, (int)theGameMode);
+    return FinishSavedGameName(aName, theUse64BitSuffix);
+}
+
 SexyString GetSavedGameName(GameMode theGameMode, int theProfileId)
 {
-    return GetAppDataFolder() + StrFormat(_S("userdata\\game%d_%d.dat"), theProfileId, (int)theGameMode);
+#ifdef _WIN64
+    return GetSavedGameNameForArchitecture(theGameMode, theProfileId, true);
+#else
+    // Keep the original filename on Win32 so existing in-progress saves remain available.
+    return GetSavedGameNameForArchitecture(theGameMode, theProfileId, false);
+#endif
 }
 
 SexyString GetSavedGameName(GameMode theGameMode, int theProfileId, int theLevel)
 {
     SexyString aName = GetAppDataFolder();
     if (theGameMode == GameMode::GAMEMODE_ADVENTURE && theLevel != 0 && gLawnApp->mPlayerInfo->mLevel != theLevel)
-        aName += StrFormat(_S("userdata\\game%d_%d_replay_%d.dat"), theProfileId, (int)theGameMode, theLevel);
+        aName += StrFormat(_S("userdata\\game%d_%d_replay_%d"), theProfileId, (int)theGameMode, theLevel);
     else
-        aName += StrFormat(_S("userdata\\game%d_%d.dat"), theProfileId, (int)theGameMode);
-    return aName;
+        aName += StrFormat(_S("userdata\\game%d_%d"), theProfileId, (int)theGameMode);
+#ifdef _WIN64
+    return FinishSavedGameName(aName, true);
+#else
+    return FinishSavedGameName(aName, false);
+#endif
 }
 
 //0x456980

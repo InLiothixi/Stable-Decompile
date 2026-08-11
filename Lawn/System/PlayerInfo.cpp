@@ -156,8 +156,9 @@ void PlayerInfo::DeleteUserFiles()
 
 	for (int i = 0; i < (int)GameMode::NUM_GAME_MODES; i++)
 	{
-		SexyString aFileName = GetSavedGameName((GameMode)i, mId);
-		gSexyAppBase->EraseFile(aFileName);
+		// Loading is architecture-specific, but deleting a profile must clean up both copies.
+		gSexyAppBase->EraseFile(GetSavedGameNameForArchitecture((GameMode)i, mId, false));
+		gSexyAppBase->EraseFile(GetSavedGameNameForArchitecture((GameMode)i, mId, true));
 	}
 }
 

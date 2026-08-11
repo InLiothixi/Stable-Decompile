@@ -27,6 +27,14 @@ struct SaveFileHeader
     unsigned int    mBuildDate;
 };
 
+enum class SaveGameLoadStatus
+{
+    NONE,
+    LOADED,
+    REJECTED_PRESERVED,
+    REJECTED_UNPRESERVED
+};
+
 class SaveGameContext
 {
 public:
@@ -52,7 +60,7 @@ void                SyncReanimation(Board* theBoard, Reanimation* theReanimation
 void                SyncTrail(Board* theBoard, Trail* theTrail, SaveGameContext& theContext);
 void                SyncBoard(SaveGameContext& theContext, Board* theBoard);
 void				FixBoardAfterLoad(Board* theBoard);
-bool				LawnLoadGame(Board* theBoard, const SexyString& theFilePath);
+SaveGameLoadStatus  LawnLoadGame(Board* theBoard, const SexyString& theFilePath);
 bool				LawnSaveGame(Board* theBoard, const SexyString& theFilePath);
 
 #endif

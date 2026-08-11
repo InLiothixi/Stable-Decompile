@@ -2247,7 +2247,9 @@ void LawnApp::Shutdown()
 			mReanimatorCache = nullptr;
 		}
 
+#ifdef _HAS_ZOMBATAR
 		DisposeZombatarClothesCache();
+#endif
 		FilterEffectDisposeForApp();
 		TodParticleFreeDefinitions();
 		ReanimatorFreeDefinitions();
@@ -2388,6 +2390,19 @@ bool LawnApp::WriteCurrentUserConfig()
 	return true;
 }
 
+static bool ShouldAbortNewGameAfterLoad(LawnApp* theApp, SaveGameLoadStatus theLoadStatus)
+{
+	if (theLoadStatus == SaveGameLoadStatus::LOADED)
+		return true;
+	if (theLoadStatus != SaveGameLoadStatus::REJECTED_UNPRESERVED)
+		return false;
+
+	theApp->DoDialog(Dialogs::DIALOG_INFO, true, _S("Unable to Load Save"),
+		_S("The existing in-progress save could not be loaded or moved to a safe backup. It has been left unchanged. Check the file permissions or move the save manually before trying again."),
+		_S("[OK_LABEL]"), Dialog::BUTTONS_FOOTER);
+	return true;
+}
+
 //0x44F560
 void LawnApp::PreNewGame(GameMode theGameMode, bool theLookForSavedGame)
 {
@@ -2398,7 +2413,7 @@ void LawnApp::PreNewGame(GameMode theGameMode, bool theLookForSavedGame)
 	//}
 
 	mGameMode = theGameMode;
-	if (theLookForSavedGame && TryLoadGame())
+	if (theLookForSavedGame && ShouldAbortNewGameAfterLoad(this, TryLoadGame()))
 		return;
 
 	SexyString aFileName = GetSavedGameName(mGameMode, mPlayerInfo->mId);
@@ -2415,7 +2430,7 @@ void LawnApp::PreNewGame(GameMode theGameMode, bool theLookForSavedGame, int the
 	//}
 
 	mGameMode = theGameMode;
-	if (theLookForSavedGame && TryLoadGame(theLevel))
+	if (theLookForSavedGame && ShouldAbortNewGameAfterLoad(this, TryLoadGame(theLevel)))
 		return;
 
 	SexyString aFileName = GetSavedGameName(mGameMode, mPlayerInfo->mId, theLevel);
@@ -2466,12 +2481,12 @@ bool LawnApp::SaveFileExists()
 }
 
 //0x44F7A0
-bool LawnApp::TryLoadGame()
+SaveGameLoadStatus LawnApp::TryLoadGame()
 {
 	return TryLoadGame(mPlayerInfo->mLevel);
 }
 
-bool LawnApp::TryLoadGame(int theLevel)
+SaveGameLoadStatus LawnApp::TryLoadGame(int theLevel)
 {
 	SexyString aSaveName = GetSavedGameName(mGameMode, mPlayerInfo->mId, theLevel);
 	mMusic->StopAllMusic();
@@ -2479,17 +2494,19 @@ bool LawnApp::TryLoadGame(int theLevel)
 	if (this->FileExists(aSaveName))
 	{
 		MakeNewBoard();
-		if (mBoard->LoadGame(aSaveName))
+		SaveGameLoadStatus aLoadStatus = mBoard->LoadGame(aSaveName);
+		if (aLoadStatus == SaveGameLoadStatus::LOADED)
 		{
 			mFirstTimeGameSelector = false;
 			DoContinueDialog();
-			return true;
+			return SaveGameLoadStatus::LOADED;
 		}
 
 		KillBoard();
+		return aLoadStatus;
 	}
 
-	return false;
+	return SaveGameLoadStatus::NONE;
 }
 
 

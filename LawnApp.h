@@ -52,6 +52,7 @@ namespace Sexy
 };
 
 enum FoleyType;
+enum class SaveGameLoadStatus;
 
 using namespace Sexy;
 
@@ -214,8 +215,8 @@ public:
 	void							KillBoard();
 	void							MakeNewBoard();
 	void							StartPlaying();
-	bool							TryLoadGame();
-	bool							TryLoadGame(int theLevel);
+	SaveGameLoadStatus			TryLoadGame();
+	SaveGameLoadStatus			TryLoadGame(int theLevel);
 	void							NewGame();
 	void							PreNewGame(GameMode theGameMode, bool theLookForSavedGame);
 	void							PreNewGame(GameMode theGameMode, bool theLookForSavedGame, int theLevel);

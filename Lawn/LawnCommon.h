@@ -57,6 +57,7 @@ void						DrawEditBox(Graphics* g, EditWidget* theWidget);
 // ====================================================================================================
 SexyString					GetSavedGameName(GameMode theGameMode, int theProfileId);
 SexyString					GetSavedGameName(GameMode theGameMode, int theProfileId, int theLevel);
+SexyString					GetSavedGameNameForArchitecture(GameMode theGameMode, int theProfileId, bool theUse64BitSuffix);
 int							GetCurrentDaysSince2000();
 
 #endif

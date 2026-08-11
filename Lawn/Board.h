@@ -41,6 +41,7 @@ class Challenge;
 class Reanimation;
 class DataSync;
 class TodParticleSystem;
+enum class SaveGameLoadStatus;
 namespace Sexy
 {
 	class Graphics;
@@ -290,7 +291,7 @@ public:
 	LawnMower*						FindLawnMowerInRow(int theRow);
 	inline bool						SyncState(DataSync& theDataSync) { /* 未发现 */return true; }
 	/*inline*/ void					SaveGame(const SexyString& theFileName);
-	bool							LoadGame(const SexyString& theFileName);
+	SaveGameLoadStatus			LoadGame(const SexyString& theFileName);
 	void							InitLevel();
 	void							DisplayAdvice(const SexyString& theAdvice, MessageStyle theMessageStyle, AdviceType theHelpIndex);
 	void							StartLevel();

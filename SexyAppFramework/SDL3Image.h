@@ -21,6 +21,7 @@ namespace Sexy
 			Uint32					GetBlendMode(SDL_BlendModes theDrawMode);
 		public:
 			SDL_Renderer* mRenderer;
+			static SDL_Texture*	CreateRenderTarget(SDL_Renderer* theRenderer, int theWidth, int theHeight);
 			SDL_Texture* GetTexture(Image* image);
 		public:
 			SDL3Image(SDL_Renderer* renderer);

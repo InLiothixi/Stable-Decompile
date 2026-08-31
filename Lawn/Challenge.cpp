@@ -7,6 +7,7 @@
 #include "ZenGarden.h"
 #include "LawnMower.h"
 #include "Challenge.h"
+#include "BoardGeometry.h"
 #include "SeedPacket.h"
 #include "Projectile.h"
 #include "../LawnApp.h"
@@ -639,11 +640,14 @@ bool Challenge::BeghouledTwistMoveCausesMatch(int theGridX, int theGridY, Beghou
 //0x420220
 bool Challenge::BeghouledTwistSquareFromMouse(int theX, int theY, int& theGridX, int& theGridY)
 {
-	theX -= mApp->mDDInterface->mWideScreenOffsetX;
-	theY -= mApp->mDDInterface->mWideScreenOffsetY;
+	const Point aLocalPoint = mBoard->GetBoardGeometry().CanvasToLocalPixel(
+		theX - mBoard->mX,
+		theY - mBoard->mY);
+	theX = aLocalPoint.mX;
+	theY = aLocalPoint.mY;
 
-	theGridX = mBoard->PixelToGridX(theX - 40, theY - 40);
-	theGridY = mBoard->PixelToGridY(theX - 40, theY - 40);
+	theGridX = mBoard->PixelToGridX(theX - BoardGeometry::kColumnWidth / 2, theY - BoardGeometry::kColumnWidth / 2);
+	theGridY = mBoard->PixelToGridY(theX - BoardGeometry::kColumnWidth / 2, theY - BoardGeometry::kColumnWidth / 2);
 	if (theGridX == -1 || theGridY == -1 || theGridX > 6 || theGridY > 3)
 	{
 		theGridX = -1;
@@ -659,8 +663,9 @@ void Challenge::BeghouledTwistMouseDown(int x, int y)
 	if (mBoard->HasLevelAwardDropped())
 		return;
 
-	x += mApp->mDDInterface->mWideScreenOffsetX;
-	y += mApp->mDDInterface->mWideScreenOffsetY;
+	const Point aBoardOrigin = mBoard->GetBoardGeometry().GetCanvasOrigin();
+	x += aBoardOrigin.mX + mBoard->mX;
+	y += aBoardOrigin.mY + mBoard->mY;
 
 	BeghouledBoardState aBoardState;
 	LoadBeghouledBoardState(&aBoardState);
@@ -730,8 +735,9 @@ bool Challenge::BeghouledIsValidMove(int theFromX, int theFromY, int theToX, int
 //0x420760
 void Challenge::BeghouledDragUpdate(int x, int y)
 {
-	int aDeltaX = x - mBeghouledMouseDownX - mApp->mDDInterface->mWideScreenOffsetX;
-	int aDeltaY = y - mBeghouledMouseDownY - mApp->mDDInterface->mWideScreenOffsetY;
+	const Point aLocalPoint = mBoard->GetBoardGeometry().CanvasToLocalPixel(x, y);
+	int aDeltaX = aLocalPoint.mX - mBeghouledMouseDownX;
+	int aDeltaY = aLocalPoint.mY - mBeghouledMouseDownY;
 	if (abs(aDeltaX) >= 10 || abs(aDeltaY) >= 10)
 	{
 		mBoard->ClearAdvice(ADVICE_BEGHOULED_DRAG_TO_MATCH_3);
@@ -910,11 +916,13 @@ void Challenge::BeghouledScore(int theGridX, int theGridY, int theNumPlants, boo
 	float aPosY = mBoard->GridToPixelY(theGridX, theGridY);
 	if (theIsHorizontal)
 	{
-		aPosX += theNumPlants == 3 ? 80.0f : theNumPlants == 4 ? 120.0f : 160.0f;
+		aPosX += theNumPlants == 3 ? BoardGeometry::kColumnWidth :
+			theNumPlants == 4 ? BoardGeometry::kColumnWidth * 1.5f : BoardGeometry::kColumnWidth * 2.0f;
 	}
 	else
 	{
-		aPosY += theNumPlants == 3 ? 80.0f : theNumPlants == 4 ? 120.0f : 160.0f;
+		aPosY += theNumPlants == 3 ? BoardGeometry::kColumnWidth :
+			theNumPlants == 4 ? BoardGeometry::kColumnWidth * 1.5f : BoardGeometry::kColumnWidth * 2.0f;
 	}
 
 	mChallengeScore++;
@@ -1203,8 +1211,9 @@ bool Challenge::MouseMove(int x, int y)
 			return true;
 		}
 
+		const Point aLocalPoint = mBoard->GetBoardGeometry().CanvasToLocalPixel(x, y);
 		HitResult aHitResult;
-		mBoard->MouseHitTest(x, y, &aHitResult);
+		mBoard->MouseHitTest(aLocalPoint.mX, aLocalPoint.mY, &aHitResult);
 		if (aHitResult.mObjectType == OBJECT_TYPE_PLANT)
 			return true;
 	}
@@ -1697,7 +1706,7 @@ void Challenge::UpdateBeghouled()
 			}
 			else if (mChallengeState == STATECHALLENGE_BEGHOULED_NO_MATCHES)
 			{
-				mApp->AddTodParticle(BOARD_WIDTH / 2, BOARD_HEIGHT / 2, RENDER_LAYER_TOP, PARTICLE_SCREEN_FLASH);
+				mApp->AddTodParticle(BoardGeometry::kDesignWidth / 2, BoardGeometry::kDesignHeight / 2, RENDER_LAYER_TOP, PARTICLE_SCREEN_FLASH);
 				BeghouledShuffle();
 			}
 		}
@@ -2428,8 +2437,8 @@ void Challenge::SpawnLevelAward(int theGridX, int theGridY)
 	if (mBoard->HasLevelAwardDropped())
 		return;
 
-	float aPosX = mBoard->GridToPixelX(theGridX, theGridY) + 40;
-	float aPosY = mBoard->GridToPixelY(theGridX, theGridY) + 40;
+	float aPosX = mBoard->GridToPixelX(theGridX, theGridY) + BoardGeometry::kColumnWidth / 2;
+	float aPosY = mBoard->GridToPixelY(theGridX, theGridY) + BoardGeometry::kColumnWidth / 2;
 	CoinType aCoinType = 
 		mApp->IsFirstTimeAdventureMode() ? COIN_FINAL_SEED_PACKET : 
 		mApp->IsAdventureMode() || mApp->HasBeatenChallenge(mApp->mGameMode) ? COIN_AWARD_MONEY_BAG : COIN_TROPHY;
@@ -2438,7 +2447,7 @@ void Challenge::SpawnLevelAward(int theGridX, int theGridY)
 	mApp->mBoardResult = BOARDRESULT_WON;
 	mApp->PlayFoley(FOLEY_SPAWN_SUN);
 	Coin* aCoin = mBoard->AddCoin(aPosX, aPosY, aCoinType, COIN_MOTION_COIN);
-	mApp->AddTodParticle(BOARD_WIDTH / 2, BOARD_HEIGHT / 2, RENDER_LAYER_TOP, PARTICLE_SCREEN_FLASH);
+	mApp->AddTodParticle(BoardGeometry::kDesignWidth / 2, BoardGeometry::kDesignHeight / 2, RENDER_LAYER_TOP, PARTICLE_SCREEN_FLASH);
 
 	if (mApp->mGameMode == GAMEMODE_CHALLENGE_ZOMBIQUARIUM)
 	{
@@ -2523,19 +2532,22 @@ void Challenge::DrawBeghouled(Graphics* g)
 		{
 			if (mBeghouledEated[aGridX][aGridY])
 			{
-				g->DrawImageCel(Sexy::IMAGE_CRATER, mBoard->GridToPixelX(aGridX, aGridY) - 8, mBoard->GridToPixelY(aGridX, aGridY) + 40, 1, 0);
+				g->DrawImageCel(Sexy::IMAGE_CRATER, mBoard->GridToPixelX(aGridX, aGridY) - 8, mBoard->GridToPixelY(aGridX, aGridY) + BoardGeometry::kColumnWidth / 2, 1, 0);
 			}
 		}
 	}
 			
 	if (mApp->mGameMode == GAMEMODE_CHALLENGE_BEGHOULED_TWIST)
 	{
+		const Point aMouse = mBoard->GetBoardGeometry().CanvasToLocalPixel(
+			mApp->mWidgetManager->mLastMouseX - mBoard->mX,
+			mApp->mWidgetManager->mLastMouseY - mBoard->mY);
 		HitResult aHitResult;
-		mBoard->MouseHitTest(mApp->mWidgetManager->mLastMouseX, mApp->mWidgetManager->mLastMouseY, &aHitResult);
+		mBoard->MouseHitTest(aMouse.mX, aMouse.mY, &aHitResult);
 		if (mChallengeGridX != -1 && mChallengeGridY != -1 && aHitResult.mObjectType != OBJECT_TYPE_COIN)
 		{
-			float aPixelX = mBoard->GridToPixelX(mChallengeGridX, mChallengeGridY) + 80 + mApp->mDDInterface->mWideScreenOffsetX;
-			float aPixelY = mBoard->GridToPixelY(mChallengeGridX, mChallengeGridY) + 100 + mApp->mDDInterface->mWideScreenOffsetY;
+			float aPixelX = mBoard->GridToPixelX(mChallengeGridX, mChallengeGridY) + BoardGeometry::kColumnWidth + mApp->mDDInterface->mWideScreenOffsetX;
+			float aPixelY = mBoard->GridToPixelY(mChallengeGridX, mChallengeGridY) + BoardGeometry::kFiveRowHeight + mApp->mDDInterface->mWideScreenOffsetY;
 
 			SexyTransform2D aTransform;
 			TodScaleRotateTransformMatrix(aTransform, aPixelX, aPixelY, -mBoard->mMainCounter * 2 * PI * 0.001f, 1, 1);
@@ -3373,15 +3385,19 @@ void Challenge::DrawStormFlash(Graphics* g, int theTime, int theMaxAmount)
 {
 	MTRand aDrawRand = MTRand(mBoard->mMainCounter / 6);
 	int aDarkness = TodAnimateCurve(150, 0, theTime, 255 - theMaxAmount, 255, CURVE_LINEAR) + aDrawRand.NextNoAssert((unsigned long)64) - 32;
+	g->PushState();
+	g->mTransX = 0;
+	g->mTransY = 0;
 	// 设置暴风雨阴暗的颜色
 	g->SetColor(Color(0, 0, 0, ClampInt(aDarkness, 0, 255)));
 	// 绘制暴风雨阴暗的主色
-	g->FillRect(-1000, -1000, 2800, 2600);
+	g->FillRect(0, 0, mApp->mWidth, mApp->mHeight);
 
 	// 设置闪电亮光的颜色
 	g->SetColor(Color(255, 255, 255, TodAnimateCurve(150, 75, theTime, theMaxAmount, 0, CURVE_LINEAR)));
 	// 绘制闪光
-	g->FillRect(-1000, -1000, 2800, 2600);
+	g->FillRect(0, 0, mApp->mWidth, mApp->mHeight);
+	g->PopState();
 }
 
 //0x426B20
@@ -3400,25 +3416,21 @@ void Challenge::DrawRain(Graphics* g)
 	if (mBoard->mCutScene->IsBeforePreloading() || !mApp->Is3DAccelerated())
 		return;
 
-	int aBoardOffsetX;
-	if (mBoard->mX > 0)
-	{
-		aBoardOffsetX = (mBoard->mX + 100) / 100 * -100;
-	}
-	else
-	{
-		aBoardOffsetX = mBoard->mX / 100 * -100;
-	}
+	g->PushState();
+	g->mTransX = 0;
+	g->mTransY = 0;
 
 	int aTime = mBoard->mEffectCounter % 100;
 	float aTimeOffsetXEst = TodAnimateCurveFloat(0, 100, aTime, 0, -100, CURVE_LINEAR);
 	float aTimeOffsetYEst = TodAnimateCurveFloat(0, 20, aTime % 20, -100, 0, CURVE_LINEAR);
 	// 绘制远景的雨
-	for (int aHorCnt = 9; aHorCnt > -2; aHorCnt--)
+	const int aFarColumnCount = (mApp->mWidth + 99) / 100 + 2;
+	const int aFarRowCount = (mApp->mHeight + 99) / 100 + 2;
+	for (int aHorCnt = aFarColumnCount; aHorCnt > -2; aHorCnt--)
 	{
-		for (int aVerCnt = 7; aVerCnt > -2; aVerCnt--)
+		for (int aVerCnt = aFarRowCount; aVerCnt > -2; aVerCnt--)
 		{
-			float aImageX = aTimeOffsetXEst + 100 * aHorCnt + aBoardOffsetX;
+			float aImageX = aTimeOffsetXEst + 100 * aHorCnt;
 			float aImageY = aTimeOffsetYEst + 100 * aVerCnt;
 			g->DrawImageF(Sexy::IMAGE_RAIN, aImageX, aImageY);
 		}
@@ -3428,16 +3440,19 @@ void Challenge::DrawRain(Graphics* g)
 	float aTimeOffsetXCls = TodAnimateCurveFloat(0, 161, aTime % 161, 0, -100, CURVE_LINEAR);
 	float aTimeOffsetYCls = TodAnimateCurveFloat(0, 33, aTime % 33, -100, 0, CURVE_LINEAR);
 	// 绘制近景的雨
-	for (int aHorCnt = -2; aHorCnt < 9; aHorCnt++)
+	const int aCloseColumnCount = (mApp->mWidth + 149) / 150 + 2;
+	const int aCloseRowCount = (mApp->mHeight + 149) / 150 + 2;
+	for (int aHorCnt = -2; aHorCnt < aCloseColumnCount; aHorCnt++)
 	{
-		for (int aVerCnt = -2; aVerCnt < 7; aVerCnt++)
+		for (int aVerCnt = -2; aVerCnt < aCloseRowCount; aVerCnt++)
 		{
 			float aRainScaleCls = 1.5f;
-			float aImageClsX = (aHorCnt * 100 + aTimeOffsetXCls) * aRainScaleCls + aBoardOffsetX;
+			float aImageClsX = (aHorCnt * 100 + aTimeOffsetXCls) * aRainScaleCls;
 			float aImageClsY = (aVerCnt * 100 + aTimeOffsetYCls) * aRainScaleCls;
 			TodDrawImageScaledF(g, Sexy::IMAGE_RAIN, aImageClsX, aImageClsY, aRainScaleCls, aRainScaleCls);
 		}
 	}
+	g->PopState();
 }
 
 //0x426E90
@@ -3468,7 +3483,7 @@ void Challenge::DrawStormNight(Graphics* g)
 		g->mTransX = 0;
 		g->mTransY = 0;
 		g->SetColor(Color::Black);
-		g->FillRect(-1000, -1000, BOARD_WIDTH + 2000, BOARD_HEIGHT + 2000);
+		g->FillRect(0, 0, mApp->mWidth, mApp->mHeight);
 		g->PopState();
 	}
 
@@ -3535,12 +3550,12 @@ void Challenge::UpdatePortal(GridItem* thePortal)
 		{
 			Rect aZombieRect = aZombie->GetZombieRect();
 			int aZombieX = aZombieRect.mX + aZombieRect.mWidth / 2;
-			int aPortalX = thePortal->mGridX * 80 + 25;
+			int aPortalX = thePortal->mGridX * BoardGeometry::kColumnWidth + 25;
 			if (abs(aZombieX - aPortalX) <= 45)
 			{
 				int aDiffX = aZombieX - aZombie->mX;
 				if (aZombie->IsWalkingBackwards()) aDiffX -= 60;
-				aZombie->mX = anOtherPortal->mGridX * 80 - aDiffX;
+				aZombie->mX = anOtherPortal->mGridX * BoardGeometry::kColumnWidth - aDiffX;
 				aZombie->mPosX = aZombie->mX;
 
 				aZombie->SetRow(anOtherPortal->mGridY);
@@ -3559,11 +3574,11 @@ void Challenge::UpdatePortal(GridItem* thePortal)
 		{
 			Rect aProjectileRect = aProjectile->GetProjectileRect();
 			int aProjectileX = aProjectileRect.mX + aProjectileRect.mWidth / 2;
-			int aPortalX = thePortal->mGridX * 80 + 55;
-			if (abs(aProjectileX - aPortalX) <= 40)
+			int aPortalX = thePortal->mGridX * BoardGeometry::kColumnWidth + 55;
+			if (abs(aProjectileX - aPortalX) <= BoardGeometry::kColumnWidth / 2)
 			{
-				int aDeltaY = (anOtherPortal->mGridY - thePortal->mGridY) * 100;
-				aProjectile->mX += anOtherPortal->mGridX * 80 - aProjectileX + 60;
+				int aDeltaY = (anOtherPortal->mGridY - thePortal->mGridY) * mBoard->GetBoardGeometry().GetRowHeight();
+				aProjectile->mX += anOtherPortal->mGridX * BoardGeometry::kColumnWidth - aProjectileX + 60;
 				aProjectile->mPosX = aProjectile->mX;
 
 				aProjectile->mRow = anOtherPortal->mGridY;
@@ -3583,12 +3598,12 @@ void Challenge::UpdatePortal(GridItem* thePortal)
 		if (aLawnMower->mMowerState == MOWER_TRIGGERED && aLawnMower->mRow == thePortal->mGridY && aLawnMower->mLastPortalX != thePortal->mGridX)
 		{
 			int aMowerX = aLawnMower->mPosX + 45;
-			int aPortalX = thePortal->mGridX * 80 + 25;
+			int aPortalX = thePortal->mGridX * BoardGeometry::kColumnWidth + 25;
 			if (abs(aMowerX - aPortalX) <= 20)
 			{
-				aLawnMower->mPosX = anOtherPortal->mGridX * 80 + 25;
+				aLawnMower->mPosX = anOtherPortal->mGridX * BoardGeometry::kColumnWidth + 25;
 				aLawnMower->mRow = anOtherPortal->mGridY;
-				aLawnMower->mPosY = (anOtherPortal->mGridY - thePortal->mGridY) * 100;
+				aLawnMower->mPosY = (anOtherPortal->mGridY - thePortal->mGridY) * mBoard->GetBoardGeometry().GetRowHeight();
 				aLawnMower->mLastPortalX = anOtherPortal->mGridX;
 				aLawnMower->mRenderOrder = Board::MakeRenderOrder(RENDER_LAYER_LAWN_MOWER, aLawnMower->mRow, 0);
 				aLawnMower->Update();
@@ -3828,8 +3843,8 @@ bool Challenge::CanTargetZombieWithPortals(Plant* thePlant, Zombie* theZombie)
 		GridItem* aPortal = GetPortalToRight(aGridX, aGridY);
 		if (aGridY == theZombie->mRow)
 		{
-			int aRangeLeft = aGridX * 80;
-			int aRangeRight = aPortal ? aPortal->mGridX * 80 : 800;
+			int aRangeLeft = aGridX * BoardGeometry::kColumnWidth;
+			int aRangeRight = aPortal ? aPortal->mGridX * BoardGeometry::kColumnWidth : BoardGeometry::kDesignWidth;
 			if (theZombie->mX > aRangeLeft&& theZombie->mX < aRangeRight)
 				return true;
 		}
@@ -4645,8 +4660,8 @@ void Challenge::PuzzlePhaseComplete(int theGridX, int theGridY)
 			aCoinType = COIN_AWARD_BAG_DIAMOND;
 		}
 
-		int aPosX = mBoard->GridToPixelX(theGridX, theGridY) + 40;
-		int aPosY = mBoard->GridToPixelY(theGridX, theGridY) + 40;
+		int aPosX = mBoard->GridToPixelX(theGridX, theGridY) + BoardGeometry::kColumnWidth / 2;
+		int aPosY = mBoard->GridToPixelY(theGridX, theGridY) + BoardGeometry::kColumnWidth / 2;
 		mBoard->AddCoin(aPosX, aPosY, aCoinType, COIN_MOTION_COIN);
 	}
 	else
@@ -4783,7 +4798,7 @@ void Challenge::PuzzleNextStageClear()
 	mSurvivalStage++;
 	mBoard->ClearAdviceImmediately();
 	mBoard->mLevelAwardSpawned = false;
-	mApp->AddTodParticle(BOARD_WIDTH / 2, BOARD_HEIGHT / 2, RENDER_LAYER_TOP, PARTICLE_SCREEN_FLASH);
+	mApp->AddTodParticle(BoardGeometry::kDesignWidth / 2, BoardGeometry::kDesignHeight / 2, RENDER_LAYER_TOP, PARTICLE_SCREEN_FLASH);
 }
 
 //0x42A040
@@ -4979,8 +4994,8 @@ void Challenge::IZombieInitLevel()
 		aBrain->mGridY = aRow;
 		aBrain->mRenderOrder = Board::MakeRenderOrder(RENDER_LAYER_PLANT, aRow, 0);
 		aBrain->mGridItemCounter = 70;
-		aBrain->mPosX = mBoard->GridToPixelX(0, aRow) - 40;
-		aBrain->mPosY = mBoard->GridToPixelY(0, aRow) + 40;
+		aBrain->mPosX = mBoard->GridToPixelX(0, aRow) - BoardGeometry::kColumnWidth / 2;
+		aBrain->mPosY = mBoard->GridToPixelY(0, aRow) + BoardGeometry::kColumnWidth / 2;
 	}
 
 	switch (mApp->mGameMode)
@@ -5776,7 +5791,10 @@ void Challenge::TreeOfWisdomDraw(Graphics* g)
 	g->PushState();
 	g->mTransX += WIDESCREEN_OFFSETX;
 	g->mTransY += WIDESCREEN_OFFSETY;
-	bool aMouseOn = TreeOfWisdomMouseOn(mApp->mWidgetManager->mLastMouseX - mBoard->mX - mApp->mDDInterface->mWideScreenOffsetX, mApp->mWidgetManager->mLastMouseY - mBoard->mY - mApp->mDDInterface->mWideScreenOffsetY);
+	const Point aMouse = mBoard->GetBoardGeometry().CanvasToLocalPixel(
+		mApp->mWidgetManager->mLastMouseX - mBoard->mX,
+		mApp->mWidgetManager->mLastMouseY - mBoard->mY);
+	bool aMouseOn = TreeOfWisdomMouseOn(aMouse.mX, aMouse.mY);
 
 	Reanimation* aReanimTree = mApp->ReanimationGet(mReanimChallenge);
 	aReanimTree->mEnableExtraOverlayDraw = false;

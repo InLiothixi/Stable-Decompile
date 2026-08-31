@@ -496,6 +496,7 @@ public:
 	virtual bool			IsAltKeyUsed(WPARAM wParam);
 	virtual bool			DebugKeyDown(int theKey);	
 	virtual bool			DebugKeyDownAsync(int theKey, bool ctrlDown, bool altDown);
+	void					SetShowFPS(bool theShowFPS);
 	virtual void			CloseRequestAsync();
 	bool					Is3DAccelerated();
 	bool					Is3DAccelerationSupported();

@@ -143,7 +143,7 @@ SeedChooserScreen::SeedChooserScreen()
 		mAlmanacButton->mBtnNoDraw = true;
 		mAlmanacButton->mDisabled = true;
 	}
-	if (!mApp->CanShowStore())
+	if (!mApp->CanShowStore() || mBoard->mCutScene->IsSurvivalRepick())
 	{
 		mStoreButton->mBtnNoDraw = true;
 		mStoreButton->mDisabled = true;
@@ -908,6 +908,9 @@ void SeedChooserScreen::ButtonDepress(int theId)
 	}
 	else if (theId == SeedChooserScreen::SeedChooserScreen_Store)
 	{
+		if (mBoard->mCutScene->IsSurvivalRepick())
+			return;
+
 		StoreScreen* aStore = mApp->ShowStoreScreen();
 		aStore->mBackButton->SetLabel(_S("[STORE_BACK_TO_GAME]"));
 		aStore->WaitForResult();

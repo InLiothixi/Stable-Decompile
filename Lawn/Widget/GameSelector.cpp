@@ -819,6 +819,7 @@ void GameSelector::Draw(Graphics* g)
 		TodDrawStringMatrix(g, Sexy::FONT_BRIANNETOD16, aOverlayMatrix * aOffsetMatrix, aWelcomeStr, Color(255, 245, 200));
 	}
 
+#ifdef _HAS_ACHIEVEMENTS
 	Graphics gAchievementButton(*g);
 	if (mAdventureButton->mVisible)
 	{
@@ -826,6 +827,7 @@ void GameSelector::Draw(Graphics* g)
 		gAchievementButton.mTransY = mAchievementsButton->mY;
 		mAchievementsButton->Render(&gAchievementButton);
 	}
+#endif
 
 	Graphics gAdventureButton(*g);
 	if (mAdventureButton->mVisible)
@@ -1177,13 +1179,17 @@ void GameSelector::UpdateTooltip()
 
 	if (mHasTrophy)
 	{
-		int aMouseX = mX + mApp->mWidgetManager->mLastMouseX;
-		int aMouseY = mY + mApp->mWidgetManager->mLastMouseY;
-		if (/*aMouseX >= mX + 50 && aMouseX < mX + 135 && aMouseY >= mY + 280 && aMouseY <= mY + 505*/
-#ifdef _HAS_ACHIEVEMENTS 
-			/*||*/ mTrophyButton && mTrophyButton->mIsOver
-#endif 
-		)
+		const int aMouseX = mApp->mWidgetManager->mLastMouseX - mX -
+			mApp->mDDInterface->mWideScreenOffsetX;
+		const int aMouseY = mApp->mWidgetManager->mLastMouseY - mY -
+			mApp->mDDInterface->mWideScreenOffsetY;
+#ifdef _HAS_ACHIEVEMENTS
+		const bool aTrophyIsOver = mTrophyButton && mTrophyButton->mIsOver;
+#else
+		const bool aTrophyIsOver = aMouseX >= 50 && aMouseX < 135 &&
+			aMouseY >= 280 && aMouseY <= 505;
+#endif
+		if (aTrophyIsOver)
 		{
 			if (mApp->EarnedGoldTrophy())
 			{
@@ -2235,6 +2241,7 @@ void GameSelector::SlideTo(int theX, int theY) {
 	mDestY = theY;
 	mStartX = mX;
 	mStartY = mY;
+	mApp->RequestSceneTargetClear();
 }
 #ifdef _HAS_ACHIEVEMENTS
 // GOTY @Patoke: 0x450200

@@ -1,0 +1,125 @@
+[NATIVE_HDR_LABEL]
+Native HDR
+
+[NATIVE_HDR_RESTART_HEADER]
+Native HDR
+
+[NATIVE_HDR_RESTART_BODY]
+Restart the game to apply this change.
+
+Windows HDR must be enabled in Display settings.
+
+[ADVANCED_SETTINGS_BUTTON]
+Advanced...
+
+[OPTIONS_ALMANAC_BUTTON]
+Almanac
+
+[ADVANCED_SETTINGS_HEADER]
+Advanced Settings
+
+[ADVANCED_SETTINGS_DONE]
+Done
+
+[ADVANCED_TONE_MAPPING_TAB]
+Tone Mapping
+
+[ADVANCED_HDR_TAB]
+HDR
+
+[ADVANCED_DISPLAY_TAB]
+Display
+
+[ADVANCED_SCALING_TAB]
+Scaling
+
+[ADVANCED_HDR_SECTION]
+HDR Tone Mapping
+
+[ADVANCED_HDR_PAPER_WHITE]
+Paper White
+
+[ADVANCED_HDR_EXPOSURE]
+HDR Exposure
+
+[ADVANCED_HDR_ADAPTIVE]
+Adaptive Tone Mapping
+
+[ADVANCED_HDR_ADAPTIVE_NOTE]
+Game image only. Adaptive mapping protects highlights above display headroom.
+
+[ADVANCED_HDR_DISABLED]
+Native HDR is off. These settings are saved for later.
+
+[ADVANCED_HDR_ACTIVE]
+Native HDR active - display headroom
+
+[ADVANCED_WINDOWS_HDR_OFF]
+Native HDR renderer ready, but Windows HDR is off.
+
+[ADVANCED_HDR_RESTART]
+Restart the game to activate Native HDR.
+
+[ADVANCED_DISPLAY_SECTION]
+Display
+
+[ADVANCED_EXCLUSIVE_FULLSCREEN]
+Exclusive Fullscreen
+
+[ADVANCED_REFRESH_RATE]
+Refresh Rate
+
+[ADVANCED_DESKTOP_CONTROLLED]
+Windows default
+
+[ADVANCED_DESKTOP_RATE]
+Desktop rate
+
+[ADVANCED_REFRESH_UNAVAILABLE]
+Unavailable
+
+[ADVANCED_DISPLAY_RESTART_NOTE]
+Fullscreen mode and refresh-rate changes apply after restart.
+
+[ADVANCED_INTEGER_SCALING]
+Pixel-Perfect Scaling
+
+[ADVANCED_SHOW_FPS]
+Show FPS
+
+[ADVANCED_FSR1]
+AMD FSR 1 Upscaling
+
+[ADVANCED_FSR1_QUALITY]
+Quality Mode
+
+[ADVANCED_FSR1_ULTRA_QUALITY]
+Ultra Quality
+
+[ADVANCED_FSR1_QUALITY_PRESET]
+Quality
+
+[ADVANCED_FSR1_BALANCED]
+Balanced
+
+[ADVANCED_FSR1_PERFORMANCE]
+Performance
+
+[ADVANCED_FSR1_SHARPNESS]
+Sharpening
+
+[ADVANCED_FSR1_NOTE]
+FSR 1 and Pixel-Perfect Scaling cannot be used together.
+On/off changes need a restart. Videos remain native.
+
+[ADVANCED_FSR1_UNAVAILABLE]
+FSR 1 is unavailable on this renderer. Standard scaling is active.
+
+[ADVANCED_RESTORE_DEFAULTS]
+Reset All
+
+[ADVANCED_DISPLAY_RESTART_HEADER]
+Display Settings
+
+[ADVANCED_DISPLAY_RESTART_BODY]
+Restart the game to apply fullscreen, refresh-rate, or FSR renderer changes.

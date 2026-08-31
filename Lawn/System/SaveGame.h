@@ -27,6 +27,38 @@ struct SaveFileHeader
     unsigned int    mBuildDate;
 };
 
+enum class SaveGameLoadStatus
+{
+    NONE,
+    LOADED,
+    REJECTED_PRESERVED,
+    REJECTED_UNPRESERVED
+};
+
+enum class LegacySaveMigrationStatus
+{
+    NOT_APPLICABLE,
+    TARGET_PRESENT,
+    MIGRATED,
+    USE_LEGACY_PATH,
+    PROBE_FAILED
+};
+
+// Gameplay coordinates are serialized in stable board-local design units.
+// Keep this independent from the window, presentation viewport and render-target
+// dimensions so display-resolution changes never require rewriting entity data.
+enum class SaveGameCoordinateSpace : unsigned int
+{
+    BOARD_LOCAL_DESIGN_V1 = 1U
+};
+
+struct SaveGameCoordinateMetadata
+{
+    SaveGameCoordinateSpace mCoordinateSpace;
+    int                     mBoardWidth;
+    int                     mBoardHeight;
+};
+
 class SaveGameContext
 {
 public:
@@ -52,7 +84,10 @@ void                SyncReanimation(Board* theBoard, Reanimation* theReanimation
 void                SyncTrail(Board* theBoard, Trail* theTrail, SaveGameContext& theContext);
 void                SyncBoard(SaveGameContext& theContext, Board* theBoard);
 void				FixBoardAfterLoad(Board* theBoard);
-bool				LawnLoadGame(Board* theBoard, const SexyString& theFilePath);
+bool                MigrateBoardCoordinatesAfterLoad(Board* theBoard, const SaveGameCoordinateMetadata& theMetadata);
+SaveGameLoadStatus  LawnLoadGame(Board* theBoard, const SexyString& theFilePath);
 bool				LawnSaveGame(Board* theBoard, const SexyString& theFilePath);
+LegacySaveMigrationStatus TryMigrateLegacyX64Save(const SexyString& theLegacyFilePath, const SexyString& theX64FilePath);
+void                DeleteSaveGameArtifactsForProfile(int theProfileId);
 
 #endif

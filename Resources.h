@@ -1,6 +1,9 @@
 #ifndef __RESOURCES__
 #define __RESOURCES__
 
+#include <cstdint>
+#include <type_traits>
+
 extern bool gNeedRecalcVariableToIdMap;
 
 namespace Sexy
@@ -8,6 +11,38 @@ namespace Sexy
     class Font;
     class Image;
     class ResourceManager;
+
+	using ResourceKey = std::uintptr_t;
+
+	struct ResourceEntry
+	{
+		void*			mVariable;
+		ResourceKey		(*mReadKey)(const void*);
+
+		template <typename T>
+		ResourceEntry(T* theVariable) :
+			mVariable(theVariable),
+			mReadKey(&ReadKey<T>)
+		{
+			static_assert(std::is_pointer_v<T> || std::is_integral_v<T>);
+		}
+
+		ResourceKey GetKey() const
+		{
+			return mReadKey(mVariable);
+		}
+
+	private:
+		template <typename T>
+		static ResourceKey ReadKey(const void* theVariable)
+		{
+			const T& aValue = *static_cast<const T*>(theVariable);
+			if constexpr (std::is_pointer_v<T>)
+				return reinterpret_cast<ResourceKey>(aValue);
+			else
+				return static_cast<ResourceKey>(aValue);
+		}
+	};
 
     enum class ResourceId : int
     {
@@ -2090,6 +2125,6 @@ namespace Sexy
 };
 extern bool (*gExtractResourcesByName)(Sexy::ResourceManager* theResourceManager, const char* theName);
 
-extern void* gResources[(int)Sexy::ResourceId::RESOURCE_ID_MAX];
+extern Sexy::ResourceEntry gResources[(int)Sexy::ResourceId::RESOURCE_ID_MAX];
 
 #endif

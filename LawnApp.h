@@ -49,9 +49,20 @@ namespace Sexy
 	class Dialog;
 	class Graphics;
 	class ButtonWidget;
+	class Fsr1D3D11Backend;
 };
 
 enum FoleyType;
+enum class SaveGameLoadStatus;
+
+enum FSR1QualityPreset
+{
+	FSR1_QUALITY_ULTRA_QUALITY,
+	FSR1_QUALITY_QUALITY,
+	FSR1_QUALITY_BALANCED,
+	FSR1_QUALITY_PERFORMANCE,
+	NUM_FSR1_QUALITY_PRESETS
+};
 
 using namespace Sexy;
 
@@ -163,6 +174,41 @@ public:
 
 	int								mPlayerLevelRef;
 	bool                            mEnableFPS;
+	bool							mEnableNativeHDR;
+	bool							mNativeHDRRenderer;
+	int								mHDRPaperWhitePercent;
+	int								mHDRExposureTenthsEV;
+	bool							mHDRAdaptiveToneMapping;
+	SDL_Texture*					mHDRToneMapTexture;
+	int								mHDRToneMapTextureScaleMilli;
+	int								mHDRToneMapTextureWidth;
+	int								mHDRToneMapTextureHeight;
+	bool							mHDRToneMapUnavailable;
+	int								mPreferredRefreshRateMilliHz;
+	bool							mUseExclusiveFullscreen;
+	bool							mUseIntegerScaling;
+	bool							mEnableFSR1;
+	int								mFSR1Quality;
+	int								mFSR1SharpnessPercent;
+	Fsr1D3D11Backend*			mFSR1Backend;
+	bool							mFSR1Unavailable;
+	int								mFSR1ScreenWidth;
+	int								mFSR1ScreenHeight;
+	int								mFSR1OutputWidth;
+	int								mFSR1OutputHeight;
+	int								mPhysicalPresentationWidth;
+	int								mPhysicalPresentationHeight;
+	int								mSceneTargetLogicalWidth;
+	int								mSceneTargetLogicalHeight;
+	int								mFSR1AppliedQuality;
+	bool							mSceneTargetUsesLogicalPresentation;
+	bool							mNativeSceneTargetUnavailable;
+	// The logical canvas remains 600 units high and expands horizontally to
+	// match the physical output. The 800x600 board stays centered inside it.
+	int								mLogicalCanvasOutputWidth;
+	int								mLogicalCanvasOutputHeight;
+	bool							mClearSceneTargetBeforeDraw;
+	bool							mReprojectMouseAfterPresentationChange;
 
 public:
 	LawnApp();
@@ -203,8 +249,8 @@ public:
 	void							KillBoard();
 	void							MakeNewBoard();
 	void							StartPlaying();
-	bool							TryLoadGame();
-	bool							TryLoadGame(int theLevel);
+	SaveGameLoadStatus			TryLoadGame();
+	SaveGameLoadStatus			TryLoadGame(int theLevel);
 	void							NewGame();
 	void							PreNewGame(GameMode theGameMode, bool theLookForSavedGame);
 	void							PreNewGame(GameMode theGameMode, bool theLookForSavedGame, int theLevel);
@@ -373,6 +419,23 @@ public:
 	void							DoMoreSettingsDialog();
 	void							KillMoreSettingsDialog();
 	void							MakeWindow();
+	bool							IsNativeHDRActive() const;
+	float							GetHDRPaperWhiteScale() const;
+	float							GetHDRCompositeScale() const;
+	void							DestroyHDRToneMapTexture();
+	void							DestroyFSR1Resources();
+	void							InvalidateFSR1Presentation();
+	void							RequestFSR1Redraw();
+	void							RequestSceneTargetClear();
+	bool							RefreshLogicalCanvasFromOutput();
+	bool							UpdateLogicalCanvasForOutput(int theOutputWidth, int theOutputHeight);
+	void							RelayoutForLogicalCanvasChange(int theOldOffsetX, int theOldOffsetY);
+	void							ReprojectMouseToLogicalCanvas();
+	bool							EnsurePersistentScreenTarget();
+	bool							IsFSR1RuntimeActive() const;
+	SDL_Texture*					GetScreenshotSourceTexture() const;
+	void							ApplyLogicalPresentationMode();
+	bool							ConfigureFullscreenDisplayMode();
 	bool							DrawDirtyStuff();
 	void							Redraw(Rect* theClipRect);
 	bool							UpdateAppStep(bool* updated);

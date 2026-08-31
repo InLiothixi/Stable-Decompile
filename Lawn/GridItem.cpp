@@ -1,5 +1,6 @@
 #include "Board.h"
 #include "GridItem.h"
+#include "BoardGeometry.h"
 #include "Challenge.h"
 #include "ZenGarden.h"
 #include "../LawnApp.h"
@@ -259,7 +260,7 @@ void GridItem::DrawCrater(Graphics* g)
     }
     else if (mBoard->StageHasRoof())
     {
-        if (mGridX < 5)
+        if (mGridX < BoardGeometry::kRoofSlopedColumnCount)
         {
             aImage = IMAGE_CRATER_ROOF_LEFT;
             aXPos += 16.0f;
@@ -410,19 +411,19 @@ void GridItem::DrawSquirrel(Graphics* g)
     }
     else if (mGridItemState == GridItemState::GRIDITEM_STATE_SQUIRREL_RUNNING_UP)
     {
-        aYPos += TodAnimateCurve(50, 0, mGridItemCounter, 100, 0, TodCurves::CURVE_EASE_IN);
+        aYPos += TodAnimateCurve(50, 0, mGridItemCounter, mBoard->GetBoardGeometry().GetRowHeight(), 0, TodCurves::CURVE_EASE_IN);
     }
     else if (mGridItemState == GridItemState::GRIDITEM_STATE_SQUIRREL_RUNNING_DOWN)
     {
-        aYPos += TodAnimateCurve(50, 0, mGridItemCounter, -100, 0, TodCurves::CURVE_EASE_IN);
+        aYPos += TodAnimateCurve(50, 0, mGridItemCounter, -mBoard->GetBoardGeometry().GetRowHeight(), 0, TodCurves::CURVE_EASE_IN);
     }
     else if (mGridItemState == GridItemState::GRIDITEM_STATE_SQUIRREL_RUNNING_LEFT)
     {
-        aXPos += TodAnimateCurve(50, 0, mGridItemCounter, 80, 0, TodCurves::CURVE_EASE_IN);
+        aXPos += TodAnimateCurve(50, 0, mGridItemCounter, BoardGeometry::kColumnWidth, 0, TodCurves::CURVE_EASE_IN);
     }
     else if (mGridItemState == GridItemState::GRIDITEM_STATE_SQUIRREL_RUNNING_RIGHT)
     {
-        aXPos += TodAnimateCurve(50, 0, mGridItemCounter, -80, 0, TodCurves::CURVE_EASE_IN);
+        aXPos += TodAnimateCurve(50, 0, mGridItemCounter, -BoardGeometry::kColumnWidth, 0, TodCurves::CURVE_EASE_IN);
     }
 
     if(IMAGE_SQUIRREL!=0) // no need to render nothing
@@ -443,7 +444,7 @@ void GridItem::AddGraveStoneParticles()
 //0x44E1B0
 void GridItem::OpenPortal()
 {
-    float aXPos = mGridX * 80.0f - 6.0f;
+    float aXPos = mGridX * BoardGeometry::kColumnWidth - 6.0f;
     float aYPos = mBoard->GridToPixelY(0, mGridY) - 65.0f;
     Reanimation* aPortalReanim = mApp->ReanimationTryToGet(mGridItemReanimID);
     if (aPortalReanim == nullptr)
@@ -516,7 +517,7 @@ void GridItem::UpdatePortal()
         aPortalReanim->PlayReanim("anim_pulse", ReanimLoopType::REANIM_LOOP, 0, 12.0f);
 
         ParticleEffect aEffect = ParticleEffect::PARTICLE_PORTAL_CIRCLE;
-        float aXPos = mGridX * 80.0f + 13.0f;
+        float aXPos = mGridX * BoardGeometry::kColumnWidth + 13.0f;
         float aYPos = mBoard->GridToPixelY(0, mGridY) - 39.0f;
         if (mGridItemType == GridItemType::GRIDITEM_PORTAL_SQUARE)
         {

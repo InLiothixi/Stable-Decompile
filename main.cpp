@@ -45,7 +45,8 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 
 	gLawnApp = new LawnApp();
 	std::string exeDir = GetExeDirectory();
-	if (Sexy::FileExists(exeDir + "\\properties\\resources.xml")) {
+	if (Sexy::FileExists(exeDir + "\\properties\\resources.xml") ||
+		Sexy::FileExists(exeDir + "\\main.pak")) {
 		gLawnApp->mChangeDirTo = exeDir;
 	}
 	else {
@@ -57,8 +58,21 @@ int WINAPI WinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _
 	gLawnApp->Init();
 	gLawnApp->Start();
 	gLawnApp->Shutdown();
+
+	SDL_Renderer* aRenderer = LawnApp::mSDLRenderer;
+	SDL_Window* aWindow = LawnApp::mSDLWindow;
 	if (gLawnApp)
+	{
+		gLawnApp->mHWnd = nullptr;
 		delete gLawnApp;
+		gLawnApp = nullptr;
+	}
+
+	SDL_DestroyRenderer(aRenderer);
+	SDL_DestroyWindow(aWindow);
+	LawnApp::mSDLRenderer = nullptr;
+	LawnApp::mSDLWindow = nullptr;
+	SDL_Quit();
 
 	return 0;
 };

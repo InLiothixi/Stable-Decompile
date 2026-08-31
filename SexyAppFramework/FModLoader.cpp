@@ -8,7 +8,7 @@ static long gFModLoadCount = 0;
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
-static void CheckFModFunction(unsigned int theFunc, const char *theName)
+static void CheckFModFunction(FARPROC theFunc, const char *theName)
 {
 	if (theFunc==0)
 	{
@@ -29,7 +29,9 @@ FMOD_INSTANCE::FMOD_INSTANCE(const char *dllName)
 
     #define GETPROC(_x, _y)                                                                       \
     {                                                                                             \
-		CheckFModFunction(*((unsigned int *)&_x) = (unsigned int)GetProcAddress(mModule, _y),#_y);    \
+		FARPROC aProc = GetProcAddress(mModule, _y);                                                  \
+		CheckFModFunction(aProc, #_y);                                                               \
+		_x = reinterpret_cast<decltype(_x)>(aProc);                                                  \
     }
 
     GETPROC(FSOUND_SetBufferSize, "_FSOUND_SetBufferSize@4");

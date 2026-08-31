@@ -67,6 +67,7 @@ public:
     static /*inline*/ void      GetStorePosition(int theSpotIndex, int& thePosX, int& thePosY);
     void                        DrawItemIcon(Graphics* g, int theItemPosition, StoreItem theItemType, bool theIsForHighlight);
     void                        DrawItem(Graphics* g, int theItemPosition, StoreItem theItemType);
+    virtual void                Resize(int theX, int theY, int theWidth, int theHeight);
     virtual void                Draw(Graphics* g);
     virtual void                DrawOverlay(Graphics* g);
     /*inline*/ void             SetBubbleText(int theCrazyDaveMessage, int theTime, bool theClickToContinue);

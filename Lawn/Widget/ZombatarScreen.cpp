@@ -351,8 +351,12 @@ ZombatarWidget::ZombatarWidget(LawnApp* theApp) {
 
 	for (int x = 0; x < 9; x++) {
 		for (int y = 0; y < 2; y++) {
+			int aPalleteIndex = x + y * 9;
+			if (aPalleteIndex >= NUM_COLOR_PALLETES)
+				continue;
+
 			NewLawnButton* mColorPallete = MakeNewButton(
-				ZombatarWidget::ZombatarScreen_Palletes + x + y * 9,
+				ZombatarWidget::ZombatarScreen_Palletes + aPalleteIndex,
 				this,
 				_S(""),
 				nullptr,
@@ -364,7 +368,7 @@ ZombatarWidget::ZombatarWidget(LawnApp* theApp) {
 			mColorPallete->mClip = false;
 			mColorPallete->mTranslateX = 0;
 			mColorPallete->mTranslateY = 0;
-			mColorPalletes[x + y * 9] = mColorPallete;
+			mColorPalletes[aPalleteIndex] = mColorPallete;
 		}
 	}
 
@@ -802,7 +806,7 @@ void ZombatarWidget::ButtonDepress(int theId)
 		return;
 	}
 	
-	if (theId >= ZombatarWidget::ZombatarScreen_Palletes && theId <= ZombatarWidget::ZombatarScreen_Palletes + NUM_COLOR_PALLETES) {
+	if (theId >= ZombatarWidget::ZombatarScreen_Palletes && theId < ZombatarWidget::ZombatarScreen_Palletes + NUM_COLOR_PALLETES) {
 		int aPallete = theId - ZombatarWidget::ZombatarScreen_Palletes;
 		int* aTargetPallete = nullptr;
 
@@ -823,7 +827,7 @@ void ZombatarWidget::ButtonDepress(int theId)
 		return;
 	}
 
-	if (theId >= ZombatarWidget::ZombatarScreen_Items && theId <= ZombatarWidget::ZombatarScreen_Items + NUM_ZOMBATAR_ITEMS) {
+	if (theId >= ZombatarWidget::ZombatarScreen_Items && theId < ZombatarWidget::ZombatarScreen_Items + NUM_ZOMBATAR_ITEMS) {
 		int aItem = theId - ZombatarWidget::ZombatarWidget::ZombatarScreen_Items;
 		int* aTargetItem = nullptr;
 
@@ -979,7 +983,7 @@ void ZombatarWidget::DrawColorPalletes(Graphics* g)
 		aTargetItem = &mCurHat;
 	}
 
-	if (aTargetItem) {
+	if (aTargetItem && *aTargetItem >= 0 && *aTargetItem < NUM_ZOMBATAR_ITEMS) {
 		ZombatarDefinition& aDef = GetZombatarDefinition((ZombatarItem)*aTargetItem);
 		curPalletes = aDef.mColorGroup;
 		if (aDef.mColorGroup != nullptr)
@@ -995,10 +999,10 @@ void ZombatarWidget::DrawColorPalletes(Graphics* g)
 		g->DrawImageF(IMAGE_ZOMBATAR_COLORS_BG, 221.5f, 335);
 	}
 
-	if (palleteCount == 0)
+	if (palleteCount == 0 || curPalletes == nullptr)
 	{
 		std::string aLabel = _S("[ZOMBATAR_COLOR_ITEM_NOT_CHOSEN]");
-		if (aTargetItem && *aTargetItem != - 1) {
+		if (aTargetItem && *aTargetItem >= 0 && *aTargetItem < NUM_ZOMBATAR_ITEMS) {
 			ZombatarDefinition& aDef = gZombatarDefinitions[*aTargetItem];
 			if (aDef.mColorGroup == nullptr) aLabel = _S("[ZOMBATAR_COLOR_NOT_APPLICABLE]");
 		}
@@ -2294,7 +2298,7 @@ void ZombatarWidget::UpdatePalletes() {
 		aTargetItem = &mCurHat;
 	}
 
-	if (aTargetItem) {
+	if (aTargetItem && *aTargetItem >= 0 && *aTargetItem < NUM_ZOMBATAR_ITEMS) {
 		ZombatarDefinition& aDef = GetZombatarDefinition((ZombatarItem)*aTargetItem);
 		curPalletes = aDef.mColorGroup;
 
@@ -2514,11 +2518,14 @@ void ZombatarWidget::CreateZombatarClothes() {
 		SDL3Image* theImage = new SDL3Image(LawnApp::mSDLRenderer);
 		theImage->mWidth = 147 * scale;
 		theImage->mHeight = 146 * scale;
-		theImage->mD3DData = SDL_CreateTexture(LawnApp::mSDLRenderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, theImage->mWidth, theImage->mHeight);
+		theImage->mD3DData = SDL3Image::CreateRenderTarget(LawnApp::mSDLRenderer, theImage->mWidth, theImage->mHeight);
 		SDL_SetTextureBlendMode((SDL_Texture*)theImage->mD3DData, SDL_BLENDMODE_BLEND);
 
 		Graphics aMemoryGraphics(theImage);
+		SDL_Texture* anOldRenderTarget = SDL_GetRenderTarget(LawnApp::mSDLRenderer);
 		SDL_SetRenderTarget(LawnApp::mSDLRenderer, (SDL_Texture*)theImage->mD3DData);
+		SDL_SetRenderDrawColor(LawnApp::mSDLRenderer, 0, 0, 0, SDL_ALPHA_TRANSPARENT);
+		SDL_RenderClear(LawnApp::mSDLRenderer);
 		aMemoryGraphics.SetLinearBlend(true);
 		aMemoryGraphics.PushState();
 		aMemoryGraphics.SetColorizeImages(true);
@@ -2548,7 +2555,7 @@ void ZombatarWidget::CreateZombatarClothes() {
 			TodDrawImageScaledF(&aMemoryGraphics, *aDef.mOutlineImage, offsetX, offsetY, scale, scale);
 		aMemoryGraphics.PopState();
 
-		SDL_SetRenderTarget(LawnApp::mSDLRenderer, nullptr);
+		SDL_SetRenderTarget(LawnApp::mSDLRenderer, anOldRenderTarget);
 
 		MemoryImage* aImage = new MemoryImage();
 		int aBitsCount = theImage->mWidth * theImage->mHeight;

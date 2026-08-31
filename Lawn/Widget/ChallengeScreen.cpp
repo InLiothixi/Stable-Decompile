@@ -118,6 +118,61 @@ ChallengeDefinition gChallengeDefs[NUM_CHALLENGE_MODES] = {
 #endif
 };
 
+namespace
+{
+	// Use one atlas for every record-text pass so resource overrides cannot give the outline and fill different glyph layouts.
+	void DrawChallengeRecordText(Graphics* g, const SexyString& theText, int theX, int theY)
+	{
+		for (int anOffsetY = -1; anOffsetY <= 1; anOffsetY++)
+		{
+			for (int anOffsetX = -1; anOffsetX <= 1; anOffsetX++)
+			{
+				if (anOffsetX == 0 && anOffsetY == 0)
+					continue;
+
+				TodDrawString(
+					g,
+					theText,
+					theX + anOffsetX,
+					theY + anOffsetY,
+					Sexy::FONT_CONTINUUMBOLD14,
+					Color::White,
+					DS_ALIGN_CENTER
+				);
+			}
+		}
+		TodDrawString(g, theText, theX, theY, Sexy::FONT_CONTINUUMBOLD14, Color(255, 0, 0), DS_ALIGN_CENTER);
+	}
+
+	void DrawChallengeRecordTextWrapped(Graphics* g, const SexyString& theText, const Rect& theRect)
+	{
+		for (int anOffsetY = -1; anOffsetY <= 1; anOffsetY++)
+		{
+			for (int anOffsetX = -1; anOffsetX <= 1; anOffsetX++)
+			{
+				if (anOffsetX == 0 && anOffsetY == 0)
+					continue;
+
+				Rect anOutlineRect(
+					theRect.mX + anOffsetX,
+					theRect.mY + anOffsetY,
+					theRect.mWidth,
+					theRect.mHeight
+				);
+				TodDrawStringWrapped(
+					g,
+					theText,
+					anOutlineRect,
+					Sexy::FONT_CONTINUUMBOLD14,
+					Color::White,
+					DS_ALIGN_CENTER
+				);
+			}
+		}
+		TodDrawStringWrapped(g, theText, theRect, Sexy::FONT_CONTINUUMBOLD14, Color(255, 0, 0), DS_ALIGN_CENTER);
+	}
+}
+
 //0x42DAE0
 ChallengeScreen::ChallengeScreen(LawnApp* theApp, ChallengePage thePage)
 {
@@ -539,10 +594,11 @@ void ChallengeScreen::DrawButton(Graphics* g, int theChallengeIndex)
 		int aPosX = aChallengeButton->mX;
 		int aPosY = aChallengeButton->mY;
 
+		const int aLocalMouseY = mApp->mWidgetManager->mLastMouseY - mY;
 		if (aChallengeButton->mY >= mScrollbar->mViewRect.mY + mScrollbar->mViewRect.mHeight ||
 			aChallengeButton->mY + aChallengeButton->mHeight <= mScrollbar->mViewRect.mY ||
-			mApp->mWidgetManager->mLastMouseY >= mScrollbar->mViewRect.mY + mScrollbar->mViewRect.mHeight ||
-			mApp->mWidgetManager->mLastMouseY <= mScrollbar->mViewRect.mY)
+			aLocalMouseY >= mScrollbar->mViewRect.mY + mScrollbar->mViewRect.mHeight ||
+			aLocalMouseY <= mScrollbar->mViewRect.mY)
 		{
 			aChallengeButton->mY = 600;
 		}
@@ -719,18 +775,16 @@ void ChallengeScreen::DrawButton(Graphics* g, int theChallengeIndex)
 				{
 					g->DrawImage(Sexy::IMAGE_MINIGAME_TROPHY, aPosX - 6, aPosY - 2);
 				}
-				else if (mApp->IsEndlessScaryPotter(aDef.mChallengeMode) || mApp->IsEndlessIZombie(aDef.mChallengeMode))
+				else if (mApp->IsSurvivalEndless(aDef.mChallengeMode) || mApp->IsLastStandEndless(aDef.mChallengeMode))
 				{
 					SexyString aAchievement = mApp->Pluralize(aRecord, _S("[ONE_FLAG]"), _S("[COUNT_FLAGS]"));
-					TodDrawString(g, aAchievement, aPosX + 48, aPosY + 48, Sexy::FONT_CONTINUUMBOLD14OUTLINE, Color::White, DS_ALIGN_CENTER);
-					TodDrawString(g, aAchievement, aPosX + 48, aPosY + 48, Sexy::FONT_CONTINUUMBOLD14, Color(255, 0, 0), DS_ALIGN_CENTER);
+					DrawChallengeRecordText(g, aAchievement, aPosX + 48, aPosY + 48);
 				}
-				else if (mApp->IsSurvivalEndless(aDef.mChallengeMode) || mApp->IsLastStandEndless(aDef.mChallengeMode))
+				else if (mApp->IsEndlessScaryPotter(aDef.mChallengeMode) || mApp->IsEndlessIZombie(aDef.mChallengeMode))
 				{
 					SexyString aAchievement = TodReplaceNumberString(_S("[LONGEST_STREAK]"), _S("{STREAK}"), aRecord);
 					Rect aRect(aPosX, aPosY + 15, 96, 200);
-					TodDrawStringWrapped(g, aAchievement, aRect, Sexy::FONT_CONTINUUMBOLD14OUTLINE, Color::White, DS_ALIGN_CENTER);
-					TodDrawStringWrapped(g, aAchievement, aRect, Sexy::FONT_CONTINUUMBOLD14, Color(255, 0, 0), DS_ALIGN_CENTER);
+					DrawChallengeRecordTextWrapped(g, aAchievement, aRect);
 				}
 			}
 			else if (aChallengeButton->mDisabled)
@@ -924,7 +978,9 @@ void ChallengeScreen::UpdateToolTip()
 		ChallengeDefinition& aDef = GetChallengeDefinition(aChallengeMode);
 		ButtonWidget* aChallengeButton = mChallengeButtons[aChallengeMode];
 		if (aChallengeButton->mVisible && aChallengeButton->mDisabled &&
-			aChallengeButton->Contains(mApp->mWidgetManager->mLastMouseX, mApp->mWidgetManager->mLastMouseY) &&
+			aChallengeButton->Contains(
+				mApp->mWidgetManager->mLastMouseX - mX,
+				mApp->mWidgetManager->mLastMouseY - mY) &&
 			AccomplishmentsNeeded(aChallengeMode) <= 1)
 		{
 			mToolTip->mX = aChallengeButton->mWidth / 2 + aChallengeButton->mX;

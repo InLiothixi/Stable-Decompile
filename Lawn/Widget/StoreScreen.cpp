@@ -50,6 +50,10 @@ void StoreScreenOverlay::Draw(Graphics* g)
 StoreScreen::StoreScreen(LawnApp* theApp) : Dialog(nullptr, nullptr, DIALOG_STORE, true, _S("Store"), _S(""), _S(""), BUTTONS_NONE)
 {
 	mApp = theApp;
+    mBackButton = nullptr;
+    mPrevButton = nullptr;
+    mNextButton = nullptr;
+    mOverlayWidget = nullptr;
     mClip = false;
     mStoreTime = 0;
     mBubbleCountDown = 0;
@@ -67,7 +71,6 @@ StoreScreen::StoreScreen(LawnApp* theApp) : Dialog(nullptr, nullptr, DIALOG_STOR
     mWaitForDialog = false;
     mCoins.DataArrayInitialize(1024U, "coins");
     TodLoadResources("DelayLoad_Store");
-    Resize(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
     mPottedPlantSpecs.InitializePottedPlant(SEED_MARIGOLD);
     mPottedPlantSpecs.mDrawVariation = (DrawVariation)RandRangeInt(VARIATION_MARIGOLD_WHITE, VARIATION_MARIGOLD_LIGHT_GREEN);
     mCrazyDaveLastTalkIndex = -1;
@@ -116,6 +119,15 @@ StoreScreen::StoreScreen(LawnApp* theApp) : Dialog(nullptr, nullptr, DIALOG_STOR
     mOverlayWidget = new StoreScreenOverlay(this);
     mOverlayWidget->Resize(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
 
+    Rect aCanvasBounds = mApp->gBoardBounds;
+    if (aCanvasBounds.mWidth <= 0 || aCanvasBounds.mHeight <= 0)
+        aCanvasBounds = Rect(0, 0, mApp->mWidth, mApp->mHeight);
+    const Point aStoreOrigin = BoardGeometry::CenteredInCanvas(
+        aCanvasBounds,
+        BoardGridLayout::FiveRows
+    ).GetCanvasOrigin();
+    Resize(aStoreOrigin.mX, aStoreOrigin.mY, BOARD_WIDTH, BOARD_HEIGHT);
+
     if (!IsPageShown(STORE_PAGE_PLANT_UPGRADES))
     {
         mPrevButton->mDisabledImage = Sexy::IMAGE_STORE_PREVBUTTONDISABLED;
@@ -137,6 +149,23 @@ StoreScreen::~StoreScreen()
     if (mPrevButton) delete mPrevButton;
     if (mNextButton) delete mNextButton;
     if (mOverlayWidget) delete mOverlayWidget;
+}
+
+void StoreScreen::Resize(int theX, int theY, int theWidth, int theHeight)
+{
+    Dialog::Resize(theX, theY, theWidth, theHeight);
+
+    // The store remains an authored 800x600 stage. Keep every child in that
+    // local space so moving the root during a canvas resize cannot accumulate
+    // presentation offsets or separate drawing from hit testing.
+    if (mBackButton != nullptr)
+        mBackButton->Move(366, 512);
+    if (mPrevButton != nullptr)
+        mPrevButton->Move(252, 402);
+    if (mNextButton != nullptr)
+        mNextButton->Move(596, 402);
+    if (mOverlayWidget != nullptr)
+        mOverlayWidget->Resize(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
 }
 
 //0x48A760
@@ -470,18 +499,18 @@ void StoreScreen::Draw(Graphics* g)
     g->DrawImage(Sexy::IMAGE_STORE_SIGN, 285, aStoreSignPosY);
 
     Graphics gBackButton(*g);
-    gBackButton.mTransX = mBackButton->mX + mApp->mDDInterface->mWideScreenOffsetX;
-    gBackButton.mTransY = mBackButton->mY + mApp->mDDInterface->mWideScreenOffsetY;
+    gBackButton.mTransX += mBackButton->mX;
+    gBackButton.mTransY += mBackButton->mY;
     mBackButton->Render(&gBackButton);
 
     Graphics gPrevButton(*g);
-    gPrevButton.mTransX = mPrevButton->mX + mApp->mDDInterface->mWideScreenOffsetX;
-    gPrevButton.mTransY = mPrevButton->mY + mApp->mDDInterface->mWideScreenOffsetY;
+    gPrevButton.mTransX += mPrevButton->mX;
+    gPrevButton.mTransY += mPrevButton->mY;
     mPrevButton->Render(&gPrevButton);
 
     Graphics gNextButton(*g);
-    gNextButton.mTransX = mNextButton->mX + mApp->mDDInterface->mWideScreenOffsetX;
-    gNextButton.mTransY = mNextButton->mY + mApp->mDDInterface->mWideScreenOffsetY;
+    gNextButton.mTransX += mNextButton->mX;
+    gNextButton.mTransY += mNextButton->mY;
     mNextButton->Render(&gNextButton);
 
     if (!mHatchTimer && mHatchOpen)

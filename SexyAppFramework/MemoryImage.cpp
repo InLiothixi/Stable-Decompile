@@ -1878,7 +1878,7 @@ void MemoryImage::StretchBlt(Image* theImage, const Rect& theDestRect, const Rec
 		SlowStretchBlt(theImage, aDestRect, aSrcRect, theColor, theDrawMode);
 }
 
-#include "../Sexy.TodLib/TodCommon.h";
+#include "../Sexy.TodLib/TodCommon.h"
 
 void MemoryImage::BltMatrixHelper(Image* theImage, float x, float y, const SexyMatrix3 &theMatrix, const Rect& theClipRect, const Color& theColor, int theDrawMode, const Rect &theSrcRect, void *theSurface, int theBytePitch, int thePixelFormat, bool blend)
 {

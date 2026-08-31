@@ -1291,12 +1291,15 @@ void ImageFont::GenerateActiveFontLayers()
 
 					aMemoryImage->mWidth = aCurX;
 					aMemoryImage->mHeight = aMaxHeight;
-					aMemoryImage->mD3DData = SDL_CreateTexture(LawnApp::mSDLRenderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_TARGET, aMemoryImage->mWidth, aMemoryImage->mHeight);
+					aMemoryImage->mD3DData = SDL3Image::CreateRenderTarget(LawnApp::mSDLRenderer, aMemoryImage->mWidth, aMemoryImage->mHeight);
 					SDL_SetTextureBlendMode((SDL_Texture*)aMemoryImage->mD3DData, SDL_BLENDMODE_BLEND);
 					Graphics g(aMemoryImage);
 					g.SetLinearBlend(true);
 
+					SDL_Texture* anOldRenderTarget = SDL_GetRenderTarget(LawnApp::mSDLRenderer);
 					SDL_SetRenderTarget(LawnApp::mSDLRenderer, (SDL_Texture*)aMemoryImage->mD3DData);
+					SDL_SetRenderDrawColor(LawnApp::mSDLRenderer, 0, 0, 0, SDL_ALPHA_TRANSPARENT);
+					SDL_RenderClear(LawnApp::mSDLRenderer);
 
 					for (aCharNum = 0; aCharNum < 256; aCharNum++)
 					{
@@ -1307,30 +1310,31 @@ void ImageFont::GenerateActiveFontLayers()
 
 					if (mForceScaledImagesWhite)
 					{
-						SDL_SetRenderTarget(LawnApp::mSDLRenderer, (SDL_Texture*)aMemoryImage->mD3DData);
-
 						SDL_Surface* surface = SDL_RenderReadPixels(LawnApp::mSDLRenderer, nullptr);
-						Uint32* pixels = (Uint32*)surface->pixels;
-						int width = surface->w;
-						int height = surface->h;
-						int pitch = surface->pitch / 4; 
-
-						for (int y = 0; y < height; y++)
+						SDL_SetRenderTarget(LawnApp::mSDLRenderer, anOldRenderTarget);
+						if (surface != nullptr)
 						{
-							Uint32* row = pixels + y * pitch;
-							for (int x = 0; x < width; x++)
-							{
-								Uint32 pixel = row[x];
-								row[x] = (pixel & 0xFF000000) | 0x00FFFFFF; 
-							}
-						}
+							Uint32* pixels = (Uint32*)surface->pixels;
+							int width = surface->w;
+							int height = surface->h;
+							int pitch = surface->pitch / 4;
 
-						SDL_UpdateTexture((SDL_Texture*)aMemoryImage->mD3DData, nullptr, surface->pixels, surface->pitch);
-						SDL_DestroySurface(surface);
-						SDL_SetRenderTarget(LawnApp::mSDLRenderer, nullptr);
+							for (int y = 0; y < height; y++)
+							{
+								Uint32* row = pixels + y * pitch;
+								for (int x = 0; x < width; x++)
+								{
+									Uint32 pixel = row[x];
+									row[x] = (pixel & 0xFF000000) | 0x00FFFFFF;
+								}
+							}
+
+							SDL_UpdateTexture((SDL_Texture*)aMemoryImage->mD3DData, nullptr, surface->pixels, surface->pitch);
+							SDL_DestroySurface(surface);
+						}
 					}
 
-					SDL_SetRenderTarget(LawnApp::mSDLRenderer, nullptr);
+					SDL_SetRenderTarget(LawnApp::mSDLRenderer, anOldRenderTarget);
 				}
 
 				int aLayerAscent = (aFontLayer->mAscent * aPointSize) / aLayerPointSize;

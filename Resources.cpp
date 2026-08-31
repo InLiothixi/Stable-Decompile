@@ -1,4 +1,5 @@
 #include <map>
+#include <cstdint>
 #include "Resources.h"
 #include "SexyAppFramework/ResourceManager.h"
 #include "GameConstants.h"
@@ -2075,7 +2076,7 @@ Image* Sexy::IMAGE_SQUIRREL;
 
 bool (*gExtractResourcesByName)(Sexy::ResourceManager* theResourceManager, const char* theName);
 
-void* gResources[(int)Sexy::ResourceId::RESOURCE_ID_MAX] =
+Sexy::ResourceEntry gResources[(int)Sexy::ResourceId::RESOURCE_ID_MAX] =
 {
 	/* Init：0x69E6B0 */
 	&Sexy::IMAGE_BLANK,
@@ -3127,32 +3128,32 @@ void* gResources[(int)Sexy::ResourceId::RESOURCE_ID_MAX] =
 
 Sexy::Image* Sexy::GetImageById(ResourceId theId)
 {
-	return *(Sexy::Image**)gResources[(int)theId];
+	return *static_cast<Sexy::Image**>(gResources[(int)theId].mVariable);
 }
 
 Sexy::Font* Sexy::GetFontById(ResourceId theId)
 {
-	return *(Sexy::Font**)gResources[(int)theId];
+	return *static_cast<Sexy::Font**>(gResources[(int)theId].mVariable);
 }
 
 int Sexy::GetSoundById(ResourceId theId)
 {
-	return *(int*)gResources[(int)theId];
+	return *static_cast<int*>(gResources[(int)theId].mVariable);
 }
 
 Image*& Sexy::GetImageRefById(ResourceId theId)
 {
-	return *(Image**)gResources[(int)theId];
+	return *static_cast<Image**>(gResources[(int)theId].mVariable);
 }
 
 Font*& Sexy::GetFontRefById(ResourceId theId)
 {
-	return *(Font**)gResources[(int)theId];
+	return *static_cast<Font**>(gResources[(int)theId].mVariable);
 }
 
 int& Sexy::GetSoundRefById(ResourceId theId)
 {
-	return *(int*)gResources[(int)theId];
+	return *static_cast<int*>(gResources[(int)theId].mVariable);
 }
 
 Sexy::ResourceId Sexy::GetIdByImage(Image* theImage)
@@ -3167,23 +3168,23 @@ Sexy::ResourceId Sexy::GetIdByFont(Font* theFont)
 
 Sexy::ResourceId Sexy::GetIdBySound(int theSound)
 {
-	return GetIdByVariable((void*)theSound);
+	return GetIdByVariable(reinterpret_cast<void*>(static_cast<intptr_t>(theSound)));
 }
 
 //0x47FBC0
 Sexy::ResourceId Sexy::GetIdByVariable(void* theVariable)
 {
-	static std::map<int, int> aMap;
+	static std::map<ResourceKey, int> aMap;
 
 	if (gNeedRecalcVariableToIdMap)
 	{
 		gNeedRecalcVariableToIdMap = false;
 		aMap.clear();
 		for (int i = 0; i < (int)ResourceId::RESOURCE_ID_MAX; i++)
-			aMap[*(int*)gResources[i]] = i;
+			aMap[gResources[i].GetKey()] = i;
 	}
 
-	auto anIter = aMap.find((int)theVariable);
+	auto anIter = aMap.find(reinterpret_cast<ResourceKey>(theVariable));
 	return anIter == aMap.end() ? ResourceId::RESOURCE_ID_MAX : (ResourceId)anIter->second;
 }
 /*

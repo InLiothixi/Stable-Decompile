@@ -976,7 +976,7 @@ bool TodResourceManager::TodLoadResources(const std::string& theGroup)
 		return false;
 	}
 
-	if (ExtractResourcesByName && !ExtractResourcesByName(this, theGroup.c_str()))
+	if (!ExtractResourcesByName(this, theGroup.c_str()))
 	{
 		gSexyAppBase->ShowResourceError(true);
 		return false;

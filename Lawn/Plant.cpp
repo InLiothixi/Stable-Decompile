@@ -1,6 +1,7 @@
 
 #include "Coin.h"
 #include "Plant.h"
+#include "BoardGeometry.h"
 #include "Board.h"
 #include "Zombie.h"
 #include "Cutscene.h"
@@ -2633,7 +2634,7 @@ void Plant::UpdateMagnetShroom()
             if (aZombie->IsDeadOrDying())
                 continue;
 
-            if (aZombieRect.mX > BOARD_WIDTH || aDiffY > 2 || aDiffY < -2)
+            if (aZombieRect.mX > BoardGeometry::kDesignWidth || aDiffY > 2 || aDiffY < -2)
                 continue;
 
             if (aZombie->mZombiePhase == ZombiePhase::PHASE_DIGGER_TUNNELING ||
@@ -2711,7 +2712,7 @@ void Plant::UpdateMagnetShroom()
             aClosestLadder->GridItemDie();
 
             MagnetItem* aMagnetItem = GetFreeMagnetItem();
-            aMagnetItem->mPosX = mBoard->GridToPixelX(aClosestLadder->mGridX, aClosestLadder->mGridY) + 40;
+            aMagnetItem->mPosX = mBoard->GridToPixelX(aClosestLadder->mGridX, aClosestLadder->mGridY) + BoardGeometry::kColumnWidth / 2;
             aMagnetItem->mPosY = mBoard->GridToPixelY(aClosestLadder->mGridX, aClosestLadder->mGridY);
             aMagnetItem->mDestOffsetX = RandRangeFloat(-10.0f, 10.0f) + 10.0f;
             aMagnetItem->mDestOffsetY = RandRangeFloat(-10.0f, 10.0f);
@@ -6265,7 +6266,7 @@ void Plant::Fire(Zombie* theTargetZombie, int theRow, PlantWeapon thePlantWeapon
         aProjectile->mVelY = 0.0f;
         aProjectile->mAccZ = 0.0f;
         aProjectile->mVelZ = -8.0f;
-        aProjectile->mCobTargetX = mTargetX - 40;
+        aProjectile->mCobTargetX = mTargetX - BoardGeometry::kColumnWidth / 2;
         aProjectile->mCobTargetRow = mBoard->PixelToGridYKeepOnBoard(mTargetX, mTargetY);
 
         if (!FloatApproxEqual(mRad, 0.0f))
@@ -6783,8 +6784,8 @@ Rect Plant::GetPlantAttackRect(PlantWeapon thePlantWeapon)
 #ifdef _HAS_BLOOM_AND_DOOM_CONTENTS
     case SeedType::SEED_BEEHIVE:
 #endif
-                                        aRect = Rect(-BOARD_WIDTH,  -BOARD_HEIGHT,  BOARD_WIDTH * 2,    BOARD_HEIGHT * 2);      break;
-    default:                            aRect = Rect(mX + 60,       mY,             BOARD_WIDTH,        mHeight);               break;
+                                        aRect = Rect(-BoardGeometry::kDesignWidth, -BoardGeometry::kDesignHeight, BoardGeometry::kDesignWidth * 2, BoardGeometry::kDesignHeight * 2); break;
+    default:                            aRect = Rect(mX + 60,       mY,             BoardGeometry::kDesignWidth, mHeight);       break;
     }
 
     return aRect;

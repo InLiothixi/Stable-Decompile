@@ -189,23 +189,24 @@ Board::Board(LawnApp* theApp)
 	mMenuButton = new GameButton(0);
 	mMenuButton->mDrawStoneButton = true;
 	mTicks = 0;
+	const Point aBoardOrigin = GetBoardGeometry().GetCanvasOrigin();
 #ifdef _REPLANTED_SPEED_CONTROL
 		mSlowdownButton = MakeNewButton(Board::SLOWDOWN, this, "", nullptr, Sexy::IMAGE_SLOWDOWN_BUTTON, Sexy::IMAGE_SLOWDOWN_BUTTON_PRESSED, Sexy::IMAGE_SLOWDOWN_BUTTON_PRESSED);
-		mSlowdownButton->Resize(mApp->mDDInterface->mWideScreenOffsetX, mApp->mDDInterface->mWideScreenOffsetY, Sexy::IMAGE_SLOWDOWN_BUTTON->GetWidth(), Sexy::IMAGE_SLOWDOWN_BUTTON->GetHeight());
+		mSlowdownButton->Resize(aBoardOrigin.mX, aBoardOrigin.mY, Sexy::IMAGE_SLOWDOWN_BUTTON->GetWidth(), Sexy::IMAGE_SLOWDOWN_BUTTON->GetHeight());
 		mSlowdownButton->mBtnNoDraw = true;
 		mSlowdownButton->mDoFinger = true;
 		mSlowdownButton->mTranslateX = 0;
 		mSlowdownButton->mTranslateY = 0;
 
 		mPauseButton = MakeNewButton(Board::PAUSE, this, "", nullptr, Sexy::IMAGE_PAUSE_BUTTON, Sexy::IMAGE_PAUSE_BUTTON_PRESSED, Sexy::IMAGE_PAUSE_BUTTON_PRESSED);
-		mPauseButton->Resize(mApp->mDDInterface->mWideScreenOffsetX, mApp->mDDInterface->mWideScreenOffsetY, Sexy::IMAGE_PAUSE_BUTTON->GetWidth(), Sexy::IMAGE_PAUSE_BUTTON->GetHeight());
+		mPauseButton->Resize(aBoardOrigin.mX, aBoardOrigin.mY, Sexy::IMAGE_PAUSE_BUTTON->GetWidth(), Sexy::IMAGE_PAUSE_BUTTON->GetHeight());
 		mPauseButton->mBtnNoDraw = true;
 		mPauseButton->mDoFinger = true;
 		mPauseButton->mTranslateX = 0;
 		mPauseButton->mTranslateY = 0;
 
 		mSpeedupButton = MakeNewButton(Board::SPEEDUP, this, "", nullptr, Sexy::IMAGE_SPEEDUP_BUTTON, Sexy::IMAGE_SPEEDUP_BUTTON_PRESSED, Sexy::IMAGE_SPEEDUP_BUTTON_PRESSED);
-		mSpeedupButton->Resize(mApp->mDDInterface->mWideScreenOffsetX, mApp->mDDInterface->mWideScreenOffsetY, Sexy::IMAGE_SPEEDUP_BUTTON->GetWidth(), Sexy::IMAGE_SPEEDUP_BUTTON->GetHeight());
+		mSpeedupButton->Resize(aBoardOrigin.mX, aBoardOrigin.mY, Sexy::IMAGE_SPEEDUP_BUTTON->GetWidth(), Sexy::IMAGE_SPEEDUP_BUTTON->GetHeight());
 		mSpeedupButton->mBtnNoDraw = true;
 		mSpeedupButton->mDoFinger = true;
 		mSpeedupButton->mTranslateX = 0;
@@ -234,7 +235,7 @@ Board::Board(LawnApp* theApp)
 	if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN || mApp->mGameMode == GameMode::GAMEMODE_TREE_OF_WISDOM)
 	{
 		mMenuButton->SetLabel(_S("[MAIN_MENU_BUTTON]"));
-		mMenuButton->Resize(628 + mApp->mDDInterface->mWideScreenOffsetX, -10 + mApp->mDDInterface->mWideScreenOffsetY, 163, 46);
+		mMenuButton->Resize(628 + aBoardOrigin.mX, -10 + aBoardOrigin.mY, 163, 46);
 
 		if (mApp->IsScreenSaver())
 		{
@@ -246,12 +247,12 @@ Board::Board(LawnApp* theApp)
 		mStoreButton->mOverImage = IMAGE_ZENSHOPBUTTON_HIGHLIGHT;
 		mStoreButton->mDownImage = IMAGE_ZENSHOPBUTTON_HIGHLIGHT;
 		mStoreButton->mParentWidget = this;
-		mStoreButton->Resize(678 + mApp->mDDInterface->mWideScreenOffsetX, 33 + mApp->mDDInterface->mWideScreenOffsetY, IMAGE_ZENSHOPBUTTON->mWidth, 40);
+		mStoreButton->Resize(678 + aBoardOrigin.mX, 33 + aBoardOrigin.mY, IMAGE_ZENSHOPBUTTON->mWidth, 40);
 	}
 	else
 	{
 		mMenuButton->SetLabel(_S("[MENU_BUTTON]"));
-		mMenuButton->Resize(681 + mApp->mDDInterface->mWideScreenOffsetX, -10 + mApp->mDDInterface->mWideScreenOffsetY, 117, 46);
+		mMenuButton->Resize(681 + aBoardOrigin.mX, -10 + aBoardOrigin.mY, 117, 46);
 	}
 
 	if (mApp->IsLastStand())
@@ -265,7 +266,7 @@ Board::Board(LawnApp* theApp)
 	if (mApp->mGameMode == GameMode::GAMEMODE_UPSELL)
 	{
 		mMenuButton->SetLabel(_S("[MAIN_MENU_BUTTON]"));
-		mMenuButton->Resize(628 + mApp->mDDInterface->mWideScreenOffsetX, -10 + mApp->mDDInterface->mWideScreenOffsetY, 163, 46);
+		mMenuButton->Resize(628 + aBoardOrigin.mX, -10 + aBoardOrigin.mY, 163, 46);
 
 		mStoreButton = new GameButton(1);
 		mStoreButton->mDrawStoneButton = true;
@@ -281,7 +282,7 @@ Board::Board(LawnApp* theApp)
 		mStoreButton->mOverImage = IMAGE_CAGEICON;
 		mStoreButton->mDownImage = IMAGE_CAGEICON;
 		mStoreButton->mParentWidget = this;
-		mStoreButton->Resize(BOARD_WIDTH - IMAGE_CAGEICON->GetWidth() + mApp->mDDInterface->mWideScreenOffsetX, mMenuButton->mY + mMenuButton->mHeight + 10, IMAGE_CAGEICON->GetWidth(), IMAGE_CAGEICON->GetHeight());
+		mStoreButton->Resize(BoardGeometry::kDesignWidth - IMAGE_CAGEICON->GetWidth() + aBoardOrigin.mX, mMenuButton->mY + mMenuButton->mHeight + 10, IMAGE_CAGEICON->GetWidth(), IMAGE_CAGEICON->GetHeight());
 	}
 #endif
 }
@@ -331,6 +332,63 @@ Board::~Board()
 	}
 	delete mCutScene;
 	delete mChallenge;
+}
+
+void Board::Resize(int theX, int theY, int theWidth, int theHeight)
+{
+	Widget::Resize(theX, theY, theWidth, theHeight);
+	RelayoutBoardControls();
+}
+
+void Board::RelayoutBoardControls()
+{
+	const Point aBoardOrigin = GetBoardGeometry().GetCanvasOrigin();
+
+#ifdef _REPLANTED_SPEED_CONTROL
+	if (mSlowdownButton)
+		mSlowdownButton->Move(aBoardOrigin.mX, aBoardOrigin.mY);
+	if (mPauseButton)
+		mPauseButton->Move(aBoardOrigin.mX, aBoardOrigin.mY);
+	if (mSpeedupButton)
+		mSpeedupButton->Move(aBoardOrigin.mX, aBoardOrigin.mY);
+#endif
+
+	if (mMenuButton)
+	{
+		if (mApp->IsScreenSaver())
+		{
+			mMenuButton->mX = -1000;
+			mMenuButton->mY = -1000;
+		}
+		else if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN ||
+			mApp->mGameMode == GameMode::GAMEMODE_TREE_OF_WISDOM ||
+			mApp->mGameMode == GameMode::GAMEMODE_UPSELL)
+		{
+			mMenuButton->mX = 628 + aBoardOrigin.mX;
+			mMenuButton->mY = -10 + aBoardOrigin.mY;
+		}
+		else
+		{
+			mMenuButton->mX = 681 + aBoardOrigin.mX;
+			mMenuButton->mY = -10 + aBoardOrigin.mY;
+		}
+	}
+
+	if (mStoreButton &&
+		(mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN ||
+		 mApp->mGameMode == GameMode::GAMEMODE_TREE_OF_WISDOM))
+	{
+		mStoreButton->mX = 678 + aBoardOrigin.mX;
+		mStoreButton->mY = 33 + aBoardOrigin.mY;
+	}
+
+#ifdef _DS_MINIGAMES
+	if (mStoreButton && mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZOMBIE_TRAP)
+	{
+		mStoreButton->mX = BoardGeometry::kDesignWidth - IMAGE_CAGEICON->GetWidth() + aBoardOrigin.mX;
+		mStoreButton->mY = mMenuButton->mY + mMenuButton->mHeight + 10;
+	}
+#endif
 }
 
 void BoardInitForPlayer()
@@ -535,6 +593,9 @@ GridItem* Board::GetZenToolAt(int theGridX, int theGridY)
 //0x408ED0
 bool Board::CanAddGraveStoneAt(int theGridX, int theGridY)
 {
+	if (!IsValidGridCell(theGridX, theGridY))
+		return false;
+
 	if (mGridSquareType[theGridX][theGridY] != GridSquareType::GRIDSQUARE_GRASS && mGridSquareType[theGridX][theGridY] != GridSquareType::GRIDSQUARE_HIGH_GROUND)
 	{
 		return false;
@@ -2514,12 +2575,8 @@ void Board::RefreshSeedPacketFromCursor()
 //0x40CE00
 bool Board::IsPoolSquare(int theGridX, int theGridY)
 {
-	if (theGridX >= 0 && theGridY >= 0)
-	{
-		TOD_ASSERT(theGridX < MAX_GRID_SIZE_X && theGridY < MAX_GRID_SIZE_Y);
-		return mGridSquareType[theGridX][theGridY] == GridSquareType::GRIDSQUARE_POOL;
-	}
-	return false;
+	return IsValidGridCell(theGridX, theGridY) &&
+		mGridSquareType[theGridX][theGridY] == GridSquareType::GRIDSQUARE_POOL;
 }
 
 //0x40CE20
@@ -2685,7 +2742,7 @@ void Board::GetPlantsOnLawn(int theGridX, int theGridY, PlantsOnLawn* thePlantOn
 	thePlantOnLawn->mFlyingPlant = nullptr;
 	thePlantOnLawn->mNormalPlant = nullptr;
 
-	if (theGridX < 0 || theGridX >= MAX_GRID_SIZE_X || theGridY < 0 || theGridY >= MAX_GRID_SIZE_Y)
+	if (!IsValidGridCell(theGridX, theGridY))
 		return;
 
 	if (mApp->IsWallnutBowlingLevel() && !mCutScene->IsInShovelTutorial())
@@ -2750,7 +2807,7 @@ void Board::GetPlantsOnLawn(int theGridX, int theGridY, PlantsOnLawn* thePlantOn
 
 Plant* Board::GetTopPlantAt(int theGridX, int theGridY, PlantPriority thePriority)
 {
-	if (theGridX < 0 || theGridX >= MAX_GRID_SIZE_X || theGridY < 0 || theGridY >= MAX_GRID_SIZE_Y)
+	if (!IsValidGridCell(theGridX, theGridY))
 		return nullptr;
 
 	if (mApp->IsWallnutBowlingLevel() && !mCutScene->IsInShovelTutorial())
@@ -3318,7 +3375,7 @@ bool Board::IsIceAt(int theGridX, int theGridY)
 PlantingReason Board::CanPlantAt(int theGridX, int theGridY, SeedType theSeedType)
 {
 	// 目标位置不在场地内，则返回“不能种在那里”
-	if (theGridX < 0 || theGridX >= MAX_GRID_SIZE_X || theGridY < 0 || theGridY >= MAX_GRID_SIZE_Y)
+	if (!IsValidGridCell(theGridX, theGridY))
 	{
 		return PlantingReason::PLANTING_NOT_HERE;
 	}
@@ -3565,8 +3622,17 @@ void Board::UpdateCursor()
 #endif
 		)return;
 
-	int aMouseX = mApp->mWidgetManager->mLastMouseX - mX - mApp->mDDInterface->mWideScreenOffsetX;
-	int aMouseY = mApp->mWidgetManager->mLastMouseY - mY - mApp->mDDInterface->mWideScreenOffsetY;
+	const BoardGeometry aGeometry = GetBoardGeometry();
+	const Point aMouse = aGeometry.CanvasToLocalPixel(
+		mApp->mWidgetManager->mLastMouseX - mX,
+		mApp->mWidgetManager->mLastMouseY - mY);
+	int aMouseX = aMouse.mX;
+	int aMouseY = aMouse.mY;
+	if (!aGeometry.ContainsLocalPoint(aMouseX, aMouseY))
+	{
+		mApp->SetCursor(Sexy::CURSOR_POINTER);
+		return;
+	}
 	bool aShowFinger = false;
 	bool aShowDrag = false;
 	bool aHideCursor = false;
@@ -3812,8 +3878,12 @@ void Board::UpdateMousePosition()
 	}
 
 	SeedType aCursorSeedType = GetSeedTypeInCursor();
-	int aMouseX = mApp->mWidgetManager->mLastMouseX - mX - mApp->mDDInterface->mWideScreenOffsetX;
-	int aMouseY = mApp->mWidgetManager->mLastMouseY - mY - mApp->mDDInterface->mWideScreenOffsetY;
+	const BoardGeometry aGeometry = GetBoardGeometry();
+	const Point aMouse = aGeometry.CanvasToLocalPixel(
+		mApp->mWidgetManager->mLastMouseX - mX,
+		mApp->mWidgetManager->mLastMouseY - mY);
+	int aMouseX = aMouse.mX;
+	int aMouseY = aMouse.mY;
 
 	// 破罐者关卡中，检测并高亮鼠标悬浮的罐子
 	if (mApp->IsScaryPotterLevel())
@@ -3826,6 +3896,8 @@ void Board::UpdateMousePosition()
 				aGridItem->mHighlighted = false;
 			}
 		}
+		if (!aGeometry.ContainsLocalPoint(aMouseX, aMouseY))
+			return;
 
 		HitResult aHitResult;
 		MouseHitTest(aMouseX, aMouseY, &aHitResult);
@@ -3835,6 +3907,17 @@ void Board::UpdateMousePosition()
 			aScaryPot->mHighlighted = true;
 			return;
 		}
+	}
+
+	if (!aGeometry.ContainsLocalPoint(aMouseX, aMouseY))
+	{
+		if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN)
+		{
+			GridItem* aStinky = mApp->mZenGarden->GetStinky();
+			if (aStinky)
+				aStinky->mHighlighted = false;
+		}
+		return;
 	}
 
 	// 禅境花园，设定蜗牛的高亮与否
@@ -3864,8 +3947,11 @@ void Board::UpdateMousePosition()
 		return;
 	}
 
-	const int aLastMouseX = mApp->mWidgetManager->mLastMouseX - mApp->mDDInterface->mWideScreenOffsetX;
-	const int aLastMouseY = mApp->mWidgetManager->mLastMouseY - mApp->mDDInterface->mWideScreenOffsetY;
+	const Point aLastMouse = GetBoardGeometry().CanvasToLocalPixel(
+		mApp->mWidgetManager->mLastMouseX - mX,
+		mApp->mWidgetManager->mLastMouseY - mY);
+	const int aLastMouseX = aLastMouse.mX;
+	const int aLastMouseY = aLastMouse.mY;
 
 	// 咖啡豆及坚果包扎术
 	if (aCursorSeedType == SeedType::SEED_INSTANT_COFFEE)
@@ -3918,8 +4004,17 @@ void Board::UpdateToolTip()
 		return;
 	}
 
-	int aMouseX = mWidgetManager->mLastMouseX - mX - mApp->mDDInterface->mWideScreenOffsetX;
-	int aMouseY = mWidgetManager->mLastMouseY - mY - mApp->mDDInterface->mWideScreenOffsetY;
+	const BoardGeometry aGeometry = GetBoardGeometry();
+	const Point aMouse = aGeometry.CanvasToLocalPixel(
+		mWidgetManager->mLastMouseX - mX,
+		mWidgetManager->mLastMouseY - mY);
+	int aMouseX = aMouse.mX;
+	int aMouseY = aMouse.mY;
+	if (!aGeometry.ContainsLocalPoint(aMouseX, aMouseY))
+	{
+		mToolTip->mVisible = false;
+		return;
+	}
 
 	if (mApp->mGameScene == GameScenes::SCENE_LEVEL_INTRO)
 	{
@@ -3929,7 +4024,7 @@ void Board::UpdateToolTip()
 			return;
 		}
 
-		if (mSeedBank->ContainsPoint(mWidgetManager->mLastMouseX, mWidgetManager->mLastMouseY) ||
+		if (mSeedBank->ContainsPoint(aMouseX, aMouseY) ||
 			mApp->mSeedChooserScreen->mAlmanacButton->IsMouseOver() ||
 			mApp->mSeedChooserScreen->mStoreButton->IsMouseOver() ||
 			mApp->mSeedChooserScreen->mImitaterButton->IsMouseOver())
@@ -3971,18 +4066,18 @@ void Board::UpdateToolTip()
 		mToolTip->mMinLeft = IMAGE_SEEDCHOOSER_BACKGROUND->GetWidth();
 		if (mApp->mSeedChooserScreen->mAlmanacButton->mBtnNoDraw && mApp->mSeedChooserScreen->mStoreButton->mBtnNoDraw)
 		{
-			mToolTip->mMaxBottom = 600 + mApp->mDDInterface->mWideScreenOffsetY;
+			mToolTip->mMaxBottom = BoardGeometry::kDesignHeight + GetBoardGeometry().GetCanvasOrigin().mY;
 		}
 		else
 		{
-			mToolTip->mMaxBottom = 570 + mApp->mDDInterface->mWideScreenOffsetY;
+			mToolTip->mMaxBottom = 570 + GetBoardGeometry().GetCanvasOrigin().mY;
 		}
 		if (!mApp->mSeedChooserScreen->mImitaterButton->mBtnNoDraw)
 		{
 			mToolTip->CalculateSize();
 			if (mX + mToolTip->mX - mToolTip->mWidth / 2 < 524)
 			{
-				mToolTip->mMaxBottom = 503 + mApp->mDDInterface->mWideScreenOffsetY;
+				mToolTip->mMaxBottom = 503 + GetBoardGeometry().GetCanvasOrigin().mY;
 			}
 		}
 
@@ -3996,7 +4091,7 @@ void Board::UpdateToolTip()
 	}
 
 	mToolTip->mMinLeft = 0;
-	mToolTip->mMaxBottom = BOARD_HEIGHT;
+	mToolTip->mMaxBottom = BoardGeometry::kDesignHeight;
 	mToolTip->SetTitle(_S(""));
 	mToolTip->SetLabel(_S(""));
 	mToolTip->SetWarningText(_S(""));
@@ -4296,7 +4391,7 @@ void Board::UpdateToolTip()
 //0x40FC70
 void Board::MouseDownCobcannonFire(int x, int y, int theClickCount)
 {
-	if (theClickCount >= 0 && y >= 80)
+	if (theClickCount >= 0 && y >= BoardGeometry::kLawnOriginY)
 	{
 		if (mCobCannonCursorDelayCounter > 0 && Distance2D(x, y, mCobCannonMouseX, mCobCannonMouseY) < 100.0f)
 		{
@@ -4338,7 +4433,7 @@ void Board::MouseDownWithPlant(int x, int y, int theClickCount)
 	int aGridY = PlantingPixelToGridY(x, y, aPlantingSeedType);
 
 	// 不在场地内的点击：放下卡牌
-	if (aGridX < 0 || aGridX >= MAX_GRID_SIZE_X || aGridY < 0 || aGridY > MAX_GRID_SIZE_Y)
+	if (!IsValidGridCell(aGridX, aGridY))
 	{
 		RefreshSeedPacketFromCursor();
 		mApp->PlayFoley(FoleyType::FOLEY_DROP);
@@ -5201,8 +5296,15 @@ void Board::MouseDown(int x, int y, int theClickCount)
 {
 	Widget::MouseDown(x, y, theClickCount);
 
-	x -= mApp->mDDInterface->mWideScreenOffsetX;
-	y -= mApp->mDDInterface->mWideScreenOffsetY;
+	const BoardGeometry aGeometry = GetBoardGeometry();
+	const Point aLocalPoint = aGeometry.CanvasToLocalPixel(x, y);
+	x = aLocalPoint.mX;
+	y = aLocalPoint.mY;
+	if (!aGeometry.ContainsLocalPoint(x, y))
+	{
+		mIgnoreMouseUp = true;
+		return;
+	}
 
 	if (mApp->IsScreenSaver())
 		return;
@@ -6705,7 +6807,7 @@ void Board::Update()
 	UpdateMousePosition();
 
 #ifdef _ALLOW_SWIPE
-	if (mIsDown)
+	if (mIsDown && !mIgnoreMouseUp)
 	{
 		if (mHeldCounter < 0)
 			mHeldCounter = 1;
@@ -6734,15 +6836,22 @@ void Board::Update()
 
 			if (mApp->mGameScene == GameScenes::SCENE_PLAYING)
 			{
-				HitResult aHitResult;
-				MouseHitTest(mWidgetManager->mLastMouseX, mWidgetManager->mLastMouseY, &aHitResult);
-				if (aHitResult.mObject && aHitResult.mObjectType == GameObjectType::OBJECT_TYPE_COIN)
+				const BoardGeometry aGeometry = GetBoardGeometry();
+				const Point aLocalMouse = aGeometry.CanvasToLocalPixel(
+					mWidgetManager->mLastMouseX - mX,
+					mWidgetManager->mLastMouseY - mY);
+				if (aGeometry.ContainsLocalPoint(aLocalMouse.mX, aLocalMouse.mY))
 				{
-					Coin* aCoin = (Coin*)(aHitResult.mObject);
-					if (aCoin && aCoin->mBoard)
+					HitResult aHitResult;
+					MouseHitTest(aLocalMouse.mX, aLocalMouse.mY, &aHitResult);
+					if (aHitResult.mObject && aHitResult.mObjectType == GameObjectType::OBJECT_TYPE_COIN)
 					{
-						aCoin->MouseDown(mWidgetManager->mLastMouseX, mWidgetManager->mLastMouseY, 1);
-						doUpdateCursor = true;
+						Coin* aCoin = (Coin*)(aHitResult.mObject);
+						if (aCoin && aCoin->mBoard)
+						{
+							aCoin->MouseDown(aLocalMouse.mX, aLocalMouse.mY, 1);
+							doUpdateCursor = true;
+						}
 					}
 				}
 
@@ -6781,31 +6890,38 @@ void Board::Update()
 		mHeld = false;
 
 		bool doUpdateCursor = false;
+		const BoardGeometry aGeometry = GetBoardGeometry();
+		const Point aLocalMouse = aGeometry.CanvasToLocalPixel(
+			mWidgetManager->mLastMouseX - mX,
+			mWidgetManager->mLastMouseY - mY);
 
-		CursorType aCursor = mCursorObject->mCursorType;
-		if (aCursor == CursorType::CURSOR_TYPE_COBCANNON_TARGET)
+		if (aGeometry.ContainsLocalPoint(aLocalMouse.mX, aLocalMouse.mY))
 		{
-			MouseDownCobcannonFire(mWidgetManager->mLastMouseX, mWidgetManager->mLastMouseY, 1);
-			doUpdateCursor = true;
-		}
-		else if (aCursor == CursorType::CURSOR_TYPE_SHOVEL ||
-			aCursor == CursorType::CURSOR_TYPE_WATERING_CAN ||
-			aCursor == CursorType::CURSOR_TYPE_FERTILIZER ||
-			aCursor == CursorType::CURSOR_TYPE_BUG_SPRAY ||
-			aCursor == CursorType::CURSOR_TYPE_PHONOGRAPH ||
-			aCursor == CursorType::CURSOR_TYPE_CHOCOLATE ||
-			aCursor == CursorType::CURSOR_TYPE_GLOVE ||
-			aCursor == CursorType::CURSOR_TYPE_MONEY_SIGN ||
-			aCursor == CursorType::CURSOR_TYPE_WHEEELBARROW ||
-			aCursor == CursorType::CURSOR_TYPE_TREE_FOOD)
-		{
-			MouseDownWithTool(mWidgetManager->mLastMouseX, mWidgetManager->mLastMouseY, 1, aCursor);
-			doUpdateCursor = true;
-		}
-		else if (IsPlantInCursor())
-		{
-			MouseDownWithPlant(mWidgetManager->mLastMouseX, mWidgetManager->mLastMouseY, 1);
-			doUpdateCursor = true;
+			CursorType aCursor = mCursorObject->mCursorType;
+			if (aCursor == CursorType::CURSOR_TYPE_COBCANNON_TARGET)
+			{
+				MouseDownCobcannonFire(aLocalMouse.mX, aLocalMouse.mY, 1);
+				doUpdateCursor = true;
+			}
+			else if (aCursor == CursorType::CURSOR_TYPE_SHOVEL ||
+				aCursor == CursorType::CURSOR_TYPE_WATERING_CAN ||
+				aCursor == CursorType::CURSOR_TYPE_FERTILIZER ||
+				aCursor == CursorType::CURSOR_TYPE_BUG_SPRAY ||
+				aCursor == CursorType::CURSOR_TYPE_PHONOGRAPH ||
+				aCursor == CursorType::CURSOR_TYPE_CHOCOLATE ||
+				aCursor == CursorType::CURSOR_TYPE_GLOVE ||
+				aCursor == CursorType::CURSOR_TYPE_MONEY_SIGN ||
+				aCursor == CursorType::CURSOR_TYPE_WHEEELBARROW ||
+				aCursor == CursorType::CURSOR_TYPE_TREE_FOOD)
+			{
+				MouseDownWithTool(aLocalMouse.mX, aLocalMouse.mY, 1, aCursor);
+				doUpdateCursor = true;
+			}
+			else if (IsPlantInCursor())
+			{
+				MouseDownWithPlant(aLocalMouse.mX, aLocalMouse.mY, 1);
+				doUpdateCursor = true;
+			}
 		}
 
 		if (doUpdateCursor) UpdateCursor();
@@ -6972,8 +7088,11 @@ void Board::Update()
 	}
 	mCursorPreview->Update();
 	mCursorObject->Update();
-	mPrevMouseX = mApp->mWidgetManager->mLastMouseX;
-	mPrevMouseY = mApp->mWidgetManager->mLastMouseY;
+	const Point aLocalMouse = GetBoardGeometry().CanvasToLocalPixel(
+		mApp->mWidgetManager->mLastMouseX - mX,
+		mApp->mWidgetManager->mLastMouseY - mY);
+	mPrevMouseX = aLocalMouse.mX;
+	mPrevMouseY = aLocalMouse.mY;
 }
 
 //0x416080
@@ -6995,7 +7114,7 @@ void Board::UpdateLayers()
 //0x416110
 bool Board::RowCanHaveZombies(int theRow)
 {
-	if (theRow < 0 || theRow >= MAX_GRID_SIZE_Y)
+	if (!IsValidGridCell(0, theRow))
 		return false;
 
 	return (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_RESODDED && theRow <= 4) || mPlantRow[theRow] != PlantRowType::PLANTROW_DIRT;
@@ -7022,11 +7141,12 @@ void Board::DrawIce(Graphics* g, int theGridY)
 	}
 
 	int aBeginningX = mIceMinX[theGridY] + 13, aDeltaX;
-	for (int aPosX = aBeginningX; aPosX < BOARD_WIDTH; aPosX += aDeltaX)
+	const int aBoardRight = GetBoardGeometry().GetLocalBounds().mWidth;
+	for (int aPosX = aBeginningX; aPosX < aBoardRight; aPosX += aDeltaX)
 	{
 		if (aPosX == aBeginningX)
 		{
-			aDeltaX = (BOARD_WIDTH - aBeginningX) % aWidth;
+			aDeltaX = (aBoardRight - aBeginningX) % aWidth;
 			if (!aDeltaX) aDeltaX = aWidth;
 		}
 		else aDeltaX = aWidth;
@@ -8019,6 +8139,7 @@ SexyString Board::GetSpeedString()
 
 void Board::DrawSpeed(Graphics* g)
 {
+	const Point aBoardOrigin = GetBoardGeometry().GetCanvasOrigin();
 	// ====================================================================================================
 	// ▲ 获取完整的关卡名称的字符串
 	// ====================================================================================================
@@ -8037,8 +8158,8 @@ void Board::DrawSpeed(Graphics* g)
 		aPosY -= Sexy::IMAGE_FLAGMETERPARTS->GetHeight() + 8;
 	}
 
-	mSpeedupButton->mX = aPosX - aStrWidth - 12 - Sexy::IMAGE_SPEEDUP_BUTTON->GetWidth() + mApp->mDDInterface->mWideScreenOffsetX;
-	mSpeedupButton->mY = aPosY - fontHeight / 2 - 4 + mApp->mDDInterface->mWideScreenOffsetY;
+	mSpeedupButton->mX = aPosX - aStrWidth - 12 - Sexy::IMAGE_SPEEDUP_BUTTON->GetWidth() + aBoardOrigin.mX;
+	mSpeedupButton->mY = aPosY - fontHeight / 2 - 4 + aBoardOrigin.mY;
 
 	mSlowdownButton->mButtonImage = mSpeedMod < SpeedMod::SPEED_NORMAL ? IMAGE_SLOWDOWN_BUTTON_PRESSED : IMAGE_SLOWDOWN_BUTTON;
 	mSpeedupButton->mButtonImage = mSpeedMod > SpeedMod::SPEED_NORMAL ? IMAGE_SPEEDUP_BUTTON_PRESSED : IMAGE_SPEEDUP_BUTTON;
@@ -8092,7 +8213,7 @@ void Board::DrawSpeed(Graphics* g)
 		aScale = TodAnimateCurveFloat(35, 0, mQECounter, 1.0f, 1.2f, TodCurves::CURVE_BOUNCE);
 
 		SexyTransform2D aMatrix;
-		TodScaleTransformMatrix(aMatrix, aPosX - curStrWidth + mApp->mDDInterface->mWideScreenOffsetX, aPosY + mApp->mDDInterface->mWideScreenOffsetY, aScale, aScale);
+		TodScaleTransformMatrix(aMatrix, aPosX - curStrWidth + aBoardOrigin.mX, aPosY + aBoardOrigin.mY, aScale, aScale);
 		TodDrawStringMatrix(g, Sexy::FONT_HOUSEOFTERROR16, aMatrix, aSpeedStr, Color(237, 241, 170));
 	}
 
@@ -8480,8 +8601,9 @@ void Board::DrawDebugText(Graphics* g)
 	g->PushState();
 	g->SetFont(mDebugFont);
 	g->SetColor(Color::Black);
-	const int offsetX = mApp->mDDInterface->mWideScreenOffsetX;
-	const int offsetY = mApp->mDDInterface->mWideScreenOffsetY;
+	const Point aBoardOrigin = GetBoardGeometry().GetCanvasOrigin();
+	const int offsetX = aBoardOrigin.mX;
+	const int offsetY = aBoardOrigin.mY;
 	g->DrawStringWordWrapped(aText, 10 + offsetX, 89 + offsetY);
 	g->DrawStringWordWrapped(aText, 11 + offsetX, 91 + offsetY);
 	g->DrawStringWordWrapped(aText, 9 + offsetX, 90 + offsetY);
@@ -8494,6 +8616,7 @@ void Board::DrawDebugText(Graphics* g)
 //0x419AE0
 void Board::DrawDebugObjectRects(Graphics* g)
 {
+	const BoardGeometry aGeometry = GetBoardGeometry();
 	g->PushState();
 	g->mTransX -= TodAnimateCurve(12, 0, mShakeCounter, 0, mShakeAmountX, TodCurves::CURVE_BOUNCE);
 	g->mTransY -= TodAnimateCurve(12, 0, mShakeCounter, 0, mShakeAmountY, TodCurves::CURVE_BOUNCE);
@@ -8509,14 +8632,14 @@ void Board::DrawDebugObjectRects(Graphics* g)
 			g->DrawRect(aRect);
 
 			Rect aAttackRect = aPlant->GetPlantAttackRect(PlantWeapon::WEAPON_PRIMARY);
-			if (aAttackRect.mWidth < BOARD_WIDTH)
+			if (aAttackRect.mWidth < aGeometry.GetLocalBounds().mWidth)
 			{
 				g->SetColor(Color(255, 0, 0));
 				g->DrawRect(aAttackRect);
 			}
 
 			Rect aSecondaryRect = aPlant->GetPlantAttackRect(PlantWeapon::WEAPON_SECONDARY);
-			if (aSecondaryRect.mWidth < BOARD_WIDTH)
+			if (aSecondaryRect.mWidth < aGeometry.GetLocalBounds().mWidth)
 			{
 				g->SetColor(Color(255, 0, 128));
 				g->DrawRect(aSecondaryRect);
@@ -8602,21 +8725,21 @@ void Board::DrawDebugObjectRects(Graphics* g)
 				for (int i = 0; i < 32; ++i) 
 				{
 					const SpecialGridPlacement& grid = gGreenhouseGridPlacement[i];
-					g->DrawRect(grid.mPixelX, grid.mPixelY, 80, 100);
+					g->DrawRect(grid.mPixelX, grid.mPixelY, BoardGeometry::kColumnWidth, BoardGeometry::kFiveRowHeight);
 				}
 			}
 			else if (mBackground == BackgroundType::BACKGROUND_MUSHROOM_GARDEN) {
 				for (int i = 0; i < 8; ++i) 
 				{
 					const SpecialGridPlacement& grid = gMushroomGridPlacement[i];
-					g->DrawRect(grid.mPixelX, grid.mPixelY, 80, 100);
+					g->DrawRect(grid.mPixelX, grid.mPixelY, BoardGeometry::kColumnWidth, BoardGeometry::kFiveRowHeight);
 				}
 			}
 			else if (mBackground == BackgroundType::BACKGROUND_ZOMBIQUARIUM) {
 				for (int i = 0; i < 8; ++i)
 				{
 					const SpecialGridPlacement& grid = gAquariumGridPlacement[i];
-					g->DrawRect(grid.mPixelX, grid.mPixelY, 80, 100);
+					g->DrawRect(grid.mPixelX, grid.mPixelY, BoardGeometry::kColumnWidth, BoardGeometry::kFiveRowHeight);
 				}
 			}
 		}
@@ -8632,10 +8755,10 @@ void Board::DrawDebugObjectRects(Graphics* g)
 					if (StageHasRoof() && x < 5) {
 						int topLX = GridToPixelX(x, y);
 						int topLY = GridToPixelY(x, y) + 10;
-						int topRX = topLX + 80;
+						int topRX = topLX + BoardGeometry::kColumnWidth;
 						int topRY = GridToPixelY(x + 1, y) + 10;
-						int botLY = topLY + 85;
-						int botRY = topRY + 85;
+						int botLY = topLY + aGeometry.GetRowHeight();
+						int botRY = topRY + aGeometry.GetRowHeight();
 
 						g->DrawLine(topLX, topLY, topRX, topRY);
 						g->DrawLine(topRX, topRY, topRX, botRY);
@@ -8644,7 +8767,10 @@ void Board::DrawDebugObjectRects(Graphics* g)
 					}
 					else
 					{
-						g->DrawRect(GridToPixelX(x, y), GridToPixelY(x, y), 80, StageHasRoof() || StageHas6Rows() ? 85 : 100);
+						g->DrawRect(aGeometry.GetCellBounds(
+							x,
+							y,
+							mGridSquareType[x][y] == GridSquareType::GRIDSQUARE_HIGH_GROUND));
 					}
 				}
 			}
@@ -8670,24 +8796,25 @@ void Board::DrawFadeOut(Graphics* g)
 	}
 	g->mTransX = 0;
 	g->mTransY = 0;
-	g->FillRect(0, 0, 800, 600);
+	g->FillRect(0, 0, mApp->mWidth, mApp->mHeight);
 	g->PopState();
 }
 
 //0x419F60
 void Board::DrawTopRightUI(Graphics* g)
 {
+	const Point aBoardOrigin = GetBoardGeometry().GetCanvasOrigin();
 	if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_ZEN_GARDEN)
 	{
 		if (mChallenge->mChallengeState == STATECHALLENGE_ZEN_FADING)
 		{
-			mMenuButton->mY = TodAnimateCurve(50, 0, mChallenge->mChallengeStateCounter, -10 + mApp->mDDInterface->mWideScreenOffsetY, -50 + WIDESCREEN_OFFSETY + mApp->mDDInterface->mWideScreenOffsetY, TodCurves::CURVE_EASE_IN_OUT);
-			mStoreButton->mX = TodAnimateCurve(50, 0, mChallenge->mChallengeStateCounter, 678 + mApp->mDDInterface->mWideScreenOffsetX, mWidth - WIDESCREEN_OFFSETX + mApp->mDDInterface->mWideScreenOffsetX, TodCurves::CURVE_EASE_IN_OUT);
+			mMenuButton->mY = TodAnimateCurve(50, 0, mChallenge->mChallengeStateCounter, -10 + aBoardOrigin.mY, -50 + WIDESCREEN_OFFSETY + aBoardOrigin.mY, TodCurves::CURVE_EASE_IN_OUT);
+			mStoreButton->mX = TodAnimateCurve(50, 0, mChallenge->mChallengeStateCounter, 678 + aBoardOrigin.mX, mWidth - WIDESCREEN_OFFSETX + aBoardOrigin.mX, TodCurves::CURVE_EASE_IN_OUT);
 		}
 		else
 		{
-			mMenuButton->mY = -10 + mApp->mDDInterface->mWideScreenOffsetY;
-			mStoreButton->mX = 678 + mApp->mDDInterface->mWideScreenOffsetX;
+			mMenuButton->mY = -10 + aBoardOrigin.mY;
+			mStoreButton->mX = 678 + aBoardOrigin.mX;
 		}
 	}
 
@@ -8700,7 +8827,7 @@ void Board::DrawTopRightUI(Graphics* g)
 	//if (mApp->mGameMode == GameMode::GAMEMODE_UPSELL)
 	{
 		g->PushState();
-		g->TranslateF(-mApp->mDDInterface->mWideScreenOffsetX, -mApp->mDDInterface->mWideScreenOffsetY);
+		g->TranslateF(-aBoardOrigin.mX, -aBoardOrigin.mY);
 		mMenuButton->Draw(g);
 		g->PopState();
 	}
@@ -8724,7 +8851,7 @@ void Board::DrawTopRightUI(Graphics* g)
 		{
 			g->TranslateF(1.0f, 1.0f);
 		}
-		g->TranslateF(-mApp->mDDInterface->mWideScreenOffsetX, -mApp->mDDInterface->mWideScreenOffsetY);
+		g->TranslateF(-aBoardOrigin.mX, -aBoardOrigin.mY);
 		mStoreButton->Draw(g);
 		g->PopState();
 		g->SetColorizeImages(false);
@@ -9068,6 +9195,7 @@ bool Board::IsScaryPotterDaveTalking()
 //0x41AA40
 void Board::DrawUITop(Graphics* g)
 {
+	const Point aBoardOrigin = GetBoardGeometry().GetCanvasOrigin();
 	/*{
 		__m256i value = _mm256_set1_epi32(0xFF000000);
 		__m256i trans_value = _mm256_set1_epi32(0);
@@ -9368,7 +9496,7 @@ void Board::DrawUITop(Graphics* g)
 		g->mTransX = 0;
 		g->mTransY = 0;
 		g->SetColor(Color(200, 200, 200, 210));
-		g->FillRect(0, 0, 800, 600);
+		g->FillRect(0, 0, mApp->mWidth, mApp->mHeight);
 		g->PopState();
 	}
 
@@ -9378,7 +9506,7 @@ void Board::DrawUITop(Graphics* g)
 		g->mTransX = 0;
 		g->mTransY = 0;
 		g->SetColor(Color(255, 255, 255, (int)(min(mNukeCounter, 150) / 150.0f * 255)));
-		g->FillRect(0, 0, 800, 600);
+		g->FillRect(0, 0, mApp->mWidth, mApp->mHeight);
 		g->PopState();
 	}
 
@@ -9404,7 +9532,7 @@ void Board::DrawUITop(Graphics* g)
 			g->TranslateF(1.0f, 1.0f);
 		}
 #endif
-		g->TranslateF(-mApp->mDDInterface->mWideScreenOffsetX, -mApp->mDDInterface->mWideScreenOffsetY);
+		g->TranslateF(-aBoardOrigin.mX, -aBoardOrigin.mY);
 		mStoreButton->Draw(g);
 		g->PopState();
 
@@ -9418,7 +9546,7 @@ void Board::DrawUITop(Graphics* g)
 				g->SetColorizeImages(true);
 				g->SetColor(Color::White);
 				g->mColor.mAlpha = 64;
-				g->TranslateF(-mApp->mDDInterface->mWideScreenOffsetX, -mApp->mDDInterface->mWideScreenOffsetY);
+				g->TranslateF(-aBoardOrigin.mX, -aBoardOrigin.mY);
 				mStoreButton->Draw(g);
 				g->PopState();
 			}
@@ -9443,8 +9571,8 @@ void Board::DrawUITop(Graphics* g)
 	if (LawnApp::ChallengeUsesMicrophone(mApp->mGameMode) && mApp->mGameScene == SCENE_PLAYING) {
 		g->PushState();
 		g->SetColorizeImages(true);
-		g->mTransX = mApp->mDDInterface->mWideScreenOffsetX;
-		g->mTransY = mApp->mDDInterface->mWideScreenOffsetY;
+		g->mTransX = aBoardOrigin.mX;
+		g->mTransY = aBoardOrigin.mY;
 		int volume = min((int)(mApp->mVoiceVolume / SHOUT_THRESHOLD * 100), 100);
 		for (int i = 0; i < 100; i++) {
 			int currentY = 588 - 2 * i;
@@ -9496,8 +9624,8 @@ void Board::DrawUITop(Graphics* g)
 	if (mApp->mGameMode == GameMode::GAMEMODE_CHALLENGE_HEAT_WAVE)
 	{
 		g->PushState();
-		g->mTransX = mApp->mDDInterface->mWideScreenOffsetX;
-		g->mTransY = mApp->mDDInterface->mWideScreenOffsetY;
+		g->mTransX = aBoardOrigin.mX;
+		g->mTransY = aBoardOrigin.mY;
 		int indicatorHeight = mChallenge->mShoutingCounter / 100.0f * 200;
 		g->SetColorizeImages(true);
 		g->SetColor(Color::White);
@@ -9505,29 +9633,29 @@ void Board::DrawUITop(Graphics* g)
 		g->PopState();
 
 		g->PushState();
-		g->mTransX = TodAnimateCurveFloat(0, 150, mMainCounter % 150, -5, 5, TodCurves::CURVE_BOUNCE) + mApp->mDDInterface->mWideScreenOffsetX;
-		g->mTransY = TodAnimateCurveFloat(0, 150, mMainCounter % 150, 5, -5, TodCurves::CURVE_BOUNCE) + mApp->mDDInterface->mWideScreenOffsetY;
+		g->mTransX = TodAnimateCurveFloat(0, 150, mMainCounter % 150, -5, 5, TodCurves::CURVE_BOUNCE) + aBoardOrigin.mX;
+		g->mTransY = TodAnimateCurveFloat(0, 150, mMainCounter % 150, 5, -5, TodCurves::CURVE_BOUNCE) + aBoardOrigin.mY;
 		g->DrawImageF(Sexy::IMAGE_LENSEFLARE, 522, 129);
-		g->mTransX = TodAnimateCurveFloat(0, 150, mMainCounter % 150, -5, 2, TodCurves::CURVE_BOUNCE) + mApp->mDDInterface->mWideScreenOffsetX;
-		g->mTransY = TodAnimateCurveFloat(0, 150, mMainCounter % 150, 5, -2, TodCurves::CURVE_BOUNCE) + mApp->mDDInterface->mWideScreenOffsetY;
+		g->mTransX = TodAnimateCurveFloat(0, 150, mMainCounter % 150, -5, 2, TodCurves::CURVE_BOUNCE) + aBoardOrigin.mX;
+		g->mTransY = TodAnimateCurveFloat(0, 150, mMainCounter % 150, 5, -2, TodCurves::CURVE_BOUNCE) + aBoardOrigin.mY;
 		g->DrawImageF(Sexy::IMAGE_LENSEFLARE2, 602, 113);
-		g->mTransX = TodAnimateCurveFloat(0, 150, mMainCounter % 150, -5, 4, TodCurves::CURVE_BOUNCE) + mApp->mDDInterface->mWideScreenOffsetX;
-		g->mTransY = TodAnimateCurveFloat(0, 150, mMainCounter % 150, 5, -4, TodCurves::CURVE_BOUNCE) + mApp->mDDInterface->mWideScreenOffsetY;
+		g->mTransX = TodAnimateCurveFloat(0, 150, mMainCounter % 150, -5, 4, TodCurves::CURVE_BOUNCE) + aBoardOrigin.mX;
+		g->mTransY = TodAnimateCurveFloat(0, 150, mMainCounter % 150, 5, -4, TodCurves::CURVE_BOUNCE) + aBoardOrigin.mY;
 		g->DrawImageF(Sexy::IMAGE_LENSEFLARE3, 626, 115);
-		g->mTransX = TodAnimateCurveFloat(0, 150, mMainCounter % 150, -5, 5, TodCurves::CURVE_BOUNCE) + mApp->mDDInterface->mWideScreenOffsetX;
-		g->mTransY = TodAnimateCurveFloat(0, 150, mMainCounter % 150, 5, -5, TodCurves::CURVE_BOUNCE) + mApp->mDDInterface->mWideScreenOffsetY;
+		g->mTransX = TodAnimateCurveFloat(0, 150, mMainCounter % 150, -5, 5, TodCurves::CURVE_BOUNCE) + aBoardOrigin.mX;
+		g->mTransY = TodAnimateCurveFloat(0, 150, mMainCounter % 150, 5, -5, TodCurves::CURVE_BOUNCE) + aBoardOrigin.mY;
 		g->DrawImageF(Sexy::IMAGE_LENSEFLARE4, 691, 109);
-		g->mTransX = TodAnimateCurveFloat(0, 150, mMainCounter % 150, -5, 8, TodCurves::CURVE_BOUNCE) + mApp->mDDInterface->mWideScreenOffsetX;
-		g->mTransY = TodAnimateCurveFloat(0, 150, mMainCounter % 150, 5, -8, TodCurves::CURVE_BOUNCE) + mApp->mDDInterface->mWideScreenOffsetY;
+		g->mTransX = TodAnimateCurveFloat(0, 150, mMainCounter % 150, -5, 8, TodCurves::CURVE_BOUNCE) + aBoardOrigin.mX;
+		g->mTransY = TodAnimateCurveFloat(0, 150, mMainCounter % 150, 5, -8, TodCurves::CURVE_BOUNCE) + aBoardOrigin.mY;
 		g->DrawImageF(Sexy::IMAGE_LENSEFLARE5, 691, 122);
-		g->mTransX = TodAnimateCurveFloat(0, 150, mMainCounter % 150, -5, 5, TodCurves::CURVE_BOUNCE) + mApp->mDDInterface->mWideScreenOffsetX;
-		g->mTransY = TodAnimateCurveFloat(0, 150, mMainCounter % 150, 2, -2, TodCurves::CURVE_BOUNCE) + mApp->mDDInterface->mWideScreenOffsetY;
+		g->mTransX = TodAnimateCurveFloat(0, 150, mMainCounter % 150, -5, 5, TodCurves::CURVE_BOUNCE) + aBoardOrigin.mX;
+		g->mTransY = TodAnimateCurveFloat(0, 150, mMainCounter % 150, 2, -2, TodCurves::CURVE_BOUNCE) + aBoardOrigin.mY;
 		g->DrawImageF(Sexy::IMAGE_LENSEFLARE6, 686, 69);
-		g->mTransX = TodAnimateCurveFloat(0, 150, mMainCounter % 150, -5, 5, TodCurves::CURVE_BOUNCE) + mApp->mDDInterface->mWideScreenOffsetX;
-		g->mTransY = TodAnimateCurveFloat(0, 150, mMainCounter % 150, 5, -5, TodCurves::CURVE_BOUNCE) + mApp->mDDInterface->mWideScreenOffsetY;
+		g->mTransX = TodAnimateCurveFloat(0, 150, mMainCounter % 150, -5, 5, TodCurves::CURVE_BOUNCE) + aBoardOrigin.mX;
+		g->mTransY = TodAnimateCurveFloat(0, 150, mMainCounter % 150, 5, -5, TodCurves::CURVE_BOUNCE) + aBoardOrigin.mY;
 		g->DrawImageF(Sexy::IMAGE_LENSEFLARE7, 681, 16);
-		g->mTransX = mApp->mDDInterface->mWideScreenOffsetX;
-		g->mTransY = mApp->mDDInterface->mWideScreenOffsetY;
+		g->mTransX = aBoardOrigin.mX;
+		g->mTransY = aBoardOrigin.mY;
 		g->SetColorizeImages(true);
 		g->SetColor(Color::White);
 		g->mColor.mAlpha = TodAnimateCurveFloat(0, 150, mMainCounter % 150, 191, 255, TodCurves::CURVE_BOUNCE);
@@ -9595,8 +9723,6 @@ void Board::DrawUITop(Graphics* g)
 //0x41ACF0
 void Board::Draw(Graphics* g)
 {
-	if (mApp->GetDialog(Dialogs::DIALOG_STORE) || mApp->GetDialog(Dialogs::DIALOG_ALMANAC))
-		return;
 	g->PushState();
 	g->ClearClipRect();
 	g->SetLinearBlend(true);
@@ -9623,7 +9749,8 @@ void Board::Draw(Graphics* g)
 	}
 
 	mDrawCount++;
-	g->Translate(mApp->mDDInterface->mWideScreenOffsetX, mApp->mDDInterface->mWideScreenOffsetY);
+	const Point aBoardOrigin = GetBoardGeometry().GetCanvasOrigin();
+	g->Translate(aBoardOrigin.mX, aBoardOrigin.mY);
 	DrawGameObjects(g);
 	g->PopState();
 }
@@ -10912,6 +11039,36 @@ bool Board::StageHas6Rows()
 	return (mBackground == BackgroundType::BACKGROUND_3_POOL || mBackground == BackgroundType::BACKGROUND_4_FOG || mBackground == BackgroundType::BACKGROUND_6);
 }
 
+BoardGeometry Board::GetBoardGeometry()
+{
+	BoardGridLayout aGridLayout = BoardGridLayout::FiveRows;
+	if (StageHasRoof())
+		aGridLayout = BoardGridLayout::Roof;
+	else if (StageHas6Rows())
+		aGridLayout = BoardGridLayout::SixRows;
+
+	Rect aCanvasBounds(0, 0, BoardGeometry::kDesignWidth, BoardGeometry::kDesignHeight);
+	if (mApp && mApp->gBoardBounds.mWidth > 0 && mApp->gBoardBounds.mHeight > 0)
+		aCanvasBounds = mApp->gBoardBounds;
+
+	return BoardGeometry::CenteredInCanvas(aCanvasBounds, aGridLayout);
+}
+
+int Board::GetActiveRowCount()
+{
+	return GetBoardGeometry().GetActiveRowCount();
+}
+
+bool Board::IsValidGridCell(int theGridX, int theGridY)
+{
+	return GetBoardGeometry().IsValidStorageCell(theGridX, theGridY);
+}
+
+bool Board::IsPlayableGridCell(int theGridX, int theGridY)
+{
+	return GetBoardGeometry().IsValidPlayableCell(theGridX, theGridY);
+}
+
 //0x41C0F0
 bool Board::StageHasZombieWalkInFromRight()
 {
@@ -11052,10 +11209,7 @@ int Board::PixelToGridX(int theX, int theY)
 		}
 	}
 
-	if (theX < LAWN_XMIN)
-		return -1;
-
-	return ClampInt((theX - LAWN_XMIN) / 80, 0, MAX_GRID_SIZE_X - 1);
+	return GetBoardGeometry().PixelToGridX(theX);
 }
 
 //0x41C530
@@ -11078,32 +11232,13 @@ int Board::PixelToGridY(int theX, int theY)
 		}
 	}
 
-	int aGridX = PixelToGridX(theX, theY);
-	if (aGridX == -1 || theY < LAWN_YMIN)
-		return -1;
-
-	if (StageHasRoof())
-	{
-		if (aGridX < 5)
-		{
-			theY -= (4 - aGridX) * 20;
-		}
-		return ClampInt((theY - LAWN_YMIN) / 85, 0, MAX_GRID_SIZE_Y - 2);
-	}
-	else if (StageHas6Rows())
-	{
-		return ClampInt((theY - LAWN_YMIN) / 85, 0, MAX_GRID_SIZE_Y - 1);
-	}
-	else
-	{
-		return ClampInt((theY - LAWN_YMIN) / 100, 0, MAX_GRID_SIZE_Y - 2);
-	}
+	return GetBoardGeometry().PixelToGridY(theX, theY);
 }
 
 //0x41C650
 int Board::PixelToGridYKeepOnBoard(int theX, int theY)
 {
-	int aGridY = PixelToGridY(max(theX, 80), theY);
+	int aGridY = PixelToGridY(max(theX, BoardGeometry::kColumnWidth), theY);
 	return max(aGridY, 0);
 }
 
@@ -11122,23 +11257,16 @@ int Board::GridToPixelX(int theGridX, int theGridY)
 		}
 	}
 
-	return theGridX * 80 + LAWN_XMIN;
+	return GetBoardGeometry().GridToPixelX(theGridX);
 }
 
 //0x41C6C0
 float Board::GetPosYBasedOnRow(float thePosX, int theRow)
 {
+	const BoardGeometry aGeometry = GetBoardGeometry();
 	if (StageHasRoof())
-	{
-		float aSlopeOffset = 0.0f;
-		if (thePosX < 440.0f)
-		{
-			aSlopeOffset = (440.0f - thePosX) * 0.25f;
-		}
+		return GridToPixelY(MAX_GRID_SIZE_X - 1, theRow) + aGeometry.GetRoofSlopeOffset(thePosX);
 
-		return GridToPixelY(8, theRow) + aSlopeOffset;
-	}
-	
 	return GridToPixelY(0, theRow);
 }
 
@@ -11157,35 +11285,9 @@ int Board::GridToPixelY(int theGridX, int theGridY)
 		}
 	}
 
-	int aY;
-	if (StageHasRoof())
-	{
-		int aSlopeOffset;
-		if (theGridX < 5)
-		{
-			aSlopeOffset = (5 - theGridX) * 20;
-		}
-		else
-		{
-			aSlopeOffset = 0;
-		}
-		aY = theGridY * 85 + aSlopeOffset + LAWN_YMIN - 10;
-	}
-	else if (StageHas6Rows())
-	{
-		aY = theGridY * 85 + LAWN_YMIN;
-	}
-	else
-	{
-		aY = theGridY * 100 + LAWN_YMIN;
-	}
-
-	if (theGridX != -1 && mGridSquareType[theGridX][theGridY] == GridSquareType::GRIDSQUARE_HIGH_GROUND)
-	{
-		aY -= HIGH_GROUND_HEIGHT;
-	}
-
-	return aY;
+	const bool aHighGround = theGridX != -1 &&
+		mGridSquareType[theGridX][theGridY] == GridSquareType::GRIDSQUARE_HIGH_GROUND;
+	return GetBoardGeometry().GridToPixelY(theGridX, theGridY, aHighGround);
 }
 
 ZombieID Board::ZombieGetID(Zombie* theZombie)

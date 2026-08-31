@@ -1179,13 +1179,15 @@ void GameSelector::UpdateTooltip()
 
 	if (mHasTrophy)
 	{
-		int aMouseX = mX + mApp->mWidgetManager->mLastMouseX;
-		int aMouseY = mY + mApp->mWidgetManager->mLastMouseY;
+		const int aMouseX = mApp->mWidgetManager->mLastMouseX - mX -
+			mApp->mDDInterface->mWideScreenOffsetX;
+		const int aMouseY = mApp->mWidgetManager->mLastMouseY - mY -
+			mApp->mDDInterface->mWideScreenOffsetY;
 #ifdef _HAS_ACHIEVEMENTS
 		const bool aTrophyIsOver = mTrophyButton && mTrophyButton->mIsOver;
 #else
-		const bool aTrophyIsOver = aMouseX >= mX + 50 && aMouseX < mX + 135 &&
-			aMouseY >= mY + 280 && aMouseY <= mY + 505;
+		const bool aTrophyIsOver = aMouseX >= 50 && aMouseX < 135 &&
+			aMouseY >= 280 && aMouseY <= 505;
 #endif
 		if (aTrophyIsOver)
 		{
@@ -2239,6 +2241,7 @@ void GameSelector::SlideTo(int theX, int theY) {
 	mDestY = theY;
 	mStartX = mX;
 	mStartY = mY;
+	mApp->RequestSceneTargetClear();
 }
 #ifdef _HAS_ACHIEVEMENTS
 // GOTY @Patoke: 0x450200

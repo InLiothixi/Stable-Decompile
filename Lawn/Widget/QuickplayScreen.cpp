@@ -212,6 +212,9 @@ QuickplayWidget::~QuickplayWidget() {
 }
 
 void QuickplayWidget::Update() {
+	const int aMouseX = mWidgetManager->mLastMouseX - mX;
+	const int aMouseY = mWidgetManager->mLastMouseY - mY;
+
 	mPoolStageButton->MarkDirty();
 	mNightStageButton->MarkDirty();
 	mFogStageButton->MarkDirty();
@@ -252,20 +255,20 @@ void QuickplayWidget::Update() {
 			const bool IS_DOWN = mWidgetManager->mFocusWidget->mIsDown;
 
 			if (!mScrollableDown && IS_DOWN) {
-				if (aScrollArea.Contains(mWidgetManager->mLastMouseX, mWidgetManager->mLastMouseY))
+				if (aScrollArea.Contains(aMouseX, aMouseY))
 				{
 					mScrollableDown = true;
 					mIsDraggingThumb = true;
-					float aThumbWidth = (mApp->mWidth / (mApp->mWidth + mMaxScrollPosition)) * mTrackWidth;
-					float aScrollPosition = (mWidgetManager->mLastMouseX - (aThumbWidth / 2.0f)) / (mTrackWidth - aThumbWidth) * mMaxScrollPosition;
+					float aThumbWidth = (BOARD_WIDTH / (float)(BOARD_WIDTH + mMaxScrollPosition)) * mTrackWidth;
+					float aScrollPosition = (aMouseX - (aThumbWidth / 2.0f)) / (mTrackWidth - aThumbWidth) * mMaxScrollPosition;
 					mScrollPosition = max(0, min(aScrollPosition, mMaxScrollPosition));
 				}
 			}
 			else if (mScrollableDown && IS_DOWN) {
 				if (mIsDraggingThumb)
 				{
-					float aThumbWidth = (mApp->mWidth / (mApp->mWidth + mMaxScrollPosition)) * mTrackWidth;
-					float aScrollPosition = (mWidgetManager->mLastMouseX - (aThumbWidth / 2.0f)) / (mTrackWidth - aThumbWidth) * mMaxScrollPosition;
+					float aThumbWidth = (BOARD_WIDTH / (float)(BOARD_WIDTH + mMaxScrollPosition)) * mTrackWidth;
+					float aScrollPosition = (aMouseX - (aThumbWidth / 2.0f)) / (mTrackWidth - aThumbWidth) * mMaxScrollPosition;
 					mScrollPosition = max(0, min(aScrollPosition, mMaxScrollPosition));
 				}
 			}
@@ -276,9 +279,9 @@ void QuickplayWidget::Update() {
 
 			if (IS_DOWN && !mIsDraggingThumb && !mIsSwiping)
 			{
-				if (mWidgetManager->mLastMouseY < BOARD_HEIGHT / 2)
+				if (aMouseY < BOARD_HEIGHT / 2)
 				{
-					mSwipeStartX = mWidgetManager->mLastMouseX;
+					mSwipeStartX = aMouseX;
 					mIsSwiping = true;
 				}
 			}
@@ -291,13 +294,13 @@ void QuickplayWidget::Update() {
 
 			if (mIsSwiping)
 			{
-				float deltaX = mWidgetManager->mLastMouseX - mSwipeStartX;
+				float deltaX = aMouseX - mSwipeStartX;
 
 				mSwipeVelocityX -= deltaX * 0.01f;
 				mSwipeVelocityX -= mSwipeVelocityX * 0.1f;
 				mScrollAmount += mSwipeVelocityX;
 
-				mSwipeStartX = mWidgetManager->mLastMouseX;
+				mSwipeStartX = aMouseX;
 			}
 
 			if (mSwipeJustReleased)
@@ -457,9 +460,11 @@ void QuickplayWidget::Draw(Graphics* g) {
 
 	if (mIsScrollable)
 	{
-		float aThumbWidth = (mApp->mWidth / (mApp->mWidth + mMaxScrollPosition)) * mTrackWidth;
+		const int aMouseX = mWidgetManager->mLastMouseX - mX;
+		const int aMouseY = mWidgetManager->mLastMouseY - mY;
+		float aThumbWidth = (BOARD_WIDTH / (float)(BOARD_WIDTH + mMaxScrollPosition)) * mTrackWidth;
 		const float aThumbX = 10 + mScrollPosition / (float)mMaxScrollPosition * (mTrackWidth - aThumbWidth);
-		const int aThumbAlpha = (int)(mScrollAmount * 10) != 0 || mIsDraggingThumb || aScrollArea.Contains(mWidgetManager->mLastMouseX, mWidgetManager->mLastMouseY) ? 255 : 128;
+		const int aThumbAlpha = (int)(mScrollAmount * 10) != 0 || mIsDraggingThumb || aScrollArea.Contains(aMouseX, aMouseY) ? 255 : 128;
 
 		Graphics gScrollBar(*g);
 		gScrollBar.SetColorizeImages(true);
@@ -476,7 +481,7 @@ void QuickplayWidget::Draw(Graphics* g) {
 		{
 			bool onScroll = false;
 
-			if (aScrollArea.Contains(mWidgetManager->mLastMouseX, mWidgetManager->mLastMouseY))
+			if (aScrollArea.Contains(aMouseX, aMouseY))
 			{
 				onScroll = true;
 			}
@@ -798,7 +803,9 @@ void QuickplayWidget::MouseUp(int theX, int theY)
 	{
 		bool onScroll = false;
 
-		if (aScrollArea.Contains(mWidgetManager->mLastMouseX, mWidgetManager->mLastMouseY))
+		if (aScrollArea.Contains(
+			mWidgetManager->mLastMouseX - mX,
+			mWidgetManager->mLastMouseY - mY))
 		{
 			onScroll = true;
 		}
@@ -815,7 +822,9 @@ void QuickplayWidget::MouseMove(int theX, int theY)
 	{
 		bool onScroll = false;
 
-		if (aScrollArea.Contains(mWidgetManager->mLastMouseX, mWidgetManager->mLastMouseY))
+		if (aScrollArea.Contains(
+			mWidgetManager->mLastMouseX - mX,
+			mWidgetManager->mLastMouseY - mY))
 		{
 			onScroll = true;
 		}

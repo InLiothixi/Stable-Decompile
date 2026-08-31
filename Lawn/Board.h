@@ -17,6 +17,7 @@
 #include "../SexyAppFramework/SexyMatrix.h"
 
 #include "../SexyAppFramework/SDL3Font.h"
+#include "BoardGeometry.h"
 
 using namespace Sexy;
 
@@ -318,6 +319,8 @@ public:
 	virtual void					Update();
 	void							UpdateLayers();
 	virtual void					Draw(Graphics* g);
+	virtual void					Resize(int theX, int theY, int theWidth, int theHeight);
+	void							RelayoutBoardControls();
 	void							DrawBackdrop(Graphics* g);
 	virtual void					ButtonMouseEnter(int theId) { ; }
 	virtual void					ButtonMouseLeave(int theId) { ; }
@@ -340,6 +343,10 @@ public:
 			bool					StageIsDayWithoutPool();
 	/*inline*/ bool					StageIsDayWithPool();
 	bool							StageHasGraveStones();
+	BoardGeometry				GetBoardGeometry();
+	int							GetActiveRowCount();
+	bool							IsValidGridCell(int theGridX, int theGridY);
+	bool							IsPlayableGridCell(int theGridX, int theGridY);
 	int								PixelToGridX(int theX, int theY);
 	int								PixelToGridY(int theX, int theY);
 	/*inline*/ int					GridToPixelX(int theGridX, int theGridY);

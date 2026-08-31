@@ -3,6 +3,7 @@
 #include "Zombie.h"
 #include "Cutscene.h"
 #include "Projectile.h"
+#include "BoardGeometry.h"
 #include "../LawnApp.h"
 #include "../Resources.h"
 #include "../GameConstants.h"
@@ -322,7 +323,7 @@ bool Projectile::PeaAboutToHitTorchwood()
 
 				Zombie* aZombie = nullptr;
 				while (mBoard->IterateZombies(aZombie)) {
-					if (aZombie->mRow == mRow && aZombie->mX < aPlantAttackRect.mX - 80) {
+					if (aZombie->mRow == mRow && aZombie->mX < aPlantAttackRect.mX - BoardGeometry::kColumnWidth) {
 						result = false;
 						break;
 					}
@@ -416,7 +417,7 @@ void Projectile::CheckForCollision()
 
 	Zombie* aTargetZombie = mMotionType == ProjectileMotion::MOTION_HOMING ?  mBoard->ZombieTryToGet(mTargetZombieID) : nullptr;
 
-	if ((mPosX > WIDE_BOARD_WIDTH && mProjectileType != ProjectileType::PROJECTILE_ZOMBIE_PEA || mPosX + mWidth < 0) && !aTargetZombie)
+	if ((mPosX > BoardGeometry::kDesignWidth && mProjectileType != ProjectileType::PROJECTILE_ZOMBIE_PEA || mPosX + mWidth < 0) && !aTargetZombie)
 	{
 		Die();
 		return;
@@ -809,7 +810,7 @@ void Projectile::UpdateLobMotion()
 		/*int aGridX = mBoard->PixelToGridXKeepOnBoard(mX, mY);
 		if (mBoard->mGridSquareType[aGridX][mRow] == GridSquareType::GRIDSQUARE_HIGH_GROUND)
 		{
-			aMinCollisionZ -= HIGH_GROUND_HEIGHT;
+			aMinCollisionZ -= BoardGeometry::kHighGroundHeight;
 		}*/
 
 		if (mPosZ <= aMinCollisionZ)
@@ -839,7 +840,7 @@ void Projectile::UpdateLobMotion()
 	bool isHighGround = false;
 	if (mBoard->mGridSquareType[aGridX][mRow] == GridSquareType::GRIDSQUARE_HIGH_GROUND)
 	{
-		aGroundZ -= HIGH_GROUND_HEIGHT;
+		aGroundZ -= BoardGeometry::kHighGroundHeight;
 	}
 #ifdef _HAS_BLOOM_AND_DOOM_CONTENTS
 	if (mProjectileType == PROJECTILE_LETTUCE)
@@ -1176,7 +1177,7 @@ void Projectile::DoImpact(Zombie* theZombie)
 
 	/*if (mProjectileType == ProjectileType::PROJECTILE_FIREBALL) {
 		const int FIREBALL_RANGE = 50;
-		const Rect screenRect{ 0, 0, BOARD_WIDTH, BOARD_HEIGHT };
+		const Rect screenRect{ 0, 0, BoardGeometry::kDesignWidth, BoardGeometry::kDesignHeight };
 
 		Rect lightRect = Rect(mPosX + 40 - FIREBALL_RANGE, mPosY + 20 - 10 - FIREBALL_RANGE, FIREBALL_RANGE * 2, FIREBALL_RANGE * 2);
 		lightRect = lightRect.Intersection(screenRect);
@@ -1373,7 +1374,7 @@ void Projectile::DoImpact(Zombie* theZombie)
 			bool isHighGround = false;
 			if (mBoard->mGridSquareType[aGridX][mRow] == GridSquareType::GRIDSQUARE_HIGH_GROUND)
 			{
-				mY -= HIGH_GROUND_HEIGHT;
+				mY -= BoardGeometry::kHighGroundHeight;
 			}
 		}
 #endif
@@ -1636,11 +1637,11 @@ void Projectile::DrawShadow(Graphics* g)
 	}
 	if (mOnHighGround && !isHighGround)
 	{
-		aOffsetY += HIGH_GROUND_HEIGHT;
+		aOffsetY += BoardGeometry::kHighGroundHeight;
 	}
 	else if (!mOnHighGround && isHighGround)
 	{
-		aOffsetY -= HIGH_GROUND_HEIGHT;
+		aOffsetY -= BoardGeometry::kHighGroundHeight;
 	}
 
 	if (mBoard->StageIsNight())
@@ -1714,7 +1715,7 @@ void Projectile::DrawShadow(Graphics* g)
 		bool isHighGround = false;
 		if (mBoard->mGridSquareType[aGridX][mRow] == GridSquareType::GRIDSQUARE_HIGH_GROUND)
 		{
-			aGroundZ -= HIGH_GROUND_HEIGHT;
+			aGroundZ -= BoardGeometry::kHighGroundHeight;
 		}
 
 		g->PushState();

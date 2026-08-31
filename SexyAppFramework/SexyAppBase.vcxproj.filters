@@ -121,8 +121,17 @@
     <Filter Include="Third Party\zlib">
       <UniqueIdentifier>{9c7da334-8127-453e-b924-8b02e2c32d61}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Third Party\FidelityFX FSR">
+      <UniqueIdentifier>{30e0e4d7-c1e7-46d7-97cf-bcbd2d5a94e8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Fsr1D3D11.cpp">
+      <Filter>Sexy\Graphics\Graphics Source</Filter>
+    </ClCompile>
+    <ClCompile Include="ViewportTransform.cpp">
+      <Filter>Sexy\Graphics\Graphics Source</Filter>
+    </ClCompile>
     <ClCompile Include="Color.cpp">
       <Filter>Sexy\Graphics\Graphics Source</Filter>
     </ClCompile>
@@ -1114,6 +1123,9 @@
     <ClInclude Include="..\Lawn\Board.h">
       <Filter>Lawn\Board\Board Include</Filter>
     </ClInclude>
+    <ClInclude Include="..\Lawn\BoardGeometry.h">
+      <Filter>Lawn\Board\Board Include</Filter>
+    </ClInclude>
     <ClInclude Include="..\Lawn\Challenge.h">
       <Filter>Lawn\Board\Board Include</Filter>
     </ClInclude>
@@ -1397,6 +1409,33 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Fsr1D3D11.h">
+      <Filter>Sexy\Graphics\Graphics Include</Filter>
+    </ClInclude>
+    <ClInclude Include="ViewportTransform.h">
+      <Filter>Sexy\Graphics\Graphics Include</Filter>
+    </ClInclude>
+    <ClInclude Include="shaders\Fsr1Shaders.generated.h">
+      <Filter>Sexy\Graphics\Graphics Include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third_party\FidelityFX-FSR\ffx_a.h">
+      <Filter>Third Party\FidelityFX FSR</Filter>
+    </ClInclude>
+    <ClInclude Include="..\third_party\FidelityFX-FSR\ffx_fsr1.h">
+      <Filter>Third Party\FidelityFX FSR</Filter>
+    </ClInclude>
+    <None Include="shaders\Fsr1Pass.hlsl">
+      <Filter>Sexy\Graphics\Graphics Source</Filter>
+    </None>
+    <None Include="..\third_party\FidelityFX-FSR\LICENSE.txt">
+      <Filter>Third Party\FidelityFX FSR</Filter>
+    </None>
+    <None Include="..\third_party\FidelityFX-FSR\UPSTREAM.md">
+      <Filter>Third Party\FidelityFX FSR</Filter>
+    </None>
+    <None Include="..\tools\Compile-Fsr1Shaders.ps1">
+      <Filter>Third Party\FidelityFX FSR</Filter>
+    </None>
     <None Include="..\third_party\zlib\LICENSE">
       <Filter>Third Party\zlib</Filter>
     </None>

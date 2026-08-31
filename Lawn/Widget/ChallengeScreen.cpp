@@ -594,10 +594,11 @@ void ChallengeScreen::DrawButton(Graphics* g, int theChallengeIndex)
 		int aPosX = aChallengeButton->mX;
 		int aPosY = aChallengeButton->mY;
 
+		const int aLocalMouseY = mApp->mWidgetManager->mLastMouseY - mY;
 		if (aChallengeButton->mY >= mScrollbar->mViewRect.mY + mScrollbar->mViewRect.mHeight ||
 			aChallengeButton->mY + aChallengeButton->mHeight <= mScrollbar->mViewRect.mY ||
-			mApp->mWidgetManager->mLastMouseY >= mScrollbar->mViewRect.mY + mScrollbar->mViewRect.mHeight ||
-			mApp->mWidgetManager->mLastMouseY <= mScrollbar->mViewRect.mY)
+			aLocalMouseY >= mScrollbar->mViewRect.mY + mScrollbar->mViewRect.mHeight ||
+			aLocalMouseY <= mScrollbar->mViewRect.mY)
 		{
 			aChallengeButton->mY = 600;
 		}
@@ -977,7 +978,9 @@ void ChallengeScreen::UpdateToolTip()
 		ChallengeDefinition& aDef = GetChallengeDefinition(aChallengeMode);
 		ButtonWidget* aChallengeButton = mChallengeButtons[aChallengeMode];
 		if (aChallengeButton->mVisible && aChallengeButton->mDisabled &&
-			aChallengeButton->Contains(mApp->mWidgetManager->mLastMouseX, mApp->mWidgetManager->mLastMouseY) &&
+			aChallengeButton->Contains(
+				mApp->mWidgetManager->mLastMouseX - mX,
+				mApp->mWidgetManager->mLastMouseY - mY) &&
 			AccomplishmentsNeeded(aChallengeMode) <= 1)
 		{
 			mToolTip->mX = aChallengeButton->mWidth / 2 + aChallengeButton->mX;

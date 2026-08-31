@@ -1,4 +1,5 @@
 #include "Coin.h"
+#include "BoardGeometry.h"
 #include "Board.h"
 #include "Cutscene.h"
 #include "ZenGarden.h"
@@ -325,9 +326,9 @@ void Coin::CoinInitialize(int theX, int theY, CoinType theCoinType, CoinMotion t
         {
             mGroundY = 521;
         }
-        if (mGroundY < 80)
+        if (mGroundY < BoardGeometry::kLawnOriginY)
         {
-            mGroundY = 80;
+            mGroundY = BoardGeometry::kLawnOriginY;
         }
         if (mType == CoinType::COIN_AWARD_SILVER_SUNFLOWER || mType == CoinType::COIN_AWARD_GOLD_SUNFLOWER)
         {
@@ -545,9 +546,9 @@ void Coin::UpdateFall()
         }
 
         mPosX += mVelX;
-        if (mPosX > BOARD_WIDTH - mWidth && mCoinMotion != CoinMotion::COIN_MOTION_FROM_BOSS)
+        if (mPosX > BoardGeometry::kDesignWidth - mWidth && mCoinMotion != CoinMotion::COIN_MOTION_FROM_BOSS)
         {
-            mPosX = BOARD_WIDTH - mWidth;
+            mPosX = BoardGeometry::kDesignWidth - mWidth;
             mVelX = -0.4f - RandRangeFloat(0.0f, 0.4f);
         }
         else if (mPosX < 0.0f)

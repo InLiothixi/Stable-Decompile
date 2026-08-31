@@ -1228,10 +1228,97 @@ void SexyAppBase::TakeScreenshot()
 
 	SDL_Texture* anOldRenderTarget = SDL_GetRenderTarget(LawnApp::mSDLRenderer);
 	SDL_Texture* aScreenTexture = (SDL_Texture*)mWidgetManager->mImage->mD3DData;
-	if (aScreenTexture != nullptr && !SDL_SetRenderTarget(LawnApp::mSDLRenderer, aScreenTexture))
+	SDL_Texture* aScreenshotTexture = gLawnApp == nullptr
+		? aScreenTexture
+		: gLawnApp->GetScreenshotSourceTexture();
+	if (aScreenshotTexture == nullptr)
+	{
+		SDL_SetRenderTarget(LawnApp::mSDLRenderer, anOldRenderTarget);
 		return;
+	}
+	SDL_Texture* aNormalizedTexture = nullptr;
+	float aSourceWidth = 0.0f;
+	float aSourceHeight = 0.0f;
+	if (aScreenshotTexture != nullptr &&
+		SDL_GetTextureSize(aScreenshotTexture, &aSourceWidth, &aSourceHeight) &&
+		((int)aSourceWidth != mWidth || (int)aSourceHeight != mHeight))
+	{
+		// Native retained rendering and FSR use display-dependent resolutions.
+		// Resolve either output back to the current logical canvas so screenshots
+		// retain the active aspect ratio without exposing render-target dimensions.
+		aNormalizedTexture = SDL3Image::CreateRenderTarget(LawnApp::mSDLRenderer, mWidth, mHeight);
+		if (aNormalizedTexture != nullptr)
+		{
+			float anOldColorScale = 1.0f;
+			Uint8 anOldDrawRed = 0;
+			Uint8 anOldDrawGreen = 0;
+			Uint8 anOldDrawBlue = 0;
+			Uint8 anOldDrawAlpha = SDL_ALPHA_OPAQUE;
+			SDL_GetRenderColorScale(LawnApp::mSDLRenderer, &anOldColorScale);
+			SDL_GetRenderDrawColor(
+				LawnApp::mSDLRenderer,
+				&anOldDrawRed,
+				&anOldDrawGreen,
+				&anOldDrawBlue,
+				&anOldDrawAlpha);
+			Uint8 anOldRed = 255;
+			Uint8 anOldGreen = 255;
+			Uint8 anOldBlue = 255;
+			Uint8 anOldAlpha = 255;
+			SDL_BlendMode anOldBlendMode = SDL_BLENDMODE_NONE;
+			SDL_GetTextureColorMod(aScreenshotTexture, &anOldRed, &anOldGreen, &anOldBlue);
+			SDL_GetTextureAlphaMod(aScreenshotTexture, &anOldAlpha);
+			SDL_GetTextureBlendMode(aScreenshotTexture, &anOldBlendMode);
+
+			const bool aResolveSucceeded =
+				SDL_SetRenderTarget(LawnApp::mSDLRenderer, aNormalizedTexture) &&
+				SDL_SetRenderColorScale(LawnApp::mSDLRenderer, 1.0f) &&
+				SDL_SetRenderDrawColor(LawnApp::mSDLRenderer, 0, 0, 0, SDL_ALPHA_OPAQUE) &&
+				SDL_RenderClear(LawnApp::mSDLRenderer) &&
+				SDL_SetTextureColorMod(aScreenshotTexture, 255, 255, 255) &&
+				SDL_SetTextureAlphaMod(aScreenshotTexture, 255) &&
+				SDL_SetTextureBlendMode(aScreenshotTexture, SDL_BLENDMODE_NONE) &&
+				SDL_RenderTexture(LawnApp::mSDLRenderer, aScreenshotTexture, nullptr, nullptr);
+
+			SDL_SetTextureColorMod(aScreenshotTexture, anOldRed, anOldGreen, anOldBlue);
+			SDL_SetTextureAlphaMod(aScreenshotTexture, anOldAlpha);
+			SDL_SetTextureBlendMode(aScreenshotTexture, anOldBlendMode);
+			SDL_SetRenderColorScale(LawnApp::mSDLRenderer, anOldColorScale);
+			SDL_SetRenderDrawColor(
+				LawnApp::mSDLRenderer,
+				anOldDrawRed,
+				anOldDrawGreen,
+				anOldDrawBlue,
+				anOldDrawAlpha);
+			if (aResolveSucceeded)
+				aScreenshotTexture = aNormalizedTexture;
+			else
+			{
+				SDL_SetRenderTarget(LawnApp::mSDLRenderer, anOldRenderTarget);
+				SDL_DestroyTexture(aNormalizedTexture);
+				aNormalizedTexture = nullptr;
+			}
+		}
+	}
+	if (aScreenshotTexture != nullptr &&
+		!SDL_SetRenderTarget(LawnApp::mSDLRenderer, aScreenshotTexture))
+	{
+		// A native interop texture may not support target readback on every
+		// D3D11 driver. Preserve the historical retained-canvas screenshot.
+		aScreenshotTexture = aScreenTexture;
+		if (aScreenshotTexture == nullptr ||
+			!SDL_SetRenderTarget(LawnApp::mSDLRenderer, aScreenshotTexture))
+		{
+			SDL_SetRenderTarget(LawnApp::mSDLRenderer, anOldRenderTarget);
+			if (aNormalizedTexture != nullptr)
+				SDL_DestroyTexture(aNormalizedTexture);
+			return;
+		}
+	}
 	SDL_Surface* surface = SDL_RenderReadPixels(LawnApp::mSDLRenderer, NULL);
 	SDL_SetRenderTarget(LawnApp::mSDLRenderer, anOldRenderTarget);
+	if (aNormalizedTexture != nullptr)
+		SDL_DestroyTexture(aNormalizedTexture);
 	if (!surface) return;
 	std::thread([surface, anImageName]() {
 		SDL_SavePNG(surface, anImageName.c_str());
@@ -2678,8 +2765,10 @@ bool SexyAppBase::DrawDirtyStuff()
 
 	if (gIsFailing) // just try to reinit
 	{
-		Redraw(NULL);
+		// Clear the request before Redraw so a renderer recovery path can queue
+		// another frame without that request being discarded on return.
 		mHasPendingDraw = false;
+		Redraw(NULL);
 		mLastDrawWasEmpty = true;		
 		return false;
 	}	
@@ -2758,6 +2847,10 @@ bool SexyAppBase::DrawDirtyStuff()
 		DWORD aPreScreenBltTime = timeGetTime();
 		mLastDrawTick = aPreScreenBltTime;
 
+		// Redraw may detect a recoverable presentation failure and request a
+		// fully redrawn follow-up frame. Consume the current request first so
+		// that a new one survives this function.
+		mHasPendingDraw = false;
 		Redraw(NULL);		
 
 		// This is our one UpdateFTimeAcc if we are vsynched
@@ -2798,7 +2891,6 @@ bool SexyAppBase::DrawDirtyStuff()
 		else
 			mNextDrawTick = aEndTime;
 
-		mHasPendingDraw = false;		
 		mCustomCursorDirty = false;
 
 		return true;

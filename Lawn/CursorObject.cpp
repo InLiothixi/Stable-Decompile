@@ -33,8 +33,8 @@ CursorObject::CursorObject()
         mReanimCursorID = mApp->ReanimationGetID(aHammerReanim);
     }
 
-    mWidth = 80;
-    mHeight = 80;
+	mWidth = BoardGeometry::kColumnWidth;
+	mHeight = BoardGeometry::kColumnWidth;
 }
 
 //0x438780
@@ -58,9 +58,12 @@ void CursorObject::Update()
         aCursorReanim->Update();
     }
 
-    mVisible = true;
-    mX = mApp->mWidgetManager->mLastMouseX - 25;
-    mY = mApp->mWidgetManager->mLastMouseY - 35;
+	mVisible = true;
+	const Point aMouse = mBoard->GetBoardGeometry().CanvasToLocalPixel(
+		mApp->mWidgetManager->mLastMouseX - mBoard->mX,
+		mApp->mWidgetManager->mLastMouseY - mBoard->mY);
+	mX = aMouse.mX - 25;
+	mY = aMouse.mY - 35;
 }
 
 void CursorObject::Die()
@@ -71,8 +74,7 @@ void CursorObject::Die()
 //0x438820
 void CursorObject::Draw(Graphics* g)
 {
-    g->PushState();
-    g->TranslateF(-mApp->mDDInterface->mWideScreenOffsetX, -mApp->mDDInterface->mWideScreenOffsetY);
+	g->PushState();
 
     switch (mCursorType)
     {
@@ -239,7 +241,8 @@ void CursorObject::Draw(Graphics* g)
     {
         HitResult aHitResult;
         mBoard->MouseHitTest(mBoard->mPrevMouseX, mBoard->mPrevMouseY, &aHitResult);
-        if (aHitResult.mObjectType == GameObjectType::OBJECT_TYPE_NONE && mBoard->mPrevMouseY >= 80)
+		if (aHitResult.mObjectType == GameObjectType::OBJECT_TYPE_NONE &&
+			mBoard->mPrevMouseY >= BoardGeometry::kLawnOriginY)
         {
             g->DrawImageCel(IMAGE_COBCANNON_TARGET, -11, 7, 0);
         }
@@ -262,8 +265,8 @@ CursorPreview::CursorPreview()
     mGridX = 0;
     mGridY = 0;
     mVisible = false;
-    mWidth = 80;
-    mHeight = 80;
+	mWidth = BoardGeometry::kColumnWidth;
+	mHeight = BoardGeometry::kColumnWidth;
 }
 
 //0x438DA0
@@ -273,14 +276,23 @@ void CursorPreview::Update()
     {
         mVisible = false;
         return;
-    }
+	}
 
-    SeedType aSeedType = mBoard->GetSeedTypeInCursor();
-    int aMouseX = mApp->mWidgetManager->mLastMouseX - mApp->mDDInterface->mWideScreenOffsetX;
-    int aMouseY = mApp->mWidgetManager->mLastMouseY - mApp->mDDInterface->mWideScreenOffsetY;
-    mGridX = mBoard->PlantingPixelToGridX(aMouseX, aMouseY, aSeedType);
-    mGridY = mBoard->PlantingPixelToGridY(aMouseX, aMouseY, aSeedType);
-    if (mGridX >= 0 && mGridX < MAX_GRID_SIZE_X && mGridY >= 0 && mGridY <= MAX_GRID_SIZE_Y)
+	SeedType aSeedType = mBoard->GetSeedTypeInCursor();
+	const BoardGeometry aGeometry = mBoard->GetBoardGeometry();
+	const Point aMouse = aGeometry.CanvasToLocalPixel(
+		mApp->mWidgetManager->mLastMouseX - mBoard->mX,
+		mApp->mWidgetManager->mLastMouseY - mBoard->mY);
+	int aMouseX = aMouse.mX;
+	int aMouseY = aMouse.mY;
+	if (!aGeometry.ContainsLocalPoint(aMouseX, aMouseY))
+	{
+		mVisible = false;
+		return;
+	}
+	mGridX = mBoard->PlantingPixelToGridX(aMouseX, aMouseY, aSeedType);
+	mGridY = mBoard->PlantingPixelToGridY(aMouseX, aMouseY, aSeedType);
+	if (mBoard->IsValidGridCell(mGridX, mGridY))
     {
         bool aShow = false;
         if (mBoard->IsPlantInCursor() && mBoard->CanPlantAt(mGridX, mGridY, aSeedType) == PlantingReason::PLANTING_OK)

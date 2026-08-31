@@ -43,6 +43,8 @@
 #include "Lawn/Widget/SeedChooserScreen.h"
 #include "SexyAppFramework/WidgetManager.h"
 #include "SexyAppFramework/ResourceManager.h"
+#include "SexyAppFramework/Fsr1D3D11.h"
+#include "SexyAppFramework/ViewportTransform.h"
 
 #include "SexyAppFramework/Checkbox.h"
 #include "SexyAppFramework/BassMusicInterface.h"
@@ -104,6 +106,56 @@ bool LawnApp::mIsPlayingVideo = false;
 
 namespace
 {
+	constexpr int LOGICAL_CANVAS_HEIGHT = BOARD_HEIGHT;
+	constexpr int MIN_LOGICAL_CANVAS_WIDTH = BOARD_WIDTH;
+	constexpr int MAX_LOGICAL_CANVAS_WIDTH = 2400;
+	constexpr int LEGACY_WIDESCREEN_CANVAS_WIDTH = 1066;
+
+	constexpr unsigned long long MAX_PROCESSED_PRESENTATION_PIXELS = 3840ULL * 2160ULL;
+	// D3D11 guarantees this limit; using it for every backend also keeps the
+	// retained-scene allocation policy predictable when renderers change.
+	constexpr int MAX_SCENE_TARGET_DIMENSION = 16384;
+
+	int CalculateLogicalCanvasWidth(int theOutputWidth, int theOutputHeight)
+	{
+		if (theOutputWidth <= 0 || theOutputHeight <= 0)
+			return LEGACY_WIDESCREEN_CANVAS_WIDTH;
+
+		const double anIdealWidth =
+			(double)LOGICAL_CANVAS_HEIGHT * theOutputWidth / theOutputHeight;
+		int aLogicalWidth = (int)std::floor(anIdealWidth);
+		aLogicalWidth = std::clamp(
+			aLogicalWidth,
+			MIN_LOGICAL_CANVAS_WIDTH,
+			MAX_LOGICAL_CANVAS_WIDTH
+		);
+
+		// An even width keeps the centered board on integer coordinates. Round
+		// inward so the logical canvas does not crop the physical output.
+		aLogicalWidth &= ~1;
+		return (std::max)(MIN_LOGICAL_CANVAS_WIDTH, aLogicalWidth);
+	}
+
+	bool QueryRawOutputSize(
+		SDL_Window* theWindow,
+		SDL_Renderer* theRenderer,
+		int& theWidth,
+		int& theHeight)
+	{
+		theWidth = 0;
+		theHeight = 0;
+		if (theRenderer != nullptr &&
+			SDL_GetRenderOutputSize(theRenderer, &theWidth, &theHeight) &&
+			theWidth > 0 && theHeight > 0)
+		{
+			return true;
+		}
+
+		return theWindow != nullptr &&
+			SDL_GetWindowSizeInPixels(theWindow, &theWidth, &theHeight) &&
+			theWidth > 0 && theHeight > 0;
+	}
+
 	int GetVideoSwsColorspace(const AVFrame* theFrame, const AVCodecContext* theDecoder)
 	{
 		const AVColorSpace aColorspace = theFrame->colorspace != AVCOL_SPC_UNSPECIFIED
@@ -161,14 +213,18 @@ namespace
 		return aTexture;
 	}
 
-	SDL_Renderer* CreateLawnRenderer(SDL_Window* theWindow, bool enableNativeHDR, bool enableVsync)
+	SDL_Renderer* CreateLawnRenderer(
+		SDL_Window* theWindow,
+		bool enableNativeHDR,
+		bool enableVsync,
+		bool requireD3D11)
 	{
 		SDL_PropertiesID aProperties = SDL_CreateProperties();
 		if (aProperties == 0)
 			return nullptr;
 
 		SDL_SetPointerProperty(aProperties, SDL_PROP_RENDERER_CREATE_WINDOW_POINTER, theWindow);
-		if (enableNativeHDR)
+		if (enableNativeHDR || requireD3D11)
 		{
 			SDL_SetStringProperty(
 				aProperties,
@@ -203,6 +259,112 @@ namespace
 		}
 
 		return aRenderer;
+	}
+
+	float GetFSR1QualityRatio(int theQuality)
+	{
+		switch (theQuality)
+		{
+		case FSR1_QUALITY_ULTRA_QUALITY:
+			return 1.3f;
+		case FSR1_QUALITY_BALANCED:
+			return 1.7f;
+		case FSR1_QUALITY_PERFORMANCE:
+			return 2.0f;
+		case FSR1_QUALITY_QUALITY:
+		default:
+			return 1.5f;
+		}
+	}
+
+	bool GetPhysicalPresentationSize(
+		SDL_Renderer* theRenderer,
+		int theLogicalWidth,
+		int theLogicalHeight,
+		int& thePhysicalWidth,
+		int& thePhysicalHeight)
+	{
+		if (theRenderer == nullptr || theLogicalWidth <= 0 || theLogicalHeight <= 0)
+			return false;
+
+		SDL_Texture* anOldTarget = SDL_GetRenderTarget(theRenderer);
+		if (!SDL_SetRenderTarget(theRenderer, nullptr))
+			return false;
+
+		SDL_FRect aPresentationRect = {
+			0.0f,
+			0.0f,
+			(float)theLogicalWidth,
+			(float)theLogicalHeight
+		};
+		bool aRectWasRead = SDL_GetRenderLogicalPresentationRect(
+			theRenderer,
+			&aPresentationRect
+		);
+		bool havePresentationSize = aRectWasRead &&
+			aPresentationRect.w >= 1.0f && aPresentationRect.h >= 1.0f;
+
+		if (!havePresentationSize)
+		{
+			int anOutputWidth = 0;
+			int anOutputHeight = 0;
+			if (SDL_GetRenderOutputSize(theRenderer, &anOutputWidth, &anOutputHeight) &&
+				anOutputWidth > 0 && anOutputHeight > 0)
+			{
+				ViewportTransform aViewport(
+					theLogicalWidth,
+					theLogicalHeight,
+					anOutputWidth,
+					anOutputHeight,
+					ViewportScaleMode::Fit
+				);
+				if (aViewport.IsValid())
+				{
+					const FRect& aFallbackRect = aViewport.GetPresentationRect();
+					aPresentationRect.w = (float)aFallbackRect.mWidth;
+					aPresentationRect.h = (float)aFallbackRect.mHeight;
+					havePresentationSize = true;
+				}
+			}
+		}
+
+		if (!SDL_SetRenderTarget(theRenderer, anOldTarget))
+		{
+			TodTrace("Presentation-size target restore failed: %s\n", SDL_GetError());
+			SDL_SetRenderTarget(theRenderer, nullptr);
+			return false;
+		}
+		if (!havePresentationSize)
+			return false;
+
+		thePhysicalWidth = (std::max)(1, (int)std::lround(aPresentationRect.w));
+		thePhysicalHeight = (std::max)(1, (int)std::lround(aPresentationRect.h));
+		return true;
+	}
+
+	void CapProcessedPresentationSize(int& theWidth, int& theHeight)
+	{
+		const unsigned long long aTargetPixels =
+			(unsigned long long)theWidth * theHeight;
+		double aTargetScale = 1.0;
+		if (aTargetPixels > MAX_PROCESSED_PRESENTATION_PIXELS)
+		{
+			aTargetScale = std::sqrt(
+				(double)MAX_PROCESSED_PRESENTATION_PIXELS / (double)aTargetPixels
+			);
+		}
+		if (theWidth > MAX_SCENE_TARGET_DIMENSION)
+			aTargetScale = (std::min)(aTargetScale,
+				(double)MAX_SCENE_TARGET_DIMENSION / theWidth);
+		if (theHeight > MAX_SCENE_TARGET_DIMENSION)
+			aTargetScale = (std::min)(aTargetScale,
+				(double)MAX_SCENE_TARGET_DIMENSION / theHeight);
+
+		if (aTargetScale < 1.0)
+		{
+			theWidth = (std::max)(1, (int)std::floor(theWidth * aTargetScale));
+			theHeight = (std::max)(1, (int)std::floor(theHeight * aTargetScale));
+		}
 	}
 
 	bool ShouldUseSDRVideoPresentation(SDL_Renderer* theRenderer)
@@ -790,8 +952,8 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 					mMinimized = false;
 					mPhysMinimized = false;
 					ClearUpdateBacklog();
-					mWidgetManager->MarkAllDirty();
-					mHasPendingDraw = true;
+					if (!RefreshLogicalCanvasFromOutput())
+						InvalidateFSR1Presentation();
 				}
 				break;
 			case SDL_EVENT_WINDOW_EXPOSED:
@@ -808,6 +970,11 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 			case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
 			case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
 			case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
+				if (event.window.windowID == aMainWindowId)
+				{
+					if (!RefreshLogicalCanvasFromOutput())
+						InvalidateFSR1Presentation();
+				}
 				if (isUsingSDRPresentation &&
 					event.window.windowID == aMainWindowId &&
 					event.window.timestamp >= aVideoPresentationReadyTimestamp)
@@ -1144,7 +1311,7 @@ bool LawnApp::PlayVideo(std::string url, bool isSkipable, Color bgColor)
 	avformat_close_input(&format_context);
 
 	mIsPlayingVideo = false;
-	mWidgetManager->MarkAllDirty();
+	RequestSceneTargetClear();
 	if (toggleFullscreenAfterVideo && !willShutdown)
 		SwitchScreenMode(!mIsWindowed, true);
 
@@ -1159,9 +1326,12 @@ void LawnApp::MakeWindow()
 {
 	//SexyAppBase::MakeWindow();
 	if (mSDLWindow != nullptr) {
+		DestroyFSR1Resources();
 		DestroyHDRToneMapTexture();
 		SDL_DestroyRenderer(mSDLRenderer);
 		SDL_DestroyWindow(mSDLWindow);
+		mSDLRenderer = nullptr;
+		mSDLWindow = nullptr;
 	}
 
 	if (mDDInterface == nullptr) {
@@ -1186,41 +1356,39 @@ void LawnApp::MakeWindow()
 		mIsWindowed = true;
 		mFullScreenWindow = false;
 	}
-
-#define _WIDE_SCREEN
-#ifdef _ULTRA_WIDESCREEN
-	mWidth = 1280;
-	mHeight = 720;
-
-	mDDInterface->mWideScreenOffsetX = 240;
-	mDDInterface->mWideScreenOffsetY = 60;
-#elif defined(_WIDE_SCREEN)
-	mWidth = 1066;
-	mHeight = 600;
-
-	mDDInterface->mWideScreenOffsetX = 133;
-#endif
-
-	gBoardBounds = Rect{ 0, 0, mWidth, mHeight };
+	// Select an initial canvas from the target display. Once the SDL window is
+	// created, the raw pixel output below becomes authoritative (including DPI).
+	int anInitialOutputWidth = 1920;
+	int anInitialOutputHeight = 1080;
+	const SDL_DisplayID anInitialDisplay = SDL_GetPrimaryDisplay();
+	const SDL_DisplayMode* anInitialMode = anInitialDisplay == 0
+		? nullptr
+		: SDL_GetDesktopDisplayMode(anInitialDisplay);
+	if (anInitialMode != nullptr && anInitialMode->w > 0 && anInitialMode->h > 0)
+	{
+		anInitialOutputWidth = anInitialMode->w;
+		anInitialOutputHeight = anInitialMode->h;
+	}
+	UpdateLogicalCanvasForOutput(anInitialOutputWidth, anInitialOutputHeight);
 
 	unsigned long long windowFlags = 0UL;
 	if (!IsParticleEditor()) windowFlags |= SDL_WINDOW_RESIZABLE;
 	if (IsScreenSaver() || !mIsWindowed) windowFlags |= SDL_WINDOW_FULLSCREEN;
 	windowFlags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
 
-	SDL_RendererLogicalPresentation presentationMode;
-
 	mSDLWindow = SDL_CreateWindow(mTitle.c_str(), mWidth, mHeight, windowFlags);
 	ConfigureFullscreenDisplayMode();
 	if (mSDLWindow != nullptr && (windowFlags & SDL_WINDOW_FULLSCREEN) != 0 && !SDL_SyncWindow(mSDLWindow))
 		TodTrace("Initial fullscreen synchronization timed out: %s\n", SDL_GetError());
+	RefreshLogicalCanvasFromOutput();
 	mNativeHDRRenderer = false;
 	mHDRToneMapUnavailable = false;
-	mSDLRenderer = CreateLawnRenderer(mSDLWindow, mEnableNativeHDR, mEnableVsync);
+	mFSR1Unavailable = false;
+	mSDLRenderer = CreateLawnRenderer(mSDLWindow, mEnableNativeHDR, mEnableVsync, mEnableFSR1);
 	if (mSDLRenderer == nullptr && mEnableNativeHDR)
 	{
 		TodTrace("Native HDR renderer creation failed: %s. Falling back to SDR.\n", SDL_GetError());
-		mSDLRenderer = CreateLawnRenderer(mSDLWindow, false, mEnableVsync);
+		mSDLRenderer = CreateLawnRenderer(mSDLWindow, false, mEnableVsync, mEnableFSR1);
 	}
 	if (mSDLRenderer == nullptr)
 	{
@@ -1247,34 +1415,32 @@ void LawnApp::MakeWindow()
 		);
 	}
 	SDL_SetRenderVSync(mSDLRenderer, mEnableVsync);
+	RefreshLogicalCanvasFromOutput();
 	ApplyLogicalPresentationMode();
+	if (mEnableFSR1 && mSDLRenderer != nullptr)
+	{
+		mFSR1Backend = new Fsr1D3D11Backend();
+		if (!mFSR1Backend->Initialize(mSDLRenderer))
+		{
+			TodTrace(
+				"AMD FidelityFX Super Resolution 1 initialization failed: %s. Using SDL scaling.\n",
+				mFSR1Backend->GetLastError()
+			);
+			delete mFSR1Backend;
+			mFSR1Backend = nullptr;
+			mFSR1Unavailable = true;
+		}
+	}
 	mHWnd = (HWND)SDL_GetPointerProperty(SDL_GetWindowProperties(mSDLWindow), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
 
-	mWidgetManager->mWidth = mWidth;
-	mWidgetManager->mHeight = mHeight;
+	mScreenBounds = Rect(0, 0, mWidth, mHeight);
+	mWidgetManager->Resize(mScreenBounds, mScreenBounds);
 
 	mWidgetManager->mImage = new SDL3Image(mSDLRenderer);
 	mWidgetManager->mImage->mWidth = mWidth;
 	mWidgetManager->mImage->mHeight = mHeight;
-	mWidgetManager->mImage->mD3DData = SDL3Image::CreateRenderTarget(
-		mSDLRenderer,
-		mWidgetManager->mImage->mWidth,
-		mWidgetManager->mImage->mHeight
-	);
-	SDL_Texture* aScreenTexture = (SDL_Texture*)mWidgetManager->mImage->mD3DData;
-	if (aScreenTexture != nullptr)
-	{
-		SDL_SetTextureBlendMode(aScreenTexture, SDL_BLENDMODE_NONE);
-		SDL_Texture* anOldRenderTarget = SDL_GetRenderTarget(mSDLRenderer);
-		SDL_SetRenderTarget(mSDLRenderer, aScreenTexture);
-		SDL_SetRenderDrawColor(mSDLRenderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
-		SDL_RenderClear(mSDLRenderer);
-		SDL_SetRenderTarget(mSDLRenderer, anOldRenderTarget);
-	}
-	else
-	{
-		TodTrace("Persistent screen texture creation failed: %s. Using full-frame direct rendering.\n", SDL_GetError());
-	}
+	mWidgetManager->mImage->mD3DData = nullptr;
+	EnsurePersistentScreenTarget();
 	mWidgetManager->MarkAllDirty();
 
 	ImGui::CreateContext();
@@ -1337,6 +1503,507 @@ void LawnApp::DestroyHDRToneMapTexture()
 		mHDRToneMapTexture = nullptr;
 	}
 	mHDRToneMapTextureScaleMilli = 0;
+	mHDRToneMapTextureWidth = 0;
+	mHDRToneMapTextureHeight = 0;
+}
+
+void LawnApp::DestroyFSR1Resources()
+{
+	if (mFSR1Backend != nullptr)
+	{
+		mFSR1Backend->Shutdown();
+		delete mFSR1Backend;
+		mFSR1Backend = nullptr;
+	}
+	mFSR1ScreenWidth = 0;
+	mFSR1ScreenHeight = 0;
+	mFSR1OutputWidth = 0;
+	mFSR1OutputHeight = 0;
+	mPhysicalPresentationWidth = 0;
+	mPhysicalPresentationHeight = 0;
+	mSceneTargetLogicalWidth = 0;
+	mSceneTargetLogicalHeight = 0;
+	mFSR1AppliedQuality = -1;
+	mSceneTargetUsesLogicalPresentation = false;
+	mNativeSceneTargetUnavailable = false;
+	mLogicalCanvasOutputWidth = 0;
+	mLogicalCanvasOutputHeight = 0;
+	mClearSceneTargetBeforeDraw = true;
+	mReprojectMouseAfterPresentationChange = false;
+}
+
+bool LawnApp::IsFSR1RuntimeActive() const
+{
+	return mEnableFSR1 && !mUseIntegerScaling && !mFSR1Unavailable &&
+		mFSR1Backend != nullptr && mFSR1Backend->IsAvailable();
+}
+
+void LawnApp::RequestFSR1Redraw()
+{
+	if (mWidgetManager != nullptr)
+	{
+		mWidgetManager->MarkAllDirty();
+		mHasPendingDraw = true;
+	}
+}
+
+void LawnApp::RequestSceneTargetClear()
+{
+	mClearSceneTargetBeforeDraw = true;
+	if (mWidgetManager != nullptr)
+	{
+		mWidgetManager->MarkAllDirty();
+		mHasPendingDraw = true;
+	}
+}
+
+bool LawnApp::RefreshLogicalCanvasFromOutput()
+{
+	int anOutputWidth = 0;
+	int anOutputHeight = 0;
+	if (!QueryRawOutputSize(mSDLWindow, mSDLRenderer, anOutputWidth, anOutputHeight))
+		return false;
+
+	return UpdateLogicalCanvasForOutput(anOutputWidth, anOutputHeight);
+}
+
+bool LawnApp::UpdateLogicalCanvasForOutput(int theOutputWidth, int theOutputHeight)
+{
+	if (theOutputWidth <= 0 || theOutputHeight <= 0)
+		return false;
+	const bool anOutputChanged =
+		theOutputWidth != mLogicalCanvasOutputWidth ||
+		theOutputHeight != mLogicalCanvasOutputHeight;
+
+	int aLogicalWidth = CalculateLogicalCanvasWidth(theOutputWidth, theOutputHeight);
+	// During interactive resize, a one-unit aspect fluctuation should not move
+	// every widget back and forth. The even-width policy normally prevents this,
+	// but retain the tolerance for callers with an existing odd canvas.
+	if (std::abs(aLogicalWidth - mWidth) <= 1)
+		aLogicalWidth = mWidth;
+
+	ViewportTransform aViewport(
+		aLogicalWidth,
+		LOGICAL_CANVAS_HEIGHT,
+		theOutputWidth,
+		theOutputHeight,
+		ViewportScaleMode::Fit
+	);
+	if (!aViewport.IsValid())
+		return false;
+
+	const int anOldWidth = mWidth;
+	const int anOldHeight = mHeight;
+	const int anOldOffsetX = mDDInterface == nullptr
+		? (std::max)(0, (anOldWidth - BOARD_WIDTH) / 2)
+		: mDDInterface->mWideScreenOffsetX;
+	const int anOldOffsetY = mDDInterface == nullptr
+		? (std::max)(0, (anOldHeight - BOARD_HEIGHT) / 2)
+		: mDDInterface->mWideScreenOffsetY;
+	const bool aCanvasChanged =
+		aLogicalWidth != anOldWidth || LOGICAL_CANVAS_HEIGHT != anOldHeight;
+	mLogicalCanvasOutputWidth = theOutputWidth;
+	mLogicalCanvasOutputHeight = theOutputHeight;
+	if (mDDInterface != nullptr)
+	{
+		mDDInterface->mDisplayWidth = theOutputWidth;
+		mDDInterface->mDisplayHeight = theOutputHeight;
+		mDDInterface->mDisplayAspect.Set(theOutputWidth, theOutputHeight);
+	}
+	if (aCanvasChanged)
+	{
+		mWidth = aLogicalWidth;
+		mHeight = LOGICAL_CANVAS_HEIGHT;
+		gBoardBounds = Rect(0, 0, mWidth, mHeight);
+
+		if (mDDInterface != nullptr)
+		{
+			mDDInterface->mWidth = mWidth;
+			mDDInterface->mHeight = mHeight;
+			mDDInterface->mAspect.Set(mWidth, mHeight);
+			mDDInterface->mPresentationRect = Rect(0, 0, mWidth, mHeight);
+			mDDInterface->mIsWidescreen = mWidth > BOARD_WIDTH;
+			mDDInterface->mWideScreenExtraWidth = mWidth - BOARD_WIDTH;
+			mDDInterface->mWideScreenOffsetX = mDDInterface->mWideScreenExtraWidth / 2;
+			mDDInterface->mWideScreenExtraHeight = mHeight - BOARD_HEIGHT;
+			mDDInterface->mWideScreenOffsetY = mDDInterface->mWideScreenExtraHeight / 2;
+		}
+
+		mScreenBounds = Rect(0, 0, mWidth, mHeight);
+		if (mWidgetManager != nullptr)
+		{
+			mWidgetManager->Resize(mScreenBounds, mScreenBounds);
+			if (mWidgetManager->mImage != nullptr)
+			{
+				mWidgetManager->mImage->mWidth = mWidth;
+				mWidgetManager->mImage->mHeight = mHeight;
+			}
+		}
+
+		RelayoutForLogicalCanvasChange(anOldOffsetX, anOldOffsetY);
+		TodTrace(
+			"Logical canvas changed from %dx%d to %dx%d for output %dx%d.\n",
+			anOldWidth,
+			anOldHeight,
+			mWidth,
+			mHeight,
+			theOutputWidth,
+			theOutputHeight
+		);
+	}
+
+	if (mSDLRenderer != nullptr && aCanvasChanged)
+		ApplyLogicalPresentationMode();
+	else
+		InvalidateFSR1Presentation();
+	if (anOutputChanged)
+		mReprojectMouseAfterPresentationChange = true;
+
+	return true;
+}
+
+void LawnApp::RelayoutForLogicalCanvasChange(
+	int theOldOffsetX,
+	int theOldOffsetY)
+{
+	if (mWidgetManager == nullptr)
+		return;
+
+	const int aNewOffsetX = (std::max)(0, (mWidth - BOARD_WIDTH) / 2);
+	const int aNewOffsetY = (std::max)(0, (mHeight - BOARD_HEIGHT) / 2);
+	const int aDeltaX = aNewOffsetX - theOldOffsetX;
+	const int aDeltaY = aNewOffsetY - theOldOffsetY;
+
+	if (aDeltaX != 0 || aDeltaY != 0)
+	{
+		// Most legacy controls are top-level manager widgets even when visually
+		// owned by a screen. Shift them by the board-centering delta. Full-canvas
+		// roots are excluded because their drawing code consumes the new offset.
+		for (Widget* aWidget : mWidgetManager->mWidgets)
+		{
+			if (aWidget == nullptr ||
+				aWidget == mBoard ||
+				aWidget == mGameSelector ||
+				(mGameSelector != nullptr && aWidget == mGameSelector->mOverlayWidget) ||
+				aWidget == mTitleScreen ||
+				aWidget == mParticleScreen ||
+				aWidget == mChallengeScreen ||
+				aWidget == mCreditScreen ||
+				aWidget == mLanguageScreen ||
+				aWidget == mAwardScreen)
+			{
+				continue;
+			}
+#ifdef _REPLANTED_SPEED_CONTROL
+			if (mBoard != nullptr &&
+				(aWidget == mBoard->mSlowdownButton ||
+				 aWidget == mBoard->mPauseButton ||
+				 aWidget == mBoard->mSpeedupButton))
+			{
+				continue;
+			}
+#endif
+			aWidget->Move(aWidget->mX + aDeltaX, aWidget->mY + aDeltaY);
+		}
+
+		// These legacy GameButtons are rendered manually rather than registered
+		// with the widget manager. Their stored positions include the canvas
+		// centering offset, so move them alongside the SeedChooser root.
+		if (mSeedChooserScreen != nullptr)
+		{
+			if (mSeedChooserScreen->mStartButton != nullptr)
+				mSeedChooserScreen->mStartButton->Resize(
+					mSeedChooserScreen->mStartButton->mX + aDeltaX,
+					mSeedChooserScreen->mStartButton->mY + aDeltaY,
+					mSeedChooserScreen->mStartButton->mWidth,
+					mSeedChooserScreen->mStartButton->mHeight);
+			if (mSeedChooserScreen->mMenuButton != nullptr)
+				mSeedChooserScreen->mMenuButton->Resize(
+					mSeedChooserScreen->mMenuButton->mX + aDeltaX,
+					mSeedChooserScreen->mMenuButton->mY + aDeltaY,
+					mSeedChooserScreen->mMenuButton->mWidth,
+					mSeedChooserScreen->mMenuButton->mHeight);
+			if (mSeedChooserScreen->mRandomButton != nullptr)
+				mSeedChooserScreen->mRandomButton->Resize(
+					mSeedChooserScreen->mRandomButton->mX + aDeltaX,
+					mSeedChooserScreen->mRandomButton->mY + aDeltaY,
+					mSeedChooserScreen->mRandomButton->mWidth,
+					mSeedChooserScreen->mRandomButton->mHeight);
+		}
+	}
+
+	// Board::Resize owns board controls and keeps mechanics in 800x600 local
+	// coordinates. Other dynamic roots retain their animation offsets while
+	// accepting the new clipping/input extent.
+	if (mBoard != nullptr)
+		mBoard->Resize(mBoard->mX, mBoard->mY, mWidth, mHeight);
+	if (mGameSelector != nullptr)
+		mGameSelector->Resize(mGameSelector->mX, mGameSelector->mY, mWidth, mHeight);
+	if (mSeedChooserScreen != nullptr)
+		mSeedChooserScreen->Resize(
+			mSeedChooserScreen->mX,
+			mSeedChooserScreen->mY,
+			mWidth,
+			mHeight
+		);
+	if (mTitleScreen != nullptr)
+		mTitleScreen->Resize(mTitleScreen->mX, mTitleScreen->mY, mWidth, mHeight);
+	if (mParticleScreen != nullptr)
+		mParticleScreen->Resize(mParticleScreen->mX, mParticleScreen->mY, mWidth, mHeight);
+	if (mChallengeScreen != nullptr)
+		mChallengeScreen->Resize(aNewOffsetX, aNewOffsetY, BOARD_WIDTH, BOARD_HEIGHT);
+	if (mCreditScreen != nullptr)
+		mCreditScreen->Resize(aNewOffsetX, aNewOffsetY, BOARD_WIDTH, BOARD_HEIGHT);
+	if (mLanguageScreen != nullptr)
+		mLanguageScreen->Resize(aNewOffsetX, aNewOffsetY, BOARD_WIDTH, BOARD_HEIGHT);
+	if (mAwardScreen != nullptr)
+		mAwardScreen->Resize(aNewOffsetX, aNewOffsetY, BOARD_WIDTH, BOARD_HEIGHT);
+
+	RequestSceneTargetClear();
+}
+
+void LawnApp::ReprojectMouseToLogicalCanvas()
+{
+	if (!mReprojectMouseAfterPresentationChange || mSDLWindow == nullptr ||
+		mSDLRenderer == nullptr || mWidgetManager == nullptr)
+	{
+		return;
+	}
+
+	SDL_Texture* anOldTarget = SDL_GetRenderTarget(mSDLRenderer);
+	if (anOldTarget != nullptr && !SDL_SetRenderTarget(mSDLRenderer, nullptr))
+	{
+		TodTrace("Mouse reprojection target bind failed: %s\n", SDL_GetError());
+		return;
+	}
+
+	float aWindowX = 0.0f;
+	float aWindowY = 0.0f;
+	float aLogicalX = 0.0f;
+	float aLogicalY = 0.0f;
+	SDL_GetMouseState(&aWindowX, &aWindowY);
+	const bool aConverted = SDL_RenderCoordinatesFromWindow(
+		mSDLRenderer,
+		aWindowX,
+		aWindowY,
+		&aLogicalX,
+		&aLogicalY
+	);
+
+	bool aTargetRestored = true;
+	if (anOldTarget != nullptr)
+		aTargetRestored = SDL_SetRenderTarget(mSDLRenderer, anOldTarget);
+	if (!aTargetRestored)
+	{
+		TodTrace("Mouse reprojection target restore failed: %s\n", SDL_GetError());
+		return;
+	}
+	if (!aConverted)
+	{
+		TodTrace("Mouse reprojection failed: %s\n", SDL_GetError());
+		return;
+	}
+
+	int aMouseX = (int)aLogicalX;
+	int aMouseY = (int)aLogicalY;
+	mWidgetManager->RemapMouse(aMouseX, aMouseY);
+	mReprojectMouseAfterPresentationChange = false;
+	// Use MousePosition rather than MouseMove: a presentation change is not a
+	// user drag, but hover/cursor ownership must reflect the new transform.
+	mWidgetManager->MousePosition(aMouseX, aMouseY);
+}
+
+void LawnApp::InvalidateFSR1Presentation()
+{
+	if (mFSR1Backend != nullptr)
+		mFSR1Backend->InvalidateOutput();
+	mNativeSceneTargetUnavailable = false;
+	DestroyHDRToneMapTexture();
+	RequestFSR1Redraw();
+}
+
+bool LawnApp::EnsurePersistentScreenTarget()
+{
+	if (mSDLRenderer == nullptr || mWidgetManager == nullptr || mWidgetManager->mImage == nullptr)
+		return false;
+
+	const bool useFSR1 = IsFSR1RuntimeActive();
+	bool useNativeSceneTarget = !mUseIntegerScaling && !useFSR1 &&
+		!mNativeSceneTargetUnavailable;
+	bool useTargetLogicalPresentation = useFSR1 || useNativeSceneTarget;
+	int aDesiredScreenWidth = mWidth;
+	int aDesiredScreenHeight = mHeight;
+	int aDesiredOutputWidth = mWidth;
+	int aDesiredOutputHeight = mHeight;
+	int aDesiredPresentationWidth = mWidth;
+	int aDesiredPresentationHeight = mHeight;
+
+	if (useTargetLogicalPresentation)
+	{
+		if (GetPhysicalPresentationSize(
+			mSDLRenderer,
+			mWidth,
+			mHeight,
+			aDesiredPresentationWidth,
+			aDesiredPresentationHeight))
+		{
+			aDesiredOutputWidth = aDesiredPresentationWidth;
+			aDesiredOutputHeight = aDesiredPresentationHeight;
+			CapProcessedPresentationSize(aDesiredOutputWidth, aDesiredOutputHeight);
+			if (useNativeSceneTarget)
+			{
+				aDesiredScreenWidth = aDesiredOutputWidth;
+				aDesiredScreenHeight = aDesiredOutputHeight;
+			}
+		}
+		else if (useNativeSceneTarget)
+		{
+			// A transient output-size query failure should not take down drawing.
+			// Keep the historical logical-sized target until presentation changes.
+			mNativeSceneTargetUnavailable = true;
+			useNativeSceneTarget = false;
+			useTargetLogicalPresentation = false;
+		}
+
+		if (useFSR1)
+		{
+			const float aQualityRatio = GetFSR1QualityRatio(mFSR1Quality);
+			aDesiredScreenWidth = (std::max)(1, (int)(aDesiredOutputWidth / aQualityRatio));
+			aDesiredScreenHeight = (std::max)(1, (int)(aDesiredOutputHeight / aQualityRatio));
+		}
+	}
+
+	SDL_Texture* anOldScreenTexture = (SDL_Texture*)mWidgetManager->mImage->mD3DData;
+	if (anOldScreenTexture != nullptr &&
+		mFSR1ScreenWidth == aDesiredScreenWidth &&
+		mFSR1ScreenHeight == aDesiredScreenHeight &&
+		mFSR1OutputWidth == aDesiredOutputWidth &&
+		mFSR1OutputHeight == aDesiredOutputHeight &&
+		mPhysicalPresentationWidth == aDesiredPresentationWidth &&
+		mPhysicalPresentationHeight == aDesiredPresentationHeight &&
+		mSceneTargetLogicalWidth == mWidth &&
+		mSceneTargetLogicalHeight == mHeight &&
+		mFSR1AppliedQuality == (useFSR1 ? mFSR1Quality : -1) &&
+		mSceneTargetUsesLogicalPresentation == useTargetLogicalPresentation)
+	{
+		return true;
+	}
+	if (useTargetLogicalPresentation &&
+		(aDesiredOutputWidth != aDesiredPresentationWidth ||
+		 aDesiredOutputHeight != aDesiredPresentationHeight))
+	{
+		TodTrace(
+			"Processed presentation capped from %dx%d to %dx%d for memory and texture limits.\n",
+			aDesiredPresentationWidth,
+			aDesiredPresentationHeight,
+			aDesiredOutputWidth,
+			aDesiredOutputHeight
+		);
+	}
+
+	SDL_Texture* aNewScreenTexture = SDL3Image::CreateRenderTarget(
+		mSDLRenderer,
+		aDesiredScreenWidth,
+		aDesiredScreenHeight
+	);
+	bool aNewTargetIsValid = aNewScreenTexture != nullptr &&
+		SDL_SetTextureBlendMode(aNewScreenTexture, SDL_BLENDMODE_NONE);
+	SDL_Texture* anOldRenderTarget = SDL_GetRenderTarget(mSDLRenderer);
+	if (aNewTargetIsValid)
+		aNewTargetIsValid = SDL_SetRenderTarget(mSDLRenderer, aNewScreenTexture);
+	if (aNewTargetIsValid && useTargetLogicalPresentation)
+	{
+		// Rasterize the current aspect-aware logical canvas directly into the
+		// display-sized (or FSR input-sized) target. Letterboxing preserves one
+		// uniform scale when target dimensions round away from the exact ratio.
+		aNewTargetIsValid = SDL_SetRenderLogicalPresentation(
+			mSDLRenderer,
+			mWidth,
+			mHeight,
+			SDL_LOGICAL_PRESENTATION_LETTERBOX
+		);
+	}
+	if (aNewTargetIsValid)
+	{
+		SDL_SetRenderDrawColor(mSDLRenderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+		aNewTargetIsValid = SDL_RenderClear(mSDLRenderer);
+	}
+	SDL_Texture* aRestoreTarget = anOldRenderTarget == anOldScreenTexture ? nullptr : anOldRenderTarget;
+	if (!SDL_SetRenderTarget(mSDLRenderer, aRestoreTarget))
+	{
+		aNewTargetIsValid = false;
+		SDL_SetRenderTarget(mSDLRenderer, nullptr);
+	}
+
+	if (!aNewTargetIsValid)
+	{
+		if (aNewScreenTexture != nullptr)
+			SDL_DestroyTexture(aNewScreenTexture);
+		if (useFSR1)
+		{
+			TodTrace("FSR render target creation failed: %s. Using native SDL rendering.\n", SDL_GetError());
+			mFSR1Unavailable = true;
+			if (mFSR1Backend != nullptr)
+				mFSR1Backend->InvalidateOutput();
+			return EnsurePersistentScreenTarget();
+		}
+		if (useNativeSceneTarget)
+		{
+			TodTrace("Native-resolution scene target creation failed: %s. Using the logical-sized target.\n", SDL_GetError());
+			mNativeSceneTargetUnavailable = true;
+			return EnsurePersistentScreenTarget();
+		}
+		TodTrace("Persistent screen texture creation failed: %s.\n", SDL_GetError());
+		// The existing target may belong to a previous logical-canvas size or
+		// presentation mode.  Keeping it would make WidgetManager render the new
+		// canvas through stale texture dimensions.  Drop it and let DrawDirtyStuff
+		// use its full-frame direct-rendering fallback for this frame.
+		if (anOldScreenTexture != nullptr)
+			SDL_DestroyTexture(anOldScreenTexture);
+		mWidgetManager->mImage->mD3DData = nullptr;
+		mFSR1ScreenWidth = 0;
+		mFSR1ScreenHeight = 0;
+		mFSR1OutputWidth = 0;
+		mFSR1OutputHeight = 0;
+		mPhysicalPresentationWidth = 0;
+		mPhysicalPresentationHeight = 0;
+		mSceneTargetLogicalWidth = 0;
+		mSceneTargetLogicalHeight = 0;
+		mFSR1AppliedQuality = -1;
+		mSceneTargetUsesLogicalPresentation = false;
+		if (mFSR1Backend != nullptr)
+			mFSR1Backend->InvalidateOutput();
+		DestroyHDRToneMapTexture();
+		return false;
+	}
+
+	mWidgetManager->mImage->mD3DData = aNewScreenTexture;
+	if (anOldScreenTexture != nullptr)
+		SDL_DestroyTexture(anOldScreenTexture);
+	mFSR1ScreenWidth = aDesiredScreenWidth;
+	mFSR1ScreenHeight = aDesiredScreenHeight;
+	mFSR1OutputWidth = aDesiredOutputWidth;
+	mFSR1OutputHeight = aDesiredOutputHeight;
+	mPhysicalPresentationWidth = aDesiredPresentationWidth;
+	mPhysicalPresentationHeight = aDesiredPresentationHeight;
+	mSceneTargetLogicalWidth = mWidth;
+	mSceneTargetLogicalHeight = mHeight;
+	mFSR1AppliedQuality = useFSR1 ? mFSR1Quality : -1;
+	mSceneTargetUsesLogicalPresentation = useTargetLogicalPresentation;
+	if (mFSR1Backend != nullptr)
+		mFSR1Backend->InvalidateOutput();
+	DestroyHDRToneMapTexture();
+	RequestFSR1Redraw();
+	return true;
+}
+
+SDL_Texture* LawnApp::GetScreenshotSourceTexture() const
+{
+	if (IsFSR1RuntimeActive() && mFSR1Backend->HasValidOutput())
+		return mFSR1Backend->GetLastOutput();
+	return mWidgetManager == nullptr || mWidgetManager->mImage == nullptr
+		? nullptr
+		: (SDL_Texture*)mWidgetManager->mImage->mD3DData;
 }
 
 void LawnApp::ApplyLogicalPresentationMode()
@@ -1347,14 +2014,16 @@ void LawnApp::ApplyLogicalPresentationMode()
 	const SDL_RendererLogicalPresentation aPresentationMode = mUseIntegerScaling
 		? SDL_LOGICAL_PRESENTATION_INTEGER_SCALE
 		: SDL_LOGICAL_PRESENTATION_LETTERBOX;
-	if (!SDL_SetRenderLogicalPresentation(mSDLRenderer, mWidth, mHeight, aPresentationMode))
+	SDL_Texture* anOldTarget = SDL_GetRenderTarget(mSDLRenderer);
+	const bool aWindowTargetWasSet = SDL_SetRenderTarget(mSDLRenderer, nullptr);
+	if (!aWindowTargetWasSet ||
+		!SDL_SetRenderLogicalPresentation(mSDLRenderer, mWidth, mHeight, aPresentationMode))
 		TodTrace("Logical presentation setup failed: %s\n", SDL_GetError());
+	if (!SDL_SetRenderTarget(mSDLRenderer, anOldTarget))
+		TodTrace("Logical presentation target restore failed: %s\n", SDL_GetError());
 
-	if (mWidgetManager != nullptr)
-	{
-		mWidgetManager->MarkAllDirty();
-		mHasPendingDraw = true;
-	}
+	mReprojectMouseAfterPresentationChange = true;
+	InvalidateFSR1Presentation();
 }
 
 bool LawnApp::ConfigureFullscreenDisplayMode()
@@ -1440,16 +2109,29 @@ bool LawnApp::DrawDirtyStuff()
 {
 	if (mIsPlayingVideo) return true;
 	if (IsParticleEditor() && mParticleScreen) mParticleScreen->ImGuiDraw();
+	EnsurePersistentScreenTarget();
 	SDL_Texture* anOldRenderTarget = SDL_GetRenderTarget(mSDLRenderer);
 	SDL_Texture* aScreenTexture = (SDL_Texture*)mWidgetManager->mImage->mD3DData;
 	if (aScreenTexture != nullptr && !SDL_SetRenderTarget(mSDLRenderer, aScreenTexture))
 	{
+		const bool wasUsingFSR1 = IsFSR1RuntimeActive();
+		const bool wasUsingNativeSceneTarget =
+			mSceneTargetUsesLogicalPresentation && !wasUsingFSR1;
 		TodTrace("Persistent screen texture bind failed: %s. Using full-frame direct rendering.\n", SDL_GetError());
 		if (anOldRenderTarget == aScreenTexture)
 			anOldRenderTarget = nullptr;
 		SDL_DestroyTexture(aScreenTexture);
 		mWidgetManager->mImage->mD3DData = nullptr;
-		DestroyHDRToneMapTexture();
+		mFSR1ScreenWidth = 0;
+		mFSR1ScreenHeight = 0;
+		mSceneTargetLogicalWidth = 0;
+		mSceneTargetLogicalHeight = 0;
+		InvalidateFSR1Presentation();
+		if (wasUsingFSR1)
+			mFSR1Unavailable = true;
+		else if (wasUsingNativeSceneTarget)
+			mNativeSceneTargetUnavailable = true;
+		mSceneTargetUsesLogicalPresentation = false;
 		aScreenTexture = nullptr;
 	}
 	if (aScreenTexture == nullptr)
@@ -1459,6 +2141,22 @@ bool LawnApp::DrawDirtyStuff()
 		SDL_RenderClear(mSDLRenderer);
 		SDL_SetRenderColorScale(mSDLRenderer, GetHDRCompositeScale());
 		mWidgetManager->MarkAllDirty();
+		mClearSceneTargetBeforeDraw = false;
+	}
+	else if (mClearSceneTargetBeforeDraw)
+	{
+		SDL_SetRenderDrawColor(mSDLRenderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+		if (SDL_RenderClear(mSDLRenderer))
+		{
+			// A retained target can otherwise preserve pixels outside an authored
+			// 800x600 screen when the next root uses the same target size.
+			mWidgetManager->MarkAllDirty();
+			mClearSceneTargetBeforeDraw = false;
+		}
+		else
+		{
+			TodTrace("Scene target clear failed: %s\n", SDL_GetError());
+		}
 	}
 	bool drewStuff = SexyAppBase::DrawDirtyStuff();
 	if (aScreenTexture == nullptr)
@@ -1475,8 +2173,42 @@ void LawnApp::Redraw(Rect* theClipRect)
 	SDL_SetRenderTarget(mSDLRenderer, nullptr);
 	if (aScreenTexture != nullptr)
 	{
+		SDL_Texture* aBaseTexture = aScreenTexture;
+		int aBaseTextureWidth = mFSR1ScreenWidth > 0 ? mFSR1ScreenWidth : mWidth;
+		int aBaseTextureHeight = mFSR1ScreenHeight > 0 ? mFSR1ScreenHeight : mHeight;
+		bool isUsingFSR1 = false;
+		if (IsFSR1RuntimeActive())
+		{
+			SDL_Texture* anUpscaledTexture = mFSR1Backend->Upscale(
+				aScreenTexture,
+				aBaseTextureWidth,
+				aBaseTextureHeight,
+				mFSR1OutputWidth,
+				mFSR1OutputHeight,
+				std::clamp(mFSR1SharpnessPercent, 0, 100) / 100.0f
+			);
+			if (anUpscaledTexture != nullptr)
+			{
+				aBaseTexture = anUpscaledTexture;
+				aBaseTextureWidth = mFSR1OutputWidth;
+				aBaseTextureHeight = mFSR1OutputHeight;
+				isUsingFSR1 = true;
+			}
+			else
+			{
+				TodTrace(
+					"FSR upscale failed: %s. Falling back to SDL scaling.\n",
+					mFSR1Backend->GetLastError()
+				);
+				mFSR1Unavailable = true;
+				mFSR1Backend->InvalidateOutput();
+				mWidgetManager->MarkAllDirty();
+				mHasPendingDraw = true;
+			}
+		}
+
 		float aCompositeScale = GetHDRCompositeScale();
-		SDL_Texture* aCompositeTexture = aScreenTexture;
+		SDL_Texture* aCompositeTexture = aBaseTexture;
 		bool isUsingAdaptiveToneMapping = false;
 
 		if (mHDRAdaptiveToneMapping && !mHDRToneMapUnavailable && IsNativeHDRActive())
@@ -1493,7 +2225,10 @@ void LawnApp::Redraw(Rect* theClipRect)
 			if (aCompositeScale > aDisplayHeadroom + 0.001f)
 			{
 				const int aScaleMilli = (int)std::lround(aCompositeScale * 1000.0f);
-				if (mHDRToneMapTexture == nullptr || mHDRToneMapTextureScaleMilli != aScaleMilli)
+				if (mHDRToneMapTexture == nullptr ||
+					mHDRToneMapTextureScaleMilli != aScaleMilli ||
+					mHDRToneMapTextureWidth != aBaseTextureWidth ||
+					mHDRToneMapTextureHeight != aBaseTextureHeight)
 				{
 					SDL_PropertiesID aProperties = SDL_CreateProperties();
 					SDL_Texture* aNewToneMapTexture = nullptr;
@@ -1503,8 +2238,8 @@ void LawnApp::Redraw(Rect* theClipRect)
 						const bool aPropertiesWereConfigured =
 							SDL_SetNumberProperty(aProperties, SDL_PROP_TEXTURE_CREATE_FORMAT_NUMBER, SDL_PIXELFORMAT_RGBA64_FLOAT) &&
 							SDL_SetNumberProperty(aProperties, SDL_PROP_TEXTURE_CREATE_ACCESS_NUMBER, SDL_TEXTUREACCESS_TARGET) &&
-							SDL_SetNumberProperty(aProperties, SDL_PROP_TEXTURE_CREATE_WIDTH_NUMBER, mWidth) &&
-							SDL_SetNumberProperty(aProperties, SDL_PROP_TEXTURE_CREATE_HEIGHT_NUMBER, mHeight) &&
+							SDL_SetNumberProperty(aProperties, SDL_PROP_TEXTURE_CREATE_WIDTH_NUMBER, aBaseTextureWidth) &&
+							SDL_SetNumberProperty(aProperties, SDL_PROP_TEXTURE_CREATE_HEIGHT_NUMBER, aBaseTextureHeight) &&
 							SDL_SetNumberProperty(aProperties, SDL_PROP_TEXTURE_CREATE_COLORSPACE_NUMBER, SDL_COLORSPACE_SRGB_LINEAR) &&
 							SDL_SetFloatProperty(aProperties, SDL_PROP_TEXTURE_CREATE_SDR_WHITE_POINT_FLOAT, 1.0f) &&
 							SDL_SetFloatProperty(aProperties, SDL_PROP_TEXTURE_CREATE_HDR_HEADROOM_FLOAT, aCompositeScale);
@@ -1546,11 +2281,13 @@ void LawnApp::Redraw(Rect* theClipRect)
 						if (aTextureIsValid)
 						{
 							SDL_ScaleMode aScaleMode = SDL_SCALEMODE_LINEAR;
-							if (SDL_GetTextureScaleMode(aScreenTexture, &aScaleMode))
+							if (SDL_GetTextureScaleMode(aBaseTexture, &aScaleMode))
 								SDL_SetTextureScaleMode(aNewToneMapTexture, aScaleMode);
 							DestroyHDRToneMapTexture();
 							mHDRToneMapTexture = aNewToneMapTexture;
 							mHDRToneMapTextureScaleMilli = aScaleMilli;
+							mHDRToneMapTextureWidth = aBaseTextureWidth;
+							mHDRToneMapTextureHeight = aBaseTextureHeight;
 						}
 						else
 						{
@@ -1571,14 +2308,14 @@ void LawnApp::Redraw(Rect* theClipRect)
 
 				if (mHDRToneMapTexture != nullptr)
 				{
-					SDL_SetTextureColorMod(aScreenTexture, 255, 255, 255);
-					SDL_SetTextureAlphaMod(aScreenTexture, 255);
-					SDL_SetTextureBlendMode(aScreenTexture, SDL_BLENDMODE_NONE);
+					SDL_SetTextureColorMod(aBaseTexture, 255, 255, 255);
+					SDL_SetTextureAlphaMod(aBaseTexture, 255);
+					SDL_SetTextureBlendMode(aBaseTexture, SDL_BLENDMODE_NONE);
 					const bool aTargetWasSet = SDL_SetRenderTarget(mSDLRenderer, mHDRToneMapTexture);
 					const bool aScaleWasSet = aTargetWasSet && SDL_SetRenderColorScale(mSDLRenderer, aCompositeScale);
 					SDL_SetRenderDrawColor(mSDLRenderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
 					const bool aTargetWasCleared = aScaleWasSet && SDL_RenderClear(mSDLRenderer);
-					const bool aToneMapSourceWasDrawn = aTargetWasCleared && SDL_RenderTexture(mSDLRenderer, aScreenTexture, nullptr, nullptr);
+					const bool aToneMapSourceWasDrawn = aTargetWasCleared && SDL_RenderTexture(mSDLRenderer, aBaseTexture, nullptr, nullptr);
 					const bool aScaleWasRestored = SDL_SetRenderColorScale(mSDLRenderer, 1.0f);
 					const bool aWindowTargetWasRestored = SDL_SetRenderTarget(mSDLRenderer, nullptr);
 
@@ -1622,20 +2359,54 @@ void LawnApp::Redraw(Rect* theClipRect)
 			SDL_SetRenderTarget(mSDLRenderer, nullptr);
 			SDL_SetRenderDrawColor(mSDLRenderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
 			SDL_RenderClear(mSDLRenderer);
+			SDL_SetTextureColorMod(aBaseTexture, 255, 255, 255);
+			SDL_SetTextureAlphaMod(aBaseTexture, 255);
+			SDL_SetTextureBlendMode(aBaseTexture, SDL_BLENDMODE_NONE);
+			const bool aFallbackScaleWasSet = SDL_SetRenderColorScale(mSDLRenderer, GetHDRCompositeScale());
+			aCompositeSucceeded = aFallbackScaleWasSet && SDL_RenderTexture(mSDLRenderer, aBaseTexture, nullptr, nullptr);
+			SDL_SetRenderColorScale(mSDLRenderer, 1.0f);
+		}
+
+		if (!aCompositeSucceeded && isUsingFSR1)
+		{
+			TodTrace("FSR composite failed: %s. Retrying with SDL scaling.\n", SDL_GetError());
+			DestroyHDRToneMapTexture();
+			SDL_SetRenderTarget(mSDLRenderer, nullptr);
+			SDL_SetRenderDrawColor(mSDLRenderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
+			SDL_RenderClear(mSDLRenderer);
 			SDL_SetTextureColorMod(aScreenTexture, 255, 255, 255);
 			SDL_SetTextureAlphaMod(aScreenTexture, 255);
 			SDL_SetTextureBlendMode(aScreenTexture, SDL_BLENDMODE_NONE);
 			const bool aFallbackScaleWasSet = SDL_SetRenderColorScale(mSDLRenderer, GetHDRCompositeScale());
-			aCompositeSucceeded = aFallbackScaleWasSet && SDL_RenderTexture(mSDLRenderer, aScreenTexture, nullptr, nullptr);
+			aCompositeSucceeded = aFallbackScaleWasSet &&
+				SDL_RenderTexture(mSDLRenderer, aScreenTexture, nullptr, nullptr);
 			SDL_SetRenderColorScale(mSDLRenderer, 1.0f);
+			if (aCompositeSucceeded)
+			{
+				mFSR1Unavailable = true;
+				mWidgetManager->MarkAllDirty();
+				mHasPendingDraw = true;
+			}
 		}
 
 		if (!aCompositeSucceeded)
 		{
+			const bool wasUsingNativeSceneTarget =
+				mSceneTargetUsesLogicalPresentation && !IsFSR1RuntimeActive();
 			TodTrace("Screen composite failed: %s. Switching to full-frame direct rendering.\n", SDL_GetError());
 			DestroyHDRToneMapTexture();
 			SDL_DestroyTexture(aScreenTexture);
 			mWidgetManager->mImage->mD3DData = nullptr;
+			mFSR1ScreenWidth = 0;
+			mFSR1ScreenHeight = 0;
+			mSceneTargetLogicalWidth = 0;
+			mSceneTargetLogicalHeight = 0;
+			InvalidateFSR1Presentation();
+			if (isUsingFSR1)
+				mFSR1Unavailable = true;
+			else if (wasUsingNativeSceneTarget)
+				mNativeSceneTargetUnavailable = true;
+			mSceneTargetUsesLogicalPresentation = false;
 			mWidgetManager->MarkAllDirty();
 			mHasPendingDraw = true;
 			return;
@@ -1703,6 +2474,10 @@ bool LawnApp::UpdateAppStep(bool* updated)
 
 	if (mUpdateAppState == UPDATESTATE_MESSAGES)
 	{
+		// SDL stores logical presentation per render target. Input must always be
+		// converted through the window presentation, never the retained scene.
+		if (!SDL_SetRenderTarget(mSDLRenderer, nullptr))
+			TodTrace("Input-coordinate window target bind failed: %s\n", SDL_GetError());
 		SDL_Event event;
 		while (!mShutdown && SDL_PollEvent(&event))
 		{
@@ -1756,7 +2531,7 @@ bool LawnApp::UpdateAppStep(bool* updated)
 							EnforceCursor();
 						}
 
-						mWidgetManager->MouseDown(event.button.x, event.button.y, buttonTrans(event.button.button));
+						mWidgetManager->MouseDown(x, y, buttonTrans(event.button.button));
 					}
 					break;
 				case SDL_EVENT_MOUSE_BUTTON_UP:
@@ -1774,7 +2549,7 @@ bool LawnApp::UpdateAppStep(bool* updated)
 							EnforceCursor();
 						}
 
-						mWidgetManager->MouseUp(event.button.x, event.button.y, buttonTrans(event.button.button));
+						mWidgetManager->MouseUp(x, y, buttonTrans(event.button.button));
 					}
 					break;
 				case SDL_EVENT_MOUSE_MOTION:
@@ -1818,17 +2593,20 @@ bool LawnApp::UpdateAppStep(bool* updated)
 					mMinimized = false;
 					mPhysMinimized = false;
 					ClearUpdateBacklog();
+					if (!RefreshLogicalCanvasFromOutput())
+						InvalidateFSR1Presentation();
+					break;
+				case SDL_EVENT_WINDOW_EXPOSED:
 					mWidgetManager->MarkAllDirty();
 					mHasPendingDraw = true;
 					break;
-				case SDL_EVENT_WINDOW_EXPOSED:
 				case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
 				case SDL_EVENT_WINDOW_ENTER_FULLSCREEN:
 				case SDL_EVENT_WINDOW_LEAVE_FULLSCREEN:
 				case SDL_EVENT_WINDOW_DISPLAY_CHANGED:
 				case SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED:
-					mWidgetManager->MarkAllDirty();
-					mHasPendingDraw = true;
+					if (!RefreshLogicalCanvasFromOutput())
+						InvalidateFSR1Presentation();
 					break;
 				case SDL_EVENT_WINDOW_RESIZED:
 				{
@@ -1838,8 +2616,8 @@ bool LawnApp::UpdateAppStep(bool* updated)
 
 					if (pw >= 800 || ph >= 600) scale = max(max(static_cast<float>(pw) / 800.0f, static_cast<float>(ph) / 600.0f), 1.0f);
 					SDL3Font::RebuildFonts(scale);
-					mWidgetManager->MarkAllDirty();
-					mHasPendingDraw = true;
+					if (!UpdateLogicalCanvasForOutput(pw, ph))
+						InvalidateFSR1Presentation();
 					break;
 				}
 				case SDL_EVENT_WINDOW_HDR_STATE_CHANGED:
@@ -1999,6 +2777,11 @@ bool LawnApp::UpdateAppStep(bool* updated)
 			return false;
 		}
 
+		// A fullscreen, DPI or aspect change can happen inside a mouse callback.
+		// Refresh only after SDL and WidgetManager have finished dispatching that
+		// event, otherwise MouseUp would overwrite this with the old coordinate.
+		ReprojectMouseToLogicalCanvas();
+
 		mUpdateAppState = UPDATESTATE_PROCESS_1;
 	}
 	else
@@ -2138,15 +2921,38 @@ LawnApp::LawnApp()
 	mHDRAdaptiveToneMapping = false;
 	mHDRToneMapTexture = nullptr;
 	mHDRToneMapTextureScaleMilli = 0;
+	mHDRToneMapTextureWidth = 0;
+	mHDRToneMapTextureHeight = 0;
 	mHDRToneMapUnavailable = false;
 	mPreferredRefreshRateMilliHz = 0;
 	mUseExclusiveFullscreen = false;
 	mUseIntegerScaling = false;
+	mEnableFSR1 = false;
+	mFSR1Quality = FSR1_QUALITY_QUALITY;
+	mFSR1SharpnessPercent = 20;
+	mFSR1Backend = nullptr;
+	mFSR1Unavailable = false;
+	mFSR1ScreenWidth = 0;
+	mFSR1ScreenHeight = 0;
+	mFSR1OutputWidth = 0;
+	mFSR1OutputHeight = 0;
+	mPhysicalPresentationWidth = 0;
+	mPhysicalPresentationHeight = 0;
+	mSceneTargetLogicalWidth = 0;
+	mSceneTargetLogicalHeight = 0;
+	mFSR1AppliedQuality = -1;
+	mSceneTargetUsesLogicalPresentation = false;
+	mNativeSceneTargetUnavailable = false;
+	mLogicalCanvasOutputWidth = 0;
+	mLogicalCanvasOutputHeight = 0;
+	mClearSceneTargetBeforeDraw = true;
+	mReprojectMouseAfterPresentationChange = false;
 }
 
 //0x44EDD0、0x44EDF0
 LawnApp::~LawnApp()
 {
+	DestroyFSR1Resources();
 	DestroyHDRToneMapTexture();
 
 	if (mBoard)
@@ -2378,6 +3184,7 @@ void LawnApp::KillBoard()
 	}
 
 	SetCursor(CURSOR_POINTER);
+	RequestSceneTargetClear();
 }
 
 //0x44F410
@@ -2431,6 +3238,9 @@ void LawnApp::WriteToRegistry()
 	RegistryWriteInteger(_S("PreferredRefreshRateMilliHz"), mPreferredRefreshRateMilliHz);
 	RegistryWriteBoolean(_S("UseExclusiveFullscreen"), mUseExclusiveFullscreen);
 	RegistryWriteBoolean(_S("UseIntegerScaling"), mUseIntegerScaling);
+	RegistryWriteBoolean(_S("EnableFSR1"), mEnableFSR1);
+	RegistryWriteInteger(_S("FSR1Quality"), mFSR1Quality);
+	RegistryWriteInteger(_S("FSR1SharpnessPercent"), mFSR1SharpnessPercent);
 	RegistryWriteBoolean(_S("ShowFPS"), mShowFPS);
 }
 
@@ -2445,11 +3255,22 @@ void LawnApp::ReadFromRegistry()
 	RegistryReadInteger(_S("PreferredRefreshRateMilliHz"), &mPreferredRefreshRateMilliHz);
 	RegistryReadBoolean(_S("UseExclusiveFullscreen"), &mUseExclusiveFullscreen);
 	RegistryReadBoolean(_S("UseIntegerScaling"), &mUseIntegerScaling);
+	RegistryReadBoolean(_S("EnableFSR1"), &mEnableFSR1);
+	RegistryReadInteger(_S("FSR1Quality"), &mFSR1Quality);
+	RegistryReadInteger(_S("FSR1SharpnessPercent"), &mFSR1SharpnessPercent);
 	bool aShowFPS = mShowFPS;
 	RegistryReadBoolean(_S("ShowFPS"), &aShowFPS);
 	mHDRPaperWhitePercent = std::clamp(mHDRPaperWhitePercent, 50, 200);
 	mHDRExposureTenthsEV = std::clamp(mHDRExposureTenthsEV, -20, 20);
 	mPreferredRefreshRateMilliHz = std::clamp(mPreferredRefreshRateMilliHz, 0, 1000000);
+	mFSR1Quality = std::clamp(
+		mFSR1Quality,
+		(int)FSR1_QUALITY_ULTRA_QUALITY,
+		(int)FSR1_QUALITY_PERFORMANCE
+	);
+	mFSR1SharpnessPercent = std::clamp(mFSR1SharpnessPercent, 0, 100);
+	if (mEnableFSR1)
+		mUseIntegerScaling = false;
 	SetShowFPS(aShowFPS);
 }
 
@@ -2525,6 +3346,7 @@ void LawnApp::MakeNewBoard()
 	mWidgetManager->AddWidget(mBoard);
 	mWidgetManager->BringToBack(mBoard);
 	mWidgetManager->SetFocus(mBoard);
+	RequestSceneTargetClear();
 	if (!mPortAudioStream && ChallengeUsesMicrophone(mGameMode))
 	{
 		if (!TryToInitializePA())
@@ -2670,6 +3492,7 @@ void LawnApp::ShowGameSelector()
 	mWidgetManager->AddWidget(mGameSelector);
 	mWidgetManager->BringToBack(mGameSelector);
 	mWidgetManager->SetFocus(mGameSelector);
+	RequestSceneTargetClear();
 
 	//if (NeedRegister())
 	//{
@@ -2685,6 +3508,7 @@ void LawnApp::KillGameSelector()
 		mWidgetManager->RemoveWidget(mGameSelector);
 		SafeDeleteWidget(mGameSelector);
 		mGameSelector = nullptr;
+		RequestSceneTargetClear();
 	}
 }
 
@@ -2693,10 +3517,15 @@ void LawnApp::ShowAwardScreen(AwardType theAwardType, bool theShowAchievements)
 {
 	mGameScene = GameScenes::SCENE_AWARD;
 	mAwardScreen = new AwardScreen(this, theAwardType, theShowAchievements);
-	mAwardScreen->Resize(0, 0, mWidth, mHeight);
+	mAwardScreen->Resize(
+		mDDInterface->mWideScreenOffsetX,
+		mDDInterface->mWideScreenOffsetY,
+		BOARD_WIDTH,
+		BOARD_HEIGHT);
 	mWidgetManager->AddWidget(mAwardScreen);
 	mWidgetManager->BringToBack(mAwardScreen);
 	mWidgetManager->SetFocus(mAwardScreen);
+	RequestSceneTargetClear();
 }
 
 //0x44FAF0
@@ -2707,6 +3536,7 @@ void LawnApp::KillAwardScreen()
 		mWidgetManager->RemoveWidget(mAwardScreen);
 		SafeDeleteWidget(mAwardScreen);
 		mAwardScreen = nullptr;
+		RequestSceneTargetClear();
 	}
 }
 
@@ -2714,10 +3544,18 @@ void LawnApp::KillAwardScreen()
 void LawnApp::ShowCreditScreen()
 {
 	mCreditScreen = new CreditScreen(this);
-	mCreditScreen->Resize(0, 0, mWidth, mHeight);
+	// Credits use the same 800x600 board-local coordinate stage as the other
+	// legacy screens; the outer canvas remains available for edge fill.
+	mCreditScreen->Resize(
+		mDDInterface->mWideScreenOffsetX,
+		mDDInterface->mWideScreenOffsetY,
+		BOARD_WIDTH,
+		BOARD_HEIGHT
+	);
 	mWidgetManager->AddWidget(mCreditScreen);
 	mWidgetManager->BringToBack(mCreditScreen);
 	mWidgetManager->SetFocus(mCreditScreen);
+	RequestSceneTargetClear();
 }
 
 //0x44FBF0
@@ -2728,6 +3566,7 @@ void LawnApp::KillCreditScreen()
 		mWidgetManager->RemoveWidget(mCreditScreen);
 		SafeDeleteWidget(mCreditScreen);
 		mCreditScreen = nullptr;
+		RequestSceneTargetClear();
 	}
 }
 
@@ -2736,10 +3575,17 @@ void LawnApp::ShowChallengeScreen(ChallengePage thePage)
 {
 	mGameScene = GameScenes::SCENE_CHALLENGE;
 	mChallengeScreen = new ChallengeScreen(this, thePage);
-	mChallengeScreen->Resize(0, 0, mWidth, mHeight);
+	// The challenge selector is an 800x600 board-local composition.
+	mChallengeScreen->Resize(
+		mDDInterface->mWideScreenOffsetX,
+		mDDInterface->mWideScreenOffsetY,
+		BOARD_WIDTH,
+		BOARD_HEIGHT
+	);
 	mWidgetManager->AddWidget(mChallengeScreen);
 	mWidgetManager->BringToBack(mChallengeScreen);
 	mWidgetManager->SetFocus(mChallengeScreen);
+	RequestSceneTargetClear();
 }
 
 //0x44FD00
@@ -2750,6 +3596,7 @@ void LawnApp::KillChallengeScreen()
 		mWidgetManager->RemoveWidget(mChallengeScreen);
 		SafeDeleteWidget(mChallengeScreen);
 		mChallengeScreen = nullptr;
+		RequestSceneTargetClear();
 	}
 }
 
@@ -2784,6 +3631,7 @@ void LawnApp::ShowSeedChooserScreen()
 	mSeedChooserScreen->Resize(0, 0, mWidth, mHeight);
 	mWidgetManager->AddWidget(mSeedChooserScreen);
 	mWidgetManager->BringToBack(mSeedChooserScreen);
+	RequestSceneTargetClear();
 }
 
 //0x44FE70
@@ -2794,6 +3642,7 @@ void LawnApp::KillSeedChooserScreen()
 		mWidgetManager->RemoveWidget(mSeedChooserScreen);
 		SafeDeleteWidget(mSeedChooserScreen);
 		mSeedChooserScreen = nullptr;
+		RequestSceneTargetClear();
 	}
 }
 
@@ -2863,6 +3712,7 @@ AlmanacDialog* LawnApp::DoAlmanacDialog(SeedType theSeedType, ZombieType theZomb
 	//FinishModelessDialogs();
 
 	AlmanacDialog* aDialog = new AlmanacDialog(this);
+	CenterDialog(aDialog, BOARD_WIDTH, BOARD_HEIGHT);
 	AddDialog(Dialogs::DIALOG_ALMANAC, aDialog);
 	mWidgetManager->SetFocus(aDialog);
 
@@ -6122,8 +6972,9 @@ void LawnApp::SwitchScreenMode(bool wantWindowed, bool is3d, bool force)
 	}
 
 	ClearUpdateBacklog();
-	mWidgetManager->MarkAllDirty();
-	mHasPendingDraw = true;
+	if (!RefreshLogicalCanvasFromOutput())
+		InvalidateFSR1Presentation();
+	mReprojectMouseAfterPresentationChange = true;
 }
 
 /* #################################################################################################### */
@@ -6207,9 +7058,16 @@ void LawnApp::ShowZombatarTOS()
 void LawnApp::ShowLanagugeScreen()
 {
 	mLanguageScreen = new LanguageWidget(this);
+	mLanguageScreen->Resize(
+		mDDInterface->mWideScreenOffsetX,
+		mDDInterface->mWideScreenOffsetY,
+		BOARD_WIDTH,
+		BOARD_HEIGHT
+	);
 	mWidgetManager->AddWidget(mLanguageScreen);
 	mWidgetManager->BringToBack(mLanguageScreen);
 	mWidgetManager->SetFocus(mLanguageScreen);
+	RequestSceneTargetClear();
 }
 
 void LawnApp::KillLanguageScreen()
@@ -6219,6 +7077,7 @@ void LawnApp::KillLanguageScreen()
 		mWidgetManager->RemoveWidget(mLanguageScreen);
 		SafeDeleteWidget(mLanguageScreen);
 		mLanguageScreen = nullptr;
+		RequestSceneTargetClear();
 	}
 }
 
@@ -6265,6 +7124,7 @@ void LawnApp::ShowParticleEditor()
 	mWidgetManager->AddWidget(mParticleScreen);
 	mWidgetManager->BringToBack(mParticleScreen);
 	mWidgetManager->SetFocus(mParticleScreen);
+	RequestSceneTargetClear();
 }
 
 bool LawnApp::TryToInitializePA()
@@ -6324,6 +7184,9 @@ void LawnApp::KillMoreSettingsDialog()
 	RegistryWriteInteger(_S("PreferredRefreshRateMilliHz"), mPreferredRefreshRateMilliHz);
 	RegistryWriteBoolean(_S("UseExclusiveFullscreen"), mUseExclusiveFullscreen);
 	RegistryWriteBoolean(_S("UseIntegerScaling"), mUseIntegerScaling);
+	RegistryWriteBoolean(_S("EnableFSR1"), mEnableFSR1);
+	RegistryWriteInteger(_S("FSR1Quality"), mFSR1Quality);
+	RegistryWriteInteger(_S("FSR1SharpnessPercent"), mFSR1SharpnessPercent);
 	RegistryWriteBoolean(_S("ShowFPS"), mShowFPS);
 	KillDialog(Dialogs::DIALOG_MORESETTINGS);
 	ClearUpdateBacklog();

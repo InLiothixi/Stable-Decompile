@@ -1,6 +1,7 @@
 #include "Board.h"
 #include "Cutscene.h"
 #include "LawnMower.h"
+#include "BoardGeometry.h"
 #include "../LawnApp.h"
 #include "System/ReanimationLawn.h"
 #include "../Sexy.TodLib/TodFoley.h"
@@ -14,7 +15,7 @@ void LawnMower::LawnMowerInitialize(int theRow)
     mPosX = -160.0f;
     mBoard = mApp->mBoard;
     mRenderOrder = Board::MakeRenderOrder(RenderLayer::RENDER_LAYER_LAWN_MOWER, theRow, 0);
-    mPosY = mBoard->GetPosYBasedOnRow(mPosX + 40.0f, theRow) + 23.0f;
+    mPosY = mBoard->GetPosYBasedOnRow(mPosX + BoardGeometry::kColumnWidth / 2.0f, theRow) + 23.0f;
     mDead = false;
     mMowerState = LawnMowerState::MOWER_READY;
     mVisible = true;
@@ -231,7 +232,7 @@ void LawnMower::Update()
         aSpeed = TodAnimateCurveFloat(50, 0, mChompCounter, aSpeed, 1.0f, TodCurves::CURVE_BOUNCE_SLOW_MIDDLE);
     }
     mPosX += aSpeed;
-    mPosY = mBoard->GetPosYBasedOnRow(mPosX + 40.0f, mRow) + 23.0f;
+    mPosY = mBoard->GetPosYBasedOnRow(mPosX + BoardGeometry::kColumnWidth / 2.0f, mRow) + 23.0f;
 
     if (mMowerType == LawnMowerType::LAWNMOWER_POOL)
     {
@@ -246,7 +247,7 @@ void LawnMower::Update()
         mApp->mSoundSystem->StopFoley(FoleyType::FOLEY_LAWNMOWER);
         Die();
     }
-    if (mPosX > WIDE_BOARD_WIDTH - WIDESCREEN_OFFSETX)
+    if (mPosX > BoardGeometry::kDesignWidth - WIDESCREEN_OFFSETX)
     {
         Die();
     }

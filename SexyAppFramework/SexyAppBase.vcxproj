@@ -525,6 +525,8 @@ EXIT /B 0</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Fsr1D3D11.cpp" />
+    <ClCompile Include="ViewportTransform.cpp" />
     <ClCompile Include="..\include\imgui\backends\imgui_impl_sdl3.cpp" />
     <ClCompile Include="..\include\imgui\backends\imgui_impl_sdlrenderer3.cpp" />
     <ClCompile Include="..\include\imgui\imgui.cpp" />
@@ -1254,6 +1256,11 @@ EXIT /B 0</Command>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Fsr1D3D11.h" />
+    <ClInclude Include="ViewportTransform.h" />
+    <ClInclude Include="shaders\Fsr1Shaders.generated.h" />
+    <ClInclude Include="..\third_party\FidelityFX-FSR\ffx_a.h" />
+    <ClInclude Include="..\third_party\FidelityFX-FSR\ffx_fsr1.h" />
     <ClInclude Include="..\Editor\ParticleScreen.h" />
     <ClInclude Include="..\include\ImageLib\ImageLib.h" />
     <ClInclude Include="..\include\ImageLib\jpeg\jpeglib.h" />
@@ -1305,6 +1312,7 @@ EXIT /B 0</Command>
     <ClInclude Include="..\third_party\zlib\zutil.h" />
     <ClInclude Include="..\Sexy.TodLib\Attachment.h" />
     <ClInclude Include="..\Lawn\Board.h" />
+    <ClInclude Include="..\Lawn\BoardGeometry.h" />
     <ClInclude Include="..\Lawn\BoardInclude.h" />
     <ClInclude Include="..\Lawn\Challenge.h" />
     <ClInclude Include="..\Lawn\Coin.h" />
@@ -1441,6 +1449,10 @@ EXIT /B 0</Command>
     <ClInclude Include="XMLParser.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="shaders\Fsr1Pass.hlsl" />
+    <None Include="..\third_party\FidelityFX-FSR\LICENSE.txt" />
+    <None Include="..\third_party\FidelityFX-FSR\UPSTREAM.md" />
+    <None Include="..\tools\Compile-Fsr1Shaders.ps1" />
     <None Include="..\third_party\zlib\LICENSE" />
     <None Include="..\third_party\zlib\README.md" />
     <None Include="BltRotatedHelper.inc" />

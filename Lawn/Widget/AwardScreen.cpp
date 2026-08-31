@@ -17,6 +17,84 @@
 #include "AchievementsScreen.h"
 #include "../../SexyAppFramework/WidgetManager.h"
 
+namespace
+{
+	struct BackgroundSlice
+	{
+		int mDestinationStart;
+		int mDestinationEnd;
+		int mSourceStart;
+		int mSourceEnd;
+	};
+
+	// Keep the original 800x600 artwork pixel-for-pixel in the middle, and
+	// extrude only its quiet outer edge into the widescreen gutters.  A regular
+	// full-image stretch moves and distorts the award card, title, and paper.
+	void DrawExpandedAwardBackground(Graphics* g, Image* theImage)
+	{
+		if (g == nullptr || theImage == nullptr)
+			return;
+
+		const int aWidth = theImage->GetWidth();
+		const int aHeight = theImage->GetHeight();
+		if (aWidth <= 0 || aHeight <= 0)
+			return;
+
+		const int anOffsetX = gSexyAppBase->mDDInterface->mWideScreenOffsetX;
+		const int anOffsetY = gSexyAppBase->mDDInterface->mWideScreenOffsetY;
+		const int anEdgeX = aWidth < 16 ? aWidth / 2 : 8;
+		const int anEdgeY = aHeight < 16 ? aHeight / 2 : 8;
+
+		const BackgroundSlice aHorizontalSlices[] =
+		{
+			{ -anOffsetX, -anOffsetX + anEdgeX, 0, anEdgeX },
+			{ -anOffsetX + anEdgeX, anEdgeX, anEdgeX, anEdgeX + 1 },
+			{ anEdgeX, aWidth - anEdgeX, anEdgeX, aWidth - anEdgeX },
+			{ aWidth - anEdgeX, aWidth + anOffsetX - anEdgeX, aWidth - anEdgeX - 1, aWidth - anEdgeX },
+			{ aWidth + anOffsetX - anEdgeX, aWidth + anOffsetX, aWidth - anEdgeX, aWidth }
+		};
+		const BackgroundSlice aVerticalSlices[] =
+		{
+			{ -anOffsetY, -anOffsetY + anEdgeY, 0, anEdgeY },
+			{ -anOffsetY + anEdgeY, anEdgeY, anEdgeY, anEdgeY + 1 },
+			{ anEdgeY, aHeight - anEdgeY, anEdgeY, aHeight - anEdgeY },
+			{ aHeight - anEdgeY, aHeight + anOffsetY - anEdgeY, aHeight - anEdgeY - 1, aHeight - anEdgeY },
+			{ aHeight + anOffsetY - anEdgeY, aHeight + anOffsetY, aHeight - anEdgeY, aHeight }
+		};
+
+		Graphics aBackgroundGraphics(*g);
+		aBackgroundGraphics.SetLinearBlend(false);
+		for (const BackgroundSlice& aVerticalSlice : aVerticalSlices)
+		{
+			const int aDestinationHeight = aVerticalSlice.mDestinationEnd - aVerticalSlice.mDestinationStart;
+			const int aSourceHeight = aVerticalSlice.mSourceEnd - aVerticalSlice.mSourceStart;
+			if (aDestinationHeight <= 0 || aSourceHeight <= 0)
+				continue;
+
+			for (const BackgroundSlice& aHorizontalSlice : aHorizontalSlices)
+			{
+				const int aDestinationWidth = aHorizontalSlice.mDestinationEnd - aHorizontalSlice.mDestinationStart;
+				const int aSourceWidth = aHorizontalSlice.mSourceEnd - aHorizontalSlice.mSourceStart;
+				if (aDestinationWidth <= 0 || aSourceWidth <= 0)
+					continue;
+
+				aBackgroundGraphics.DrawImage(
+					theImage,
+					Rect(
+						aHorizontalSlice.mDestinationStart,
+						aVerticalSlice.mDestinationStart,
+						aDestinationWidth,
+						aDestinationHeight),
+					Rect(
+						aHorizontalSlice.mSourceStart,
+						aVerticalSlice.mSourceStart,
+						aSourceWidth,
+						aSourceHeight));
+			}
+		}
+	}
+}
+
 //0x405780
 // GOTY @Patoke: 0x4063E0
 AwardScreen::AwardScreen(LawnApp* theApp, AwardType theAwardType, bool theShowingAchievements)
@@ -121,6 +199,7 @@ AwardScreen::AwardScreen(LawnApp* theApp, AwardType theAwardType, bool theShowin
 	mStartButton->mColors[ButtonWidget::COLOR_LABEL] = Color(213, 159, 43);
 	mStartButton->mColors[ButtonWidget::COLOR_LABEL_HILITE] = Color(213, 159, 43);
 	mStartButton->Resize(324, 500, 156, 42);
+	mStartButton->mParentWidget = this;
 	mStartButton->mTextOffsetY = -1;
 
 	// @Patoke: implemented
@@ -250,7 +329,7 @@ bool AwardScreen::IsPaperNote()
 //0x4064D0
 void AwardScreen::DrawBottom(Graphics* g, const SexyString& theTitle, const SexyString& theAward, const SexyString& theMessage)
 {
-	g->DrawImage(Sexy::IMAGE_AWARDSCREEN_BACK, 0, 0);
+	DrawExpandedAwardBackground(g, Sexy::IMAGE_AWARDSCREEN_BACK);
 	TodDrawString(g, theTitle, BOARD_WIDTH / 2, 58, Sexy::FONT_DWARVENTODCRAFT24, Color(213, 159, 43), DS_ALIGN_CENTER);
 	TodDrawString(g, theAward, BOARD_WIDTH / 2, 326, Sexy::FONT_DWARVENTODCRAFT18YELLOW, Color::White, DS_ALIGN_CENTER);
 	TodDrawStringWrapped(g, theMessage, Rect(285, 360, 230, 90), Sexy::FONT_BRIANNETOD16, Color(40, 50, 90), DS_ALIGN_CENTER_VERTICAL_MIDDLE);
@@ -289,7 +368,11 @@ void AwardScreen::Draw(Graphics* g)
 		g->DrawImage(Sexy::IMAGE_BACKGROUND6BOSS, -900, -400, 2800, 1200);
 		g->SetColorizeImages(false);
 		g->SetColor(Color(0, 0, 0, 64));
-		g->FillRect(-gSexyAppBase->mDDInterface->mWideScreenOffsetX, 525 - gSexyAppBase->mDDInterface->mWideScreenOffsetY, 800, 600);
+		g->FillRect(
+			-mApp->mDDInterface->mWideScreenOffsetX,
+			525 - mApp->mDDInterface->mWideScreenOffsetY,
+			mApp->mWidth,
+			mApp->mHeight);
 		g->DrawImage(Sexy::IMAGE_ZOMBIE_NOTE, 75, 60);
 		g->DrawImage(Sexy::IMAGE_CREDITS_ZOMBIENOTE, 149, 103, 475, 325);
 	}
@@ -407,7 +490,11 @@ void AwardScreen::Draw(Graphics* g)
 
 	int aFadeInAlpha = TodAnimateCurve(180, 0, mFadeInCounter, 255, 0, CURVE_LINEAR);
 	g->SetColor(IsPaperNote() ? Color(0, 0, 0, aFadeInAlpha) : Color(255, 255, 255, aFadeInAlpha));
-	g->FillRect(-gSexyAppBase->mDDInterface->mWideScreenOffsetX, -gSexyAppBase->mDDInterface->mWideScreenOffsetY, 800, 600);
+	g->FillRect(
+		-mApp->mDDInterface->mWideScreenOffsetX,
+		-mApp->mDDInterface->mWideScreenOffsetY,
+		mApp->mWidth,
+		mApp->mHeight);
 }
 
 //0x4076A0
@@ -588,7 +675,7 @@ void AwardScreen::MouseUp(int x, int y, int theClickCount)
 // @Patoke: implement functions
 // GOTY @Patoke: 0x407C20
 void AwardScreen::DrawAchievements(Graphics* g) {
-	g->DrawImage(IMAGE_CHALLENGE_BACKGROUND, 0, 0);
+	DrawExpandedAwardBackground(g, IMAGE_CHALLENGE_BACKGROUND);
 
 	TodDrawString(g, _S("ACHIEVEMENTS"), BOARD_WIDTH / 2, 58, FONT_HOUSEOFTERROR28, Color(220, 220, 220), DS_ALIGN_CENTER);
 

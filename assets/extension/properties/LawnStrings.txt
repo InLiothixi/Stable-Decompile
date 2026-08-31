@@ -24,8 +24,14 @@ Done
 [ADVANCED_TONE_MAPPING_TAB]
 Tone Mapping
 
+[ADVANCED_HDR_TAB]
+HDR
+
 [ADVANCED_DISPLAY_TAB]
 Display
+
+[ADVANCED_SCALING_TAB]
+Scaling
 
 [ADVANCED_HDR_SECTION]
 HDR Tone Mapping
@@ -81,6 +87,34 @@ Pixel-Perfect Scaling
 [ADVANCED_SHOW_FPS]
 Show FPS
 
+[ADVANCED_FSR1]
+AMD FSR 1 Upscaling
+
+[ADVANCED_FSR1_QUALITY]
+Quality Mode
+
+[ADVANCED_FSR1_ULTRA_QUALITY]
+Ultra Quality
+
+[ADVANCED_FSR1_QUALITY_PRESET]
+Quality
+
+[ADVANCED_FSR1_BALANCED]
+Balanced
+
+[ADVANCED_FSR1_PERFORMANCE]
+Performance
+
+[ADVANCED_FSR1_SHARPNESS]
+Sharpening
+
+[ADVANCED_FSR1_NOTE]
+FSR 1 and Pixel-Perfect Scaling cannot be used together.
+On/off changes need a restart. Videos remain native.
+
+[ADVANCED_FSR1_UNAVAILABLE]
+FSR 1 is unavailable on this renderer. Standard scaling is active.
+
 [ADVANCED_RESTORE_DEFAULTS]
 Reset All
 
@@ -88,4 +122,4 @@ Reset All
 Display Settings
 
 [ADVANCED_DISPLAY_RESTART_BODY]
-Restart the game to apply fullscreen mode or refresh-rate changes.
+Restart the game to apply fullscreen, refresh-rate, or FSR renderer changes.
